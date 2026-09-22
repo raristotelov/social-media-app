@@ -1,5 +1,5 @@
 .logo {
 	font-family: 'Pacifico';
 	font-size: 26px;
-	color: #f64d4d;
+	color: var(--brand-red);
 }

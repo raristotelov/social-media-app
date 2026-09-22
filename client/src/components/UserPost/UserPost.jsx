@@ -46,7 +46,7 @@ const UserPost = (props) => {
 				return {
 					...currLoggedInUser,
 					followedUsersPosts: [...followedUsersPosts.filter((userPost) => userPost._id !== updatedUserPostData._id), currUserPost].sort(
-						(a, b) => b.createdAt - a.createdAt
+						(a, b) => b.createdAt - a.createdAt,
 					),
 				};
 			});
@@ -72,7 +72,7 @@ const UserPost = (props) => {
 				return {
 					...currLoggedInUser,
 					followedUsersPosts: [...followedUsersPosts.filter((userPost) => userPost._id !== updatedUserPostData._id), currUserPost].sort(
-						(a, b) => b.createdAt - a.createdAt
+						(a, b) => b.createdAt - a.createdAt,
 					),
 				};
 			});

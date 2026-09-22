@@ -7,7 +7,7 @@ const Logo = ({ className }) => {
 		classes.push(className);
 	}
 
-	return <span className={classes.join(' ')}>Picstagram</span>;
+	return <span className={classes.join(' ')}>ShareSnap</span>;
 };
 
 export default Logo;

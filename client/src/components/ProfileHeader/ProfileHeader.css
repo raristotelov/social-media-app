@@ -1,53 +1,129 @@
 .profile-header {
-	display: flex;
+	display: grid;
+	grid-template-columns: 190px minmax(0, 1fr) auto;
+	grid-template-areas:
+		'avatar username action'
+		'avatar stats stats'
+		'avatar bio bio';
+	column-gap: 60px;
+
 	width: 900px;
-	padding-bottom: 40px;
-	border-bottom: 1px solid #b5b5b5;
+	max-width: 100%;
+	padding-bottom: 32px;
+	box-sizing: border-box;
+
+	border-bottom: 1px solid var(--border-divider);
 }
 
-.profile-picture-wrapper img {
+.profile-picture-wrapper {
+	grid-area: avatar;
+}
+
+.profile-picture-wrapper .profile-picture {
 	width: 190px;
 	height: 190px;
-	object-fit: contain;
-	margin-left: 60px;
-	border: 0.5px solid #b5b5b5;
-	border-radius: 50%;
+	box-sizing: border-box;
+
+	border: 0.5px solid var(--text-muted);
 }
 
-.user-data-wrapper {
-	width: 100%;
-	margin-left: 60px;
+.profile-header .username {
+	grid-area: username;
+	align-self: center;
+	margin-bottom: 25px;
+
+	font-size: 20px;
+	font-weight: bold;
+	color: var(--text-primary);
 }
 
-.user-data-wrapper .username-section {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding-bottom: 25px;
-}
-
-.user-data-wrapper .username-section .username {
-	color: #b5b5b5;
-	display: inline-block;
-	font-size: 22px;
+.profile-action {
+	grid-area: action;
+	align-self: center;
+	margin-bottom: 25px;
 }
 
 .followers-data-wrapper {
-	color: #b5b5b5;
-	font-size: 20px;
-	padding-bottom: 30px;
+	grid-area: stats;
+	margin-bottom: 30px;
+
+	display: flex;
+	gap: 30px;
+
+	font-size: 15px;
+	color: var(--text-primary);
 }
 
-.followers-data-wrapper span {
-	margin-right: 30px;
+.profile-stat {
+	display: inline-flex;
+	gap: 4px;
 }
 
-.user-data-wrapper .bio {
-	color: #b5b5b5;
-	font-size: 20px;
+.profile-header .bio {
+	grid-area: bio;
 	margin: 0;
+
+	font-size: 15px;
+	color: var(--text-primary);
+	word-wrap: break-word;
+	overflow-wrap: break-word;
 }
 
-.follow-button-wrapper {
-	margin-top: 20px;
+@media (max-width: 599px) {
+	.profile-header {
+		grid-template-columns: 86px minmax(0, 1fr);
+		grid-template-areas:
+			'avatar stats'
+			'username username'
+			'bio bio'
+			'action action';
+		column-gap: 24px;
+		row-gap: 12px;
+
+		width: 100%;
+		padding: 0 16px 20px;
+	}
+
+	.profile-picture-wrapper .profile-picture {
+		width: 86px;
+		height: 86px;
+	}
+
+	.profile-header .username {
+		align-self: start;
+		margin-bottom: 0;
+
+		font-size: 16px;
+	}
+
+	.followers-data-wrapper {
+		align-self: center;
+		margin-bottom: 0;
+
+		justify-content: space-between;
+		gap: 0;
+		max-width: 280px;
+	}
+
+	.profile-stat {
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+
+		font-size: 14px;
+	}
+
+	.profile-stat strong {
+		font-size: 16px;
+	}
+
+	.profile-action {
+		align-self: start;
+		margin-bottom: 0;
+		width: 100%;
+	}
+
+	.profile-action button {
+		width: 100%;
+	}
 }

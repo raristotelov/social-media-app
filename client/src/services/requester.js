@@ -29,7 +29,11 @@ const request = async (method, token, url, data) => {
 	const result = await response.json();
 
 	if (!response.ok) {
-		throw result;
+		const error = result !== null && typeof result === 'object' ? result : { message: result };
+
+		error.status = response.status;
+
+		throw error;
 	}
 
 	return result;

@@ -4,8 +4,6 @@ import PictureFrameIcon from '../icons/PictureFrameIcon';
 
 import './ImageInput.css';
 
-const defaultImageWidth = 290;
-const defaultImageHeight = 320;
 const defaultIconWidth = 90;
 const defaultIconHeight = 90;
 const defaultFontSize = 22;
@@ -16,18 +14,7 @@ const ImageInput = (props) => {
 
 	const inputRef = useRef(null);
 
-	const {
-		onChange,
-		initialValue,
-		placeholderText,
-		isRoundImage,
-		PlaceHolderImageProp,
-		imageWidthProp,
-		imageHeightProp,
-		iconWidthProp,
-		iconHeightProp,
-		fontSizeProp,
-	} = props;
+	const { onChange, initialValue, placeholderText, isRoundImage, PlaceHolderImageProp, iconWidthProp, iconHeightProp, fontSizeProp } = props;
 
 	useEffect(() => {
 		if (initialValue) {
@@ -87,17 +74,15 @@ const ImageInput = (props) => {
 	};
 
 	const PlaceHolderImage = PlaceHolderImageProp || PictureFrameIcon;
-	const imageWidth = imageWidthProp || defaultImageWidth;
-	const imageHeigth = imageHeightProp || defaultImageHeight;
 	const iconWidth = iconWidthProp || defaultIconWidth;
 	const iconHeight = iconHeightProp || defaultIconHeight;
 	const fontSize = fontSizeProp || defaultFontSize;
 
 	return (
 		<Fragment>
-			<div className={getImageInputWrapperClasses()} style={{ width: `${imageWidth}px`, height: `${imageHeigth}px` }}>
+			<div className={getImageInputWrapperClasses()}>
 				<label htmlFor='picture'>
-					<PlaceHolderImage iconColorProp='#B5B5B5' iconWidthProp={iconWidth} iconHeightProp={iconHeight} />
+					<PlaceHolderImage iconColorProp='currentColor' iconWidthProp={iconWidth} iconHeightProp={iconHeight} />
 
 					{placeholderText ? <span style={{ fontSize: `${fontSize}px` }}>{placeholderText}</span> : null}
 				</label>
@@ -105,8 +90,8 @@ const ImageInput = (props) => {
 				<input type='file' id='picture' name='picture' onChange={onChangeHandler} ref={inputRef} />
 			</div>
 
-			<div className={getPreviewWrapperClasses()} style={{ width: `${imageWidth}px`, height: `${imageHeigth}px` }}>
-				<img src={imagePreview} alt='preview' width={imageWidth} height={imageHeigth} />
+			<div className={getPreviewWrapperClasses()}>
+				<img src={imagePreview} alt='preview' />
 
 				<button
 					onClick={(e) => {
@@ -114,7 +99,6 @@ const ImageInput = (props) => {
 						inputRef.current.click();
 					}}
 					className='image-change-button'
-					style={{ width: `${imageWidth}px`, height: `${imageHeigth}px` }}
 				>
 					Change
 				</button>

@@ -25,8 +25,6 @@ const Router = () => {
 
 				<Route path='/user-feed' element={<FeedView posts={loggedInUser?.followedUsersPosts} />} />
 
-				<Route path='/my-profile' element={<ProfileView />} />
-
 				<Route path='/popular-posts' element={<PopularPostsView />} />
 
 				<Route path='/user/:userId' element={<ProfileView />} />

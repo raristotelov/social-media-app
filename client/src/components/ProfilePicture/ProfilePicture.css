@@ -1,0 +1,8 @@
+/* Size and border belong to the consumer — the header, tab bar and profile page
+   each set their own. border-radius clips the placeholder's shoulders ellipse,
+   which deliberately overflows the viewBox, into the disc. */
+.profile-picture {
+	display: block;
+	border-radius: 50%;
+	object-fit: cover;
+}

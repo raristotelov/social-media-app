@@ -9,7 +9,7 @@ const renderLoginForm = (loginHandler) =>
 	render(
 		<MemoryRouter>
 			<LoginForm loginHandler={loginHandler} />
-		</MemoryRouter>
+		</MemoryRouter>,
 	);
 
 const fillValidCredentials = () => {
@@ -76,7 +76,7 @@ describe('LoginForm', () => {
 			() =>
 				new Promise((resolve) => {
 					resolveSubmit = resolve;
-				})
+				}),
 		);
 		renderLoginForm(loginHandler);
 

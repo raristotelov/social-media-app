@@ -1,4 +1,3 @@
-/* eslint-disable max-len */
 const Comment = ({ iconColorProp }) => {
 	const iconColor = iconColorProp || '#4B4B4B';
 

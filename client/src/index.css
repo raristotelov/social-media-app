@@ -70,7 +70,6 @@ code {
 	color: var(--feedback-error);
 }
 
-/* Auth-specific so it cannot collide with the `.input-wrapper` other components define. */
 .auth-input-wrapper {
 	display: flex;
 	align-items: flex-start;
@@ -81,7 +80,9 @@ code {
 	min-height: 44px;
 }
 
-.auth-input-wrapper input {
+.auth-input-wrapper input,
+.profile-form-input-wrapper input,
+.profile-form-input-wrapper textarea {
 	width: 100%;
 	height: 44px;
 
@@ -96,21 +97,27 @@ code {
 	color: var(--text-primary);
 }
 
-.auth-input-wrapper input:focus {
+.auth-input-wrapper input:focus,
+.profile-form-input-wrapper input:focus,
+.profile-form-input-wrapper textarea:focus {
 	outline: none;
 }
 
-.auth-input-wrapper input::placeholder {
+.auth-input-wrapper input::placeholder,
+.profile-form-input-wrapper input::placeholder,
+.profile-form-input-wrapper textarea::placeholder {
 	color: var(--text-muted);
 	opacity: 1;
 }
 
 .auth-input-wrapper input.has-error,
-.auth-input-wrapper input.has-error:focus {
+.auth-input-wrapper input.has-error:focus,
+.profile-form-input-wrapper input.has-error,
+.profile-form-input-wrapper input.has-error:focus {
 	border-color: var(--feedback-error);
 }
 
-@media (max-width: 639px) {
+@media (max-width: 599px) {
 	.auth-input-wrapper,
 	.form-error {
 		width: 100%;

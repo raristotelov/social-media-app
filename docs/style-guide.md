@@ -52,7 +52,7 @@ Measured against `background/page`:
 | Card / popup heading | 26 | Regular |
 | Profile username (desktop, tablet) | 20 | Bold |
 | Profile username (mobile) | 16 | Bold |
-| Auth nav links (Log In / Sign up) | 18 | Bold |
+| Auth nav links (Log in / Sign up) | 18 | Bold |
 | Body, comments, captions, stats | 15 | Regular |
 | Usernames, counts, Post action | 15 | Bold |
 | Input placeholder, add-a-comment | 16 | Regular |

@@ -7,15 +7,15 @@ import LoggedInUserContext from './contexts/LoggedInUserContext';
 import { getUsersProfileData } from './services/userService';
 
 import MainHeader from './components/Header/MainHeader';
+import MobileTopBar from './components/Header/MobileTopBar';
 import TabBar from './components/TabBar/TabBar';
 import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner';
 import Router from './Router';
 
 import './App.css';
 
-// `jwtDecode` neither verifies the signature nor checks expiry, so a stale or
-// malformed token has to be rejected here before it is used. Either case is
-// treated the same: the token cannot restore a session.
+const getOperatingSystemTheme = () => (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
 const readUserIdFromToken = (token) => {
 	try {
 		const { userId, exp } = jwtDecode(token);
@@ -34,8 +34,32 @@ function App() {
 	const [jwtToken, setJwtToken] = useLocalStorage('jwt-token', null);
 	const [loggedInUser, setLoggedInUser] = useState(null);
 	const [isRestoringSession, setIsRestoringSession] = useState(Boolean(jwtToken));
+	const [storedTheme, setStoredTheme] = useLocalStorage('theme', null);
 
 	const navigate = useNavigate();
+
+	useEffect(() => {
+		const theme = loggedInUser?.theme || storedTheme || getOperatingSystemTheme();
+
+		document.documentElement.setAttribute('data-theme', theme);
+
+		if (loggedInUser?.theme && loggedInUser.theme !== storedTheme) {
+			setStoredTheme(loggedInUser.theme);
+		}
+	}, [loggedInUser, storedTheme, setStoredTheme]);
+
+	useEffect(() => {
+		if (loggedInUser?.theme || storedTheme) {
+			return;
+		}
+
+		const query = window.matchMedia('(prefers-color-scheme: dark)');
+		const applyOperatingSystemTheme = () => document.documentElement.setAttribute('data-theme', getOperatingSystemTheme());
+
+		query.addEventListener('change', applyOperatingSystemTheme);
+
+		return () => query.removeEventListener('change', applyOperatingSystemTheme);
+	}, [loggedInUser, storedTheme]);
 
 	useEffect(() => {
 		if (!jwtToken) {
@@ -49,10 +73,15 @@ function App() {
 			return;
 		}
 
+		const abandonSession = () => {
+			setJwtToken(null);
+			navigate('/log-in');
+		};
+
 		const userId = readUserIdFromToken(jwtToken);
 
 		if (!userId) {
-			setJwtToken(null);
+			abandonSession();
 
 			return;
 		}
@@ -64,18 +93,18 @@ function App() {
 				if (result[0]) {
 					setLoggedInUser(result[0]);
 				} else {
-					// The token is valid but its user is gone; clearing it keeps the
-					// header, the tab bar and the router from disagreeing about auth.
-					setJwtToken(null);
+					abandonSession();
 				}
 			})
-			.catch(() => {
-				setJwtToken(null);
+			.catch((error) => {
+				if (error?.status === 401 || error?.status === 403) {
+					abandonSession();
+				}
 			})
 			.finally(() => {
 				setIsRestoringSession(false);
 			});
-	}, [jwtToken, loggedInUser, setJwtToken]);
+	}, [jwtToken, loggedInUser, setJwtToken, navigate]);
 
 	const updateLoggedInUser = (updatedUser) => {
 		setLoggedInUser(updatedUser.user);
@@ -98,15 +127,15 @@ function App() {
 		isRestoringSession,
 	};
 
-	// Rendering while the session is being restored would briefly show the guest
-	// header and guest tab bar to someone who is in fact logged in.
 	if (isRestoringSession) {
-		return <LoadingSpinner />;
+		return <LoadingSpinner isFullPage />;
 	}
 
 	return (
 		<LoggedInUserContext.Provider value={loggedInUserContextValues}>
 			<MainHeader logoutHandler={logoutHandler} />
+
+			<MobileTopBar logoutHandler={logoutHandler} />
 
 			<Router />
 

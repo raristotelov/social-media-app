@@ -1,6 +1,6 @@
 # Auth Pages — Login & Sign Up
 
-The two entry pages for unauthenticated users. Both render the guest header (logo + Log In / Sign up links) with the form centered on the `#F0F0F0` canvas.
+The two entry pages for unauthenticated users. Both render the guest header (logo + Log in / Sign up links) with the form centered on the `#F0F0F0` canvas.
 
 ## Login (`/log-in`)
 

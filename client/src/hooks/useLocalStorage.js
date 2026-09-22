@@ -24,7 +24,7 @@ const useLocalStorage = (key, initialValue) => {
 				localStorage.removeItem(key);
 			}
 		},
-		[key]
+		[key],
 	);
 
 	return [state, setLocalStorageState];

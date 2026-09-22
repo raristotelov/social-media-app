@@ -1,6 +1,6 @@
 # Tech Stack
 
-Overview of the technologies used across Picstagram. Versions reflect the current `package.json` files.
+Overview of the technologies used across the social media app. Versions reflect the current `package.json` files.
 
 ## Frontend (`client/`)
 

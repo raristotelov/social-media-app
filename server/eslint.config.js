@@ -15,10 +15,9 @@ module.exports = [
 		},
 		rules: {
 			semi: ['error', 'always'],
-			quotes: ['error', 'single'],
-			indent: ['error', 'tab'],
+			quotes: ['error', 'single', { avoidEscape: true }],
 			'comma-dangle': ['error', 'always-multiline'],
-			'max-len': ['error', { code: 150 }],
+			'max-len': ['error', { code: 150, ignoreStrings: true, ignoreTemplateLiterals: true }],
 			// args: 'none' because Express error middleware must declare `next` without using it.
 			'no-unused-vars': ['error', { args: 'none' }],
 			'arrow-parens': ['error', 'always'],

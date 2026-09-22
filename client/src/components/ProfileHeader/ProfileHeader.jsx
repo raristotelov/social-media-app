@@ -1,4 +1,5 @@
 import Button from '../Button/Button';
+import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
 import './ProfileHeader.css';
 
@@ -8,47 +9,58 @@ const ProfileHeader = (props) => {
 	const totalPostsCount = userData?.posts?.length ? userData.posts.length : 0;
 	const followersCount = userData?.followers?.length ? userData.followers.length : 0;
 	const followingCount = userData?.following?.length ? userData.following.length : 0;
-	const bio = userData.bio ? userData.bio : 'No bio';
+	const bio = userData.bio ? userData.bio : '';
 
-	const profilePictureUrl = userData?.profilePicture?.imageUrl ? userData.profilePicture.imageUrl : '/images/default-profile-picture.png';
+	const profilePictureUrl = userData?.profilePicture?.imageUrl;
+
+	const isFollowed = loggedInUserData?.following?.includes(userData._id);
 
 	return (
 		<header className='profile-header'>
 			<div className='profile-picture-wrapper'>
-				<img src={profilePictureUrl} alt='' />
+				<ProfilePicture imageUrl={profilePictureUrl} />
 			</div>
 
-			<div className='user-data-wrapper'>
-				<div className='username-section'>
-					<span className='username'>{userData.username}</span>
+			<span className='username'>{userData.username}</span>
 
-					{isLoggedInUserProfile ? <Button onClick={onEditProfileClick} label='Edit Profile' /> : null}
-				</div>
+			<div className='followers-data-wrapper'>
+				<span className='profile-stat'>
+					<strong>{totalPostsCount}</strong>
 
-				<div className='followers-data-wrapper'>
-					<span>{totalPostsCount} posts</span>
+					<span>posts</span>
+				</span>
 
-					<span>{followersCount} followers</span>
+				<span className='profile-stat'>
+					<strong>{followersCount}</strong>
 
-					<span>{followingCount} following</span>
-				</div>
+					<span>followers</span>
+				</span>
 
-				<p className='bio'>{bio}</p>
+				<span className='profile-stat'>
+					<strong>{followingCount}</strong>
 
-				<div className='follow-button-wrapper'>
-					{!isLoggedInUserProfile ? (
-						<Button
-							onClick={() => {
-								if (loggedInUserData?.following?.includes(userData._id)) {
-									onUnfollowUserClick(userData._id);
-								} else {
-									onFollowUserClick(userData._id);
-								}
-							}}
-							label={loggedInUserData?.following?.includes(userData._id) ? 'Unfollow' : 'Follow'}
-						/>
-					) : null}
-				</div>
+					<span>following</span>
+				</span>
+			</div>
+
+			{bio ? <p className='bio'>{bio}</p> : null}
+
+			<div className='profile-action'>
+				{isLoggedInUserProfile ? (
+					<Button onClick={onEditProfileClick} label='Edit Profile' variant='secondary' />
+				) : (
+					<Button
+						onClick={() => {
+							if (isFollowed) {
+								onUnfollowUserClick(userData._id);
+							} else {
+								onFollowUserClick(userData._id);
+							}
+						}}
+						label={isFollowed ? 'Unfollow' : 'Follow'}
+						variant={isFollowed ? 'secondary' : 'primary'}
+					/>
+				)}
 			</div>
 		</header>
 	);

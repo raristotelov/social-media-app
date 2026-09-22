@@ -36,7 +36,7 @@ describe('sign up', () => {
 		cy.get('.tab-bar').within(() => {
 			cy.contains('Feed').should('exist');
 			cy.contains('Profile').should('exist');
-			cy.contains('Log In').should('not.exist');
+			cy.contains('Log in').should('not.exist');
 		});
 	});
 

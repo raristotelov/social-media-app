@@ -26,12 +26,12 @@
 .commenter-account-details img {
 	width: 40px;
 	height: 40px;
-	border: 0.5px solid #b5b5b5;
+	border: 0.5px solid var(--text-muted);
 	border-radius: 50%;
 }
 
 .commenter-account-details span {
-	color: #4b4b4b;
+	color: var(--text-primary);
 	font-size: 14px;
 	margin-left: 10px;
 }
@@ -44,7 +44,7 @@
 }
 
 .commenter-username {
-	color: #4b4b4b;
+	color: var(--text-primary);
 	font-size: 18px;
 	font-weight: bold;
 	margin-bottom: 4px;
@@ -54,7 +54,7 @@
 	word-wrap: break-word;
 	overflow-wrap: break-word;
 
-	color: #4b4b4b;
+	color: var(--text-primary);
 	font-size: 30px;
 	margin-bottom: 4px;
 }
@@ -86,7 +86,7 @@
 	font-family: 'Mada';
 	font-size: 18px;
 	font-weight: bold;
-	color: #b5b5b5;
+	color: var(--text-muted);
 }
 
 .comment-util-btn:hover {
@@ -97,5 +97,5 @@
 	font-family: 'Mada';
 	font-size: 18px;
 	font-weight: bold;
-	color: #b5b5b5;
+	color: var(--text-muted);
 }

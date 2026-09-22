@@ -1,16 +1,15 @@
-/* eslint-disable indent */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 
-import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
+import SearchResults from '../SearchResults/SearchResults';
 
 import './SearchInput.css';
 
+const MIN_SEARCH_LENGTH = 2;
+
 const SearchInput = (props) => {
 	const [isSearchDropDownOpen, setIsSearchDropDownOpen] = useState(false);
-	const [searchedText, setSearchedText] = useState('');
 
-	const { className, onUpdate, dropDownOptions, isLoading } = props;
+	const { className, searchWord, onSearchWordChange, results, isLoading, onResultClick } = props;
 
 	const dropdownOptionsRef = useRef();
 	const searchInputRef = useRef();
@@ -21,27 +20,6 @@ const SearchInput = (props) => {
 		}
 	}, []);
 
-	const openSearchDropdown = useCallback(() => {
-		setIsSearchDropDownOpen(true);
-	}, []);
-
-	const closeSearchDropdown = useCallback(() => {
-		setIsSearchDropDownOpen(false);
-	}, []);
-
-	const handleDropdownActions = useCallback(
-		(action) => {
-			if (searchedText.length >= 2) {
-				openSearchDropdown();
-			}
-
-			if (searchedText === '') {
-				closeSearchDropdown();
-			}
-		},
-		[openSearchDropdown, closeSearchDropdown, searchedText]
-	);
-
 	useEffect(() => {
 		document.addEventListener('click', handleClickOutside);
 
@@ -50,18 +28,14 @@ const SearchInput = (props) => {
 		};
 	}, [handleClickOutside]);
 
-	useEffect(() => {
-		handleDropdownActions();
-	}, [searchedText, handleDropdownActions]);
-
 	const onChange = (e) => {
-		setSearchedText(e.target.value);
-		onUpdate(e.target.value);
+		onSearchWordChange(e.target.value);
+		setIsSearchDropDownOpen(true);
 	};
 
 	const onSearchOptionClick = () => {
-		closeSearchDropdown();
-		setSearchedText('');
+		setIsSearchDropDownOpen(false);
+		onResultClick();
 	};
 
 	let classes = 'search-input-wrapper';
@@ -70,15 +44,7 @@ const SearchInput = (props) => {
 		classes = `search-input-wrapper ${className}`;
 	}
 
-	const dropdownOptions = dropDownOptions.length
-		? dropDownOptions.map((option) => (
-				<Link to={`/user/${option._id}`} key={option.username} className='search-option' onClick={onSearchOptionClick}>
-					{option.username}
-				</Link>
-			))
-		: 'No Data';
-
-	const dropdownContent = isLoading ? <LoadingSpinner /> : dropdownOptions;
+	const hasSearchWord = searchWord.trim().length >= MIN_SEARCH_LENGTH;
 
 	return (
 		<div className={classes}>
@@ -87,16 +53,16 @@ const SearchInput = (props) => {
 				id='searched-text'
 				name='searchedText'
 				placeholder='Search'
-				value={searchedText}
+				value={searchWord}
 				onChange={onChange}
-				onFocus={handleDropdownActions}
+				onFocus={() => setIsSearchDropDownOpen(true)}
 				className='search-input'
 				ref={searchInputRef}
 			/>
 
-			{isSearchDropDownOpen ? (
+			{isSearchDropDownOpen && hasSearchWord ? (
 				<div className='options-wrapper' ref={dropdownOptionsRef}>
-					{dropdownContent}
+					<SearchResults results={results} isLoading={isLoading} onResultClick={onSearchOptionClick} className='search-results-dropdown' />
 				</div>
 			) : null}
 		</div>

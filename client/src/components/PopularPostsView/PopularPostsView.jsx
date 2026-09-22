@@ -3,32 +3,7 @@ import UserProfilePost from '../UserProfilePost/UserProfilePost';
 import './PopularPostsView.css';
 
 const PopularPostsView = () => {
-	const userPosts = [
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-		{ imageUrl: '/images/default-profile-picture.png' },
-	];
+	const userPosts = [];
 
 	return (
 		<section className='popular-posts-wrapper'>

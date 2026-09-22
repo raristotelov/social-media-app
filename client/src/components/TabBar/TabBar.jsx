@@ -5,6 +5,7 @@ import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 
 import FlameIcon from '../icons/Flame';
 import HouseIcon from '../icons/House';
+import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
 import './TabBar.css';
 
@@ -44,7 +45,7 @@ const TabBar = () => {
 				</Link>
 
 				<Link to={profilePath} className={itemClasses(profilePath)}>
-					<span className='tab-bar-avatar' />
+					<ProfilePicture className='tab-bar-avatar' imageUrl={loggedInUser.profilePicture?.imageUrl} />
 
 					<span className='tab-bar-label'>Profile</span>
 				</Link>
@@ -61,7 +62,7 @@ const TabBar = () => {
 			</Link>
 
 			<Link to='/log-in' className={itemClasses('/log-in', 'tab-bar-item-text')}>
-				Log In
+				Log in
 			</Link>
 
 			<Link to='/sign-up' className={itemClasses('/sign-up', 'tab-bar-item-text')}>

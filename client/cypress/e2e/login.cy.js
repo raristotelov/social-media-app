@@ -29,7 +29,7 @@ describe('login', () => {
 
 		cy.get('.tab-bar').within(() => {
 			cy.contains('Feed').should('exist');
-			cy.contains('Log In').should('not.exist');
+			cy.contains('Log in').should('not.exist');
 		});
 	});
 
@@ -42,7 +42,7 @@ describe('login', () => {
 		cy.location('pathname').should('eq', '/log-in');
 
 		cy.get('.tab-bar').within(() => {
-			cy.contains('Log In').should('exist');
+			cy.contains('Log in').should('exist');
 			cy.contains('Feed').should('not.exist');
 		});
 	});

@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 
+const constants = require('../config/constants');
+
 const UserSchema = new mongoose.Schema({
 	email: {
 		type: String,
@@ -19,6 +21,13 @@ const UserSchema = new mongoose.Schema({
 	},
 	bio: {
 		type: String,
+		maxlength: [constants.MAX_BIO_LENGTH, `Bio must be at most ${constants.MAX_BIO_LENGTH} characters`],
+	},
+	// A string rather than a boolean so 'system' can be added without a migration.
+	theme: {
+		type: String,
+		enum: ['light', 'dark'],
+		default: 'light',
 	},
 	profilePicture: {
 		type: 'ObjectId',

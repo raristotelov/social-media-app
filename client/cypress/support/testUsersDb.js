@@ -71,7 +71,7 @@ const removeUsersById = async (testUserIds) => {
 	await CommentModel.updateMany({ likes: { $in: testUserIds } }, { $pull: { likes: { $in: testUserIds } } });
 	await UserModel.updateMany(
 		{ $or: [{ followers: { $in: testUserIds } }, { following: { $in: testUserIds } }] },
-		{ $pull: { followers: { $in: testUserIds }, following: { $in: testUserIds } } }
+		{ $pull: { followers: { $in: testUserIds }, following: { $in: testUserIds } } },
 	);
 
 	const deletedUsers = await UserModel.deleteMany({ _id: { $in: testUserIds } });

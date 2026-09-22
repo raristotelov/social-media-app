@@ -9,7 +9,7 @@ const renderSignUpForm = (signUpHandler) =>
 	render(
 		<MemoryRouter>
 			<SignUpForm signUpHandler={signUpHandler} />
-		</MemoryRouter>
+		</MemoryRouter>,
 	);
 
 const fillField = (placeholder, value) => {

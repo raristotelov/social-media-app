@@ -1,10 +1,18 @@
 .search-input-wrapper {
 	position: relative;
 	width: 280px;
+	max-width: 100%;
 	padding: 0px 16px;
+	box-sizing: border-box;
 
-	border: 1px solid #c0c0c0;
+	border: 1px solid var(--border-divider);
 	border-radius: 20px;
+}
+
+@media (min-width: 600px) and (max-width: 1279px) {
+	.search-input-wrapper {
+		width: 220px;
+	}
 }
 
 .search-input {
@@ -14,42 +22,30 @@
 	border: none;
 	font-size: 14px;
 	font-family: 'Mada';
-	color: #4b4b4b;
+	color: var(--text-primary);
 }
 
 .search-input::placeholder {
-	color: #4b4b4b;
+	color: var(--text-primary);
 }
 
 .search-input:focus {
 	outline: none;
 }
 
+/* 9px below the field puts the panel on the header's bottom edge, as designed. */
 .options-wrapper {
 	position: absolute;
-	width: calc(100% - 4px);
+	left: 0;
+	top: calc(100% + 9px);
+	width: 100%;
 	box-sizing: border-box;
-	left: 2px;
-	top: 40px;
+	overflow: hidden;
 
-	background-color: #ffffff;
-	border: 1px solid #b5b5b5;
-	border-bottom-left-radius: 5px;
-	border-bottom-right-radius: 5px;
+	border: 1px solid var(--text-muted);
+	border-radius: 12px;
+	box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.12);
 
 	display: flex;
 	flex-direction: column;
-}
-
-.search-option {
-	padding: 6px;
-
-	color: #b5b5b5;
-	font-size: 20px;
-	text-decoration: none;
-}
-
-.search-option:hover {
-	background-color: #b5b5b5;
-	color: #ffffff;
 }

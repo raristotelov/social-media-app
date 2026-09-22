@@ -14,7 +14,7 @@ const LoginForm = ({ loginHandler }) => {
 			password: '',
 		},
 		loginHandler,
-		{ submitAllValues: true, validate: validateLogin }
+		{ submitAllValues: true, validate: validateLogin },
 	);
 
 	return (

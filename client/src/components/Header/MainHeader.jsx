@@ -1,42 +1,27 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { getUsersProfileData } from '../../services/userService';
+import useUserSearch from '../../hooks/useUserSearch';
 
 import Logo from '../Logo/Logo';
 import SearchInput from '../SearchInput/SearchInput';
-import LogOut from '../icons/LogOut';
+import AccountMenu from '../AccountMenu/AccountMenu';
+import ProfilePicture from '../ProfilePicture/ProfilePicture';
+import ArrowDown from '../icons/ArrowDown';
 import FlameIcon from '../icons/Flame';
 import HouseIcon from '../icons/House';
 
 import './MainHeader.css';
 
 const MainHeader = ({ logoutHandler }) => {
-	const [searchWord, setSearchWord] = useState('');
-	const [searchResults, setSearchResults] = useState([]);
-	const [isLoading, setIsLoading] = useState(false);
+	const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
 	const location = useLocation();
 	const currentPath = location.pathname;
 
-	const { jwtToken, loggedInUser } = useContext(LoggedInUserContext);
-
-	useEffect(() => {
-		if (searchWord.length >= 2) {
-			setIsLoading(true);
-
-			getUsersProfileData({ searchWord, jwtToken })
-				.then((result) => {
-					setSearchResults(result);
-					setIsLoading(false);
-				})
-				.catch(() => {
-					setIsLoading(false);
-					console.log('something went wrong while trying to fetch user data');
-				});
-		}
-	}, [jwtToken, searchWord]);
+	const { loggedInUser } = useContext(LoggedInUserContext);
+	const { searchWord, setSearchWord, results, isLoading, clearSearch } = useUserSearch();
 
 	const loggedUserLinks = (
 		<div className='navigation-links'>
@@ -61,7 +46,7 @@ const MainHeader = ({ logoutHandler }) => {
 	const guestUserLinks = (
 		<div className='navigation-links'>
 			<Link to='/log-in' className={`navigation-item-text ${currentPath === '/log-in' ? 'navigation-item-active' : ''}`}>
-				Log In
+				Log in
 			</Link>
 
 			<Link to='/sign-up' className={`navigation-item-text ${currentPath === '/sign-up' ? 'navigation-item-active' : ''}`}>
@@ -78,29 +63,39 @@ const MainHeader = ({ logoutHandler }) => {
 						<Logo />
 					</Link>
 
-					{loggedInUser && (
-						<div className='search-component-wrapper'>
-							<SearchInput onUpdate={setSearchWord} dropDownOptions={searchResults} isLoading={isLoading} />
-						</div>
-					)}
+					<div className='search-component-wrapper'>
+						<SearchInput
+							searchWord={searchWord}
+							onSearchWordChange={setSearchWord}
+							results={results}
+							isLoading={isLoading}
+							onResultClick={clearSearch}
+						/>
+					</div>
 				</div>
 
 				<div className='navbar-logged-user-container'>
 					<nav className='navbar'>{loggedInUser ? loggedUserLinks : guestUserLinks}</nav>
 
 					{loggedInUser ? (
-						<Link to={`/user/${loggedInUser._id}`} className='logged-user-avatar'>
-							<img src='https://i.pinimg.com/736x/30/df/1c/30df1cb8981338d42ed2722ab74cb51e.jpg' alt='post-img' />
+						<div className='account-menu-anchor'>
+							<button
+								type='button'
+								className='logged-user-avatar'
+								onClick={() => setIsAccountMenuOpen((state) => !state)}
+								aria-expanded={isAccountMenuOpen}
+								aria-haspopup='menu'
+							>
+								<ProfilePicture imageUrl={loggedInUser.profilePicture?.imageUrl} />
 
-							<span>{loggedInUser.username}</span>
-						</Link>
+								<span>{loggedInUser.username}</span>
+
+								<ArrowDown iconColorProp='currentColor' />
+							</button>
+
+							<AccountMenu isOpen={isAccountMenuOpen} onClose={() => setIsAccountMenuOpen(false)} logoutHandler={logoutHandler} />
+						</div>
 					) : null}
-
-					<div className='logged-user-options'>
-						<button onClick={logoutHandler}>
-							<LogOut />
-						</button>
-					</div>
 				</div>
 			</header>
 		</div>

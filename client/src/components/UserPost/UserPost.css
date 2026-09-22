@@ -1,7 +1,7 @@
 .post-wrapper {
-	border: 2px solid #c0c0c0;
+	border: 2px solid var(--border-divider);
 	margin-bottom: 60px;
-	background-color: white;
+	background-color: var(--background-surface);
 }
 
 .account-details {
@@ -13,7 +13,7 @@
 .account-details img {
 	width: 40px;
 	height: 40px;
-	border: 0.5px solid #c0c0c0;
+	border: 0.5px solid var(--border-divider);
 	border-radius: 50%;
 }
 
@@ -21,7 +21,7 @@
 	margin-left: 16px;
 
 	font-family: 'Mada';
-	color: #4b4b4b;
+	color: var(--text-primary);
 	font-size: 18px;
 	font-weight: bold;
 }
@@ -38,7 +38,7 @@
 	margin-left: 16px;
 	margin-right: 16px;
 
-	color: #4b4b4b;
+	color: var(--text-primary);
 	font-family: 'Mada';
 	font-size: 16px;
 	word-wrap: break-word;
@@ -56,7 +56,7 @@
 	display: flex;
 	align-items: center;
 
-	border-bottom: 1px solid #c0c0c0;
+	border-bottom: 1px solid var(--border-divider);
 	margin-left: 16px;
 	margin-right: 16px;
 }
@@ -64,7 +64,7 @@
 .like-action-wrapper span {
 	margin-left: 16px;
 
-	color: #4b4b4b;
+	color: var(--text-primary);
 	font-weight: bold;
 	font-family: 'Mada';
 	font-size: 18px;
@@ -107,7 +107,7 @@
 	margin-left: 16px;
 	margin-right: 16px;
 
-	border-bottom: 1px solid #c0c0c0;
+	border-bottom: 1px solid var(--border-divider);
 }
 
 .comments-section-toggle-wrapper {
@@ -148,7 +148,7 @@
 .comments-count-section span {
 	margin-left: 16px;
 
-	color: #4b4b4b;
+	color: var(--text-primary);
 	font-weight: bold;
 	font-family: 'Mada';
 	font-size: 18px;
@@ -172,9 +172,9 @@
 	resize: none;
 	outline: none;
 	background-color: transparent;
-	border-bottom: 1px solid #c0c0c0;
+	border-bottom: 1px solid var(--border-divider);
 
-	color: #4b4b4b;
+	color: var(--text-primary);
 	font-family: 'Mada';
 	font-size: 16px;
 }

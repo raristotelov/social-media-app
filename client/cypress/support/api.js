@@ -9,3 +9,15 @@ export const createUserViaApi = (user) =>
 		username: user.username,
 		password: user.password,
 	});
+
+export const loginViaApi = (user) =>
+	cy.request('POST', `${serverUrl}/users/login`, { email: user.email, password: user.password }).then((response) => response.body);
+
+export const visitAsUser = (path, jwtToken) =>
+	cy.visit(path, {
+		onBeforeLoad: (win) => {
+			win.localStorage.setItem('jwt-token', JSON.stringify(jwtToken));
+		},
+	});
+
+export const userIdFromToken = (jwtToken) => JSON.parse(atob(jwtToken.split('.')[1])).userId;

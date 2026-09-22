@@ -16,7 +16,7 @@ const SignUpForm = ({ signUpHandler }) => {
 			repeatPassword: '',
 		},
 		signUpHandler,
-		{ submitAllValues: true, validate: validateSignUp }
+		{ submitAllValues: true, validate: validateSignUp },
 	);
 
 	return (

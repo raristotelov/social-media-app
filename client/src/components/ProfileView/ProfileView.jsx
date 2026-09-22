@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { addUserPost } from '../../services/userPostService';
@@ -22,6 +22,9 @@ const ProfileView = (props) => {
 	const [isEditProfileFormOpen, setIsEditProfileFormOpen] = useState(false);
 
 	const { jwtToken, loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
+
+	const navigate = useNavigate();
+	const location = useLocation();
 
 	let { userId } = useParams();
 
@@ -76,33 +79,36 @@ const ProfileView = (props) => {
 	};
 
 	const editProfileDataHandler = async (userUpdatedData) => {
-		try {
-			let updatedProfileData = { ...userUpdatedData };
+		let updatedProfileData = { ...userUpdatedData };
 
-			if (updatedProfileData.profilePicture) {
-				const createdImageForProflePicrture = await uploadImageToCloudinary(updatedProfileData.profilePicture);
-				updatedProfileData = {
-					...updatedProfileData,
-					profilePicture: createdImageForProflePicrture,
-				};
-			}
+		if (updatedProfileData.profilePicture) {
+			const createdImageForProflePicrture = await uploadImageToCloudinary(updatedProfileData.profilePicture);
 
-			const updatedUser = await updateUserProfileData({
-				userId,
-				jwtToken,
-				updatedProfileData,
-			});
-
-			setUserData(updatedUser);
-
-			closeEditProfileForm();
-		} catch (error) {
-			// TODO add some error handling
-			console.log('Something went wrong while trying to update user profile');
+			updatedProfileData = {
+				...updatedProfileData,
+				profilePicture: createdImageForProflePicrture,
+			};
 		}
+
+		const updatedUserData = await updateUserProfileData({
+			userId,
+			jwtToken,
+			updatedProfileData,
+		});
+
+		setUserData(updatedUserData.user);
+		updateLoggedInUser(updatedUserData);
+
+		closeEditProfileForm();
 	};
 
 	const followUserHandler = async (userIdToFollow) => {
+		if (!loggedInUser) {
+			navigate('/log-in', { state: { from: location.pathname } });
+
+			return;
+		}
+
 		try {
 			const updatedUserData = await followUser({
 				userId: loggedInUser?._id,
@@ -142,11 +148,13 @@ const ProfileView = (props) => {
 			/>
 
 			<section className='profile-posts-wrapper'>
-				<button className='add-post-button' onClick={openAddPictureForm}>
-					<PlusIcon iconColorProp='#B5B5B5' />
+				{isLoggedInUserProfile ? (
+					<button className='add-post-button' onClick={openAddPictureForm}>
+						<PlusIcon iconColorProp='#B5B5B5' />
 
-					<span>Upload Picture</span>
-				</button>
+						<span>Upload Picture</span>
+					</button>
+				) : null}
 
 				{userPosts.map((post) => (
 					<UserProfilePost key={post.imageIdentifier} post={post} />
@@ -154,13 +162,13 @@ const ProfileView = (props) => {
 			</section>
 
 			{isAddPicturePopupOpen ? (
-				<Popup onClosePopupClick={closeAddPictureForm}>
+				<Popup title='Upload Picture' onClosePopupClick={closeAddPictureForm}>
 					<AddImagePostForm addImagePostHandler={addImagePostHandler} onCancelClick={closeAddPictureForm} />
 				</Popup>
 			) : null}
 
 			{isEditProfileFormOpen ? (
-				<Popup onClosePopupClick={closeEditProfileForm}>
+				<Popup title='Edit Profile' onClosePopupClick={closeEditProfileForm}>
 					<EditProfileForm userData={userData} editProfileData={editProfileDataHandler} onCancelClick={closeEditProfileForm} />
 				</Popup>
 			) : null}
