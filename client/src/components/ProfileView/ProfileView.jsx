@@ -148,11 +148,13 @@ const ProfileView = (props) => {
 			/>
 
 			<section className='profile-posts-wrapper'>
-				<button className='add-post-button' onClick={openAddPictureForm}>
-					<PlusIcon iconColorProp='#B5B5B5' />
+				{isLoggedInUserProfile ? (
+					<button className='add-post-button' onClick={openAddPictureForm}>
+						<PlusIcon iconColorProp='#B5B5B5' />
 
-					<span>Upload Picture</span>
-				</button>
+						<span>Upload Picture</span>
+					</button>
+				) : null}
 
 				{userPosts.map((post) => (
 					<UserProfilePost key={post.imageIdentifier} post={post} />

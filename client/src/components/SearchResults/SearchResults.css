@@ -37,12 +37,18 @@
 }
 
 .search-result-text {
+	min-width: 0;
+
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
 }
 
 .search-result-username {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+
 	font-family: 'Mada';
 	font-size: 15px;
 	font-weight: bold;
@@ -62,4 +68,13 @@
 	font-family: 'Mada';
 	font-size: 15px;
 	color: var(--text-secondary);
+}
+
+.search-results-dropdown .search-result {
+	padding: 8px 16px;
+}
+
+.search-results-dropdown .search-result-avatar {
+	width: 40px;
+	height: 40px;
 }

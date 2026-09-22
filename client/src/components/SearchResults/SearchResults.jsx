@@ -4,10 +4,12 @@ import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 
 import './SearchResults.css';
 
-const SearchResults = ({ results, isLoading, onResultClick }) => {
+const SearchResults = ({ results, isLoading, onResultClick, className = '' }) => {
+	const classNames = `search-results ${className}`.trim();
+
 	if (isLoading) {
 		return (
-			<div className='search-results'>
+			<div className={classNames}>
 				<LoadingSpinner />
 			</div>
 		);
@@ -15,14 +17,14 @@ const SearchResults = ({ results, isLoading, onResultClick }) => {
 
 	if (!results.length) {
 		return (
-			<div className='search-results'>
+			<div className={classNames}>
 				<p className='search-results-empty'>No users found</p>
 			</div>
 		);
 	}
 
 	return (
-		<div className='search-results'>
+		<div className={classNames}>
 			{results.map((user) => (
 				<Link to={`/user/${user._id}`} key={user._id} className='search-result' onClick={onResultClick}>
 					<span className='search-result-avatar' />

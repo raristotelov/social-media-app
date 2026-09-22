@@ -1,8 +1,8 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { getUsersProfileData } from '../../services/userService';
+import useUserSearch from '../../hooks/useUserSearch';
 
 import Logo from '../Logo/Logo';
 import SearchInput from '../SearchInput/SearchInput';
@@ -15,31 +15,13 @@ import HouseIcon from '../icons/House';
 import './MainHeader.css';
 
 const MainHeader = ({ logoutHandler }) => {
-	const [searchWord, setSearchWord] = useState('');
-	const [searchResults, setSearchResults] = useState([]);
-	const [isLoading, setIsLoading] = useState(false);
 	const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
 	const location = useLocation();
 	const currentPath = location.pathname;
 
-	const { jwtToken, loggedInUser } = useContext(LoggedInUserContext);
-
-	useEffect(() => {
-		if (searchWord.length >= 2) {
-			setIsLoading(true);
-
-			getUsersProfileData({ searchWord, jwtToken })
-				.then((result) => {
-					setSearchResults(result);
-					setIsLoading(false);
-				})
-				.catch(() => {
-					setIsLoading(false);
-					console.log('something went wrong while trying to fetch user data');
-				});
-		}
-	}, [jwtToken, searchWord]);
+	const { loggedInUser } = useContext(LoggedInUserContext);
+	const { searchWord, setSearchWord, results, isLoading, clearSearch } = useUserSearch();
 
 	const loggedUserLinks = (
 		<div className='navigation-links'>
@@ -82,7 +64,13 @@ const MainHeader = ({ logoutHandler }) => {
 					</Link>
 
 					<div className='search-component-wrapper'>
-						<SearchInput onUpdate={setSearchWord} dropDownOptions={searchResults} isLoading={isLoading} />
+						<SearchInput
+							searchWord={searchWord}
+							onSearchWordChange={setSearchWord}
+							results={results}
+							isLoading={isLoading}
+							onResultClick={clearSearch}
+						/>
 					</div>
 				</div>
 

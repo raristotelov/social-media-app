@@ -10,10 +10,9 @@ const House = ({ iconColorProp, fillColorProp }) => {
 			viewBox='0 0 24 24'
 			fill={fillColor}
 			stroke={iconColor}
-			stroke-width='2'
-			stroke-linecap='round'
-			stroke-linejoin='round'
-			class='lucide lucide-house-icon lucide-house'
+			strokeWidth='2'
+			strokeLinecap='round'
+			strokeLinejoin='round'
 		>
 			<path d='M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8' />
 

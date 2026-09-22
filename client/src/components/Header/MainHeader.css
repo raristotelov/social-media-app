@@ -106,9 +106,10 @@
 }
 
 .navigation-item-text {
+	position: relative;
 	height: 48px;
 
-	padding: 2px 10px;
+	padding: 2px 0;
 	border-bottom: 2px solid transparent;
 
 	font-family: 'Mada';
@@ -120,6 +121,15 @@
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
+}
+
+.navigation-item-text::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: -10px;
+	bottom: 0;
+	left: -10px;
 }
 
 .navigation-item-text:hover {
