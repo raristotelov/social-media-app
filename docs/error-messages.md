@@ -24,9 +24,20 @@ Every error code the server sends and the copy the client shows for it. The clie
 | `USER_NOT_FOUND` | 404 | Profile load, unknown or malformed user id | — (blank page until #29) |
 | `POST_NOT_FOUND` | 404 | Post edit / delete | This post no longer exists |
 | `POST_FORBIDDEN` | 403 | Post edit / delete on someone else's post | You can only change your own posts |
+| `BAD_REQUEST` | 400 | Malformed request body; 4xx errors not yet given their own code | The action's fallback (below) |
 | `INTERNAL_ERROR` | 500 | Anywhere | The action's fallback (below) |
 
 Any code the client doesn't know is treated as `INTERNAL_ERROR`.
+
+## Client-only validation
+
+Checked before any request; no server code.
+
+| Where | Copy |
+| --- | --- |
+| Sign up, repeat password empty | Please repeat your password |
+| Sign up, passwords differ (form message) | Passwords do not match |
+| Upload Picture, no picture chosen | Please choose a picture |
 
 ## Action fallbacks
 

@@ -19,11 +19,6 @@
 	text-align: center;
 }
 
-.delete-post-confirm .form-error {
-	width: 100%;
-	margin-top: 16px;
-}
-
 .delete-post-actions {
 	margin-top: 29px;
 
@@ -67,10 +62,6 @@
 		width: 100%;
 		padding: 0;
 		gap: 16px;
-	}
-
-	.delete-post-confirm .form-error {
-		margin-top: 0;
 	}
 
 	.delete-post-actions {

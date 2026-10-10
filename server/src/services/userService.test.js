@@ -13,7 +13,8 @@ const UserPostModel = require('../models/userPostModel');
 const imageStorageService = require('./imageStorageService');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
-const { login, signUp, updateUserProfileData } = require('./userService');
+const { ERROR_CODES } = require('../config/errorCodes');
+const { login, signUp, updateUserProfileData, getUsersProfileDataByUserIds } = require('./userService');
 
 describe('userService', () => {
 	beforeEach(() => {
@@ -26,8 +27,26 @@ describe('userService', () => {
 
 			await expect(login({ email: 'nobody@example.com', password: 'irrelevant' })).rejects.toMatchObject({
 				statusCode: 401,
+				code: ERROR_CODES.WRONG_CREDENTIALS,
 				message: 'Wrong email or password',
 			});
+		});
+
+		it.each([
+			['a non-string email', { email: { $ne: null }, password: 'irrelevant' }],
+			['a non-string password', { email: 'realuser@example.com', password: { $ne: null } }],
+			['a missing email', { password: 'irrelevant' }],
+			['a missing password', { email: 'realuser@example.com' }],
+		])('rejects %s with WRONG_CREDENTIALS without querying the database', async (_name, credentials) => {
+			UserModel.findOne = jest.fn();
+
+			await expect(login(credentials)).rejects.toMatchObject({
+				statusCode: 401,
+				code: ERROR_CODES.WRONG_CREDENTIALS,
+			});
+
+			expect(UserModel.findOne).not.toHaveBeenCalled();
+			expect(bcrypt.compare).not.toHaveBeenCalled();
 		});
 
 		it('rejects with a 401 when bcrypt.compare resolves false (regression: password check must not be skipped)', async () => {
@@ -36,6 +55,7 @@ describe('userService', () => {
 
 			await expect(login({ email: 'realuser@example.com', password: 'wrongPassword' })).rejects.toMatchObject({
 				statusCode: 401,
+				code: ERROR_CODES.WRONG_CREDENTIALS,
 				message: 'Wrong email or password',
 			});
 
@@ -66,6 +86,7 @@ describe('userService', () => {
 
 			expect(unknownEmailError.message).toBe(wrongPasswordError.message);
 			expect(unknownEmailError.statusCode).toBe(wrongPasswordError.statusCode);
+			expect(unknownEmailError.code).toBe(wrongPasswordError.code);
 			expect(unknownEmailError.fields).toBeUndefined();
 			expect(wrongPasswordError.fields).toBeUndefined();
 		});
@@ -113,16 +134,27 @@ describe('userService', () => {
 		});
 
 		it('throws a 400 when the password is shorter than MIN_PASSWORD_LENGTH', async () => {
-			const expectedMessage = `Password must be at least ${constants.MIN_PASSWORD_LENGTH} characters`;
-
 			await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'short' })).rejects.toMatchObject({
 				statusCode: 400,
-				message: expectedMessage,
-				fields: { password: expectedMessage },
+				code: ERROR_CODES.PASSWORD_TOO_SHORT,
+				fields: { password: ERROR_CODES.PASSWORD_TOO_SHORT },
 			});
 
 			expect(bcrypt.hash).not.toHaveBeenCalled();
 		});
+
+		it.each([[undefined], [null], [''], [12345678], [{ value: 'x' }]])(
+			'throws a 400 PASSWORD_REQUIRED for a missing or non-string password (%p)',
+			async (password) => {
+				await expect(signUp({ email: 'a@b.com', username: 'newuser', password })).rejects.toMatchObject({
+					statusCode: 400,
+					code: ERROR_CODES.PASSWORD_REQUIRED,
+					fields: { password: ERROR_CODES.PASSWORD_REQUIRED },
+				});
+
+				expect(bcrypt.hash).not.toHaveBeenCalled();
+			},
+		);
 
 		it('throws a 400 when the password exceeds MAX_PASSWORD_BYTES measured in bytes, not characters', async () => {
 			// Each 'é' (é) is 1 character but 2 bytes in UTF-8: 40 chars -> 80 bytes.
@@ -131,12 +163,10 @@ describe('userService', () => {
 			expect(multiByteOverLimitPassword.length).toBe(40);
 			expect(Buffer.byteLength(multiByteOverLimitPassword, 'utf8')).toBe(80);
 
-			const expectedMessage = `Password must be at most ${constants.MAX_PASSWORD_BYTES} bytes`;
-
 			await expect(signUp({ email: 'a@b.com', username: 'newuser', password: multiByteOverLimitPassword })).rejects.toMatchObject({
 				statusCode: 400,
-				message: expectedMessage,
-				fields: { password: expectedMessage },
+				code: ERROR_CODES.PASSWORD_TOO_LONG,
+				fields: { password: ERROR_CODES.PASSWORD_TOO_LONG },
 			});
 
 			expect(bcrypt.hash).not.toHaveBeenCalled();
@@ -165,8 +195,6 @@ describe('userService', () => {
 		});
 
 		it('rethrows an AppError from the try block unchanged (e.g. the password length validation error)', async () => {
-			const expectedMessage = `Password must be at least ${constants.MIN_PASSWORD_LENGTH} characters`;
-
 			let thrown;
 
 			try {
@@ -177,7 +205,7 @@ describe('userService', () => {
 
 			expect(thrown).toBeInstanceOf(AppError);
 			expect(thrown.statusCode).toBe(400);
-			expect(thrown.message).toBe(expectedMessage);
+			expect(thrown.code).toBe(ERROR_CODES.PASSWORD_TOO_SHORT);
 		});
 
 		it('converts a Mongoose ValidationError into a 400 with fields keyed by the failing path', async () => {
@@ -185,19 +213,47 @@ describe('userService', () => {
 
 			validationError.name = 'ValidationError';
 			validationError.errors = {
-				email: { message: 'Please provide a valid email address' },
-				username: { message: 'Path `username` is required.' },
+				email: { kind: 'regexp', message: 'Please provide a valid email address' },
+				username: { kind: 'required', message: 'Path `username` is required.' },
 			};
 
 			buildUserModelMock(jest.fn().mockRejectedValue(validationError));
 
 			await expect(signUp({ email: 'bad-email', username: '', password: 'validPassword1' })).rejects.toMatchObject({
 				statusCode: 400,
-				message: 'Please provide a valid email address, Path `username` is required.',
+				code: ERROR_CODES.EMAIL_INVALID,
 				fields: {
-					email: 'Please provide a valid email address',
-					username: 'Path `username` is required.',
+					email: ERROR_CODES.EMAIL_INVALID,
+					username: ERROR_CODES.USERNAME_REQUIRED,
 				},
+			});
+		});
+
+		it('maps a required email to EMAIL_REQUIRED', async () => {
+			const validationError = new Error('User validation failed');
+
+			validationError.name = 'ValidationError';
+			validationError.errors = { email: { kind: 'required', message: 'Path `email` is required.' } };
+
+			buildUserModelMock(jest.fn().mockRejectedValue(validationError));
+
+			await expect(signUp({ email: '', username: 'newuser', password: 'validPassword1' })).rejects.toMatchObject({
+				statusCode: 400,
+				fields: { email: ERROR_CODES.EMAIL_REQUIRED },
+			});
+		});
+
+		it('treats a ValidationError with an unmapped path or kind as an unexpected 500', async () => {
+			const validationError = new Error('User validation failed');
+
+			validationError.name = 'ValidationError';
+			validationError.errors = { theme: { kind: 'enum', message: 'bad theme' } };
+
+			buildUserModelMock(jest.fn().mockRejectedValue(validationError));
+
+			await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' })).rejects.toMatchObject({
+				statusCode: 500,
+				cause: validationError,
 			});
 		});
 
@@ -211,7 +267,22 @@ describe('userService', () => {
 
 			await expect(signUp({ email: 'taken@example.com', username: 'newuser', password: 'validPassword1' })).rejects.toMatchObject({
 				statusCode: 409,
-				fields: { email: 'This email is already registered' },
+				code: ERROR_CODES.EMAIL_TAKEN,
+				fields: { email: ERROR_CODES.EMAIL_TAKEN },
+			});
+		});
+
+		it('treats a duplicate-key error on an unknown key as an unexpected 500', async () => {
+			const duplicateKeyError = new Error('E11000 duplicate key error');
+
+			duplicateKeyError.code = 11000;
+			duplicateKeyError.keyPattern = { somethingElse: 1 };
+
+			buildUserModelMock(jest.fn().mockRejectedValue(duplicateKeyError));
+
+			await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' })).rejects.toMatchObject({
+				statusCode: 500,
+				cause: duplicateKeyError,
 			});
 		});
 
@@ -225,7 +296,8 @@ describe('userService', () => {
 
 			await expect(signUp({ email: 'a@b.com', username: 'takenname', password: 'validPassword1' })).rejects.toMatchObject({
 				statusCode: 409,
-				fields: { username: 'This username is taken' },
+				code: ERROR_CODES.USERNAME_TAKEN,
+				fields: { username: ERROR_CODES.USERNAME_TAKEN },
 			});
 		});
 
@@ -317,7 +389,8 @@ describe('userService', () => {
 
 				await expect(updateUserProfileData(USER_ID, { username: 'taken', profilePicture: null })).rejects.toMatchObject({
 					statusCode: 409,
-					fields: { username: 'This username is taken' },
+					code: ERROR_CODES.USERNAME_TAKEN,
+					fields: { username: ERROR_CODES.USERNAME_TAKEN },
 				});
 
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
@@ -455,7 +528,8 @@ describe('userService', () => {
 
 				await expect(updateUserProfileData(USER_ID, { username: 'taken', profilePicture: newPicture })).rejects.toMatchObject({
 					statusCode: 409,
-					fields: { username: 'This username is taken' },
+					code: ERROR_CODES.USERNAME_TAKEN,
+					fields: { username: ERROR_CODES.USERNAME_TAKEN },
 				});
 
 				expect(UserPostModel.deleteOne).toHaveBeenCalledTimes(1);
@@ -467,7 +541,7 @@ describe('userService', () => {
 				const validationError = new Error('User validation failed');
 
 				validationError.name = 'ValidationError';
-				validationError.errors = { bio: { message: 'Bio is too long' } };
+				validationError.errors = { bio: { kind: 'maxlength', message: 'Bio is too long' } };
 
 				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
@@ -475,7 +549,8 @@ describe('userService', () => {
 
 				await expect(updateUserProfileData(USER_ID, { bio: 'x', profilePicture: newPicture })).rejects.toMatchObject({
 					statusCode: 400,
-					fields: { bio: 'Bio is too long' },
+					code: ERROR_CODES.BIO_TOO_LONG,
+					fields: { bio: ERROR_CODES.BIO_TOO_LONG },
 				});
 
 				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
@@ -541,10 +616,58 @@ describe('userService', () => {
 			it('rejects a password change with a 400 before touching the picture', async () => {
 				UserModel.findOne = jest.fn();
 
-				await expect(updateUserProfileData(USER_ID, { password: 'x', profilePicture: null })).rejects.toMatchObject({ statusCode: 400 });
+				await expect(updateUserProfileData(USER_ID, { password: 'x', profilePicture: null })).rejects.toMatchObject({
+					statusCode: 400,
+					code: ERROR_CODES.PASSWORD_NOT_EDITABLE,
+					fields: { password: ERROR_CODES.PASSWORD_NOT_EDITABLE },
+				});
 
 				expect(UserModel.findOne).not.toHaveBeenCalled();
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+			});
+		});
+	});
+
+	describe('getUsersProfileDataByUserIds', () => {
+		const VALID_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
+
+		const givenFindResolves = (users) => {
+			const populate = jest.fn();
+
+			populate.mockReturnValueOnce({ populate }).mockResolvedValueOnce(users);
+			UserModel.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ populate }) });
+		};
+
+		it('rejects with a 404 USER_NOT_FOUND when no user has that id', async () => {
+			givenFindResolves([]);
+
+			await expect(getUsersProfileDataByUserIds({ userIds: [VALID_ID] })).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.USER_NOT_FOUND,
+			});
+		});
+
+		it('rejects with a 404 USER_NOT_FOUND for a malformed id without querying the database', async () => {
+			UserModel.find = jest.fn();
+
+			await expect(getUsersProfileDataByUserIds({ userIds: ['not-an-object-id'] })).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.USER_NOT_FOUND,
+			});
+
+			expect(UserModel.find).not.toHaveBeenCalled();
+		});
+
+		it('wraps an unexpected database failure in a 500 AppError', async () => {
+			const dbError = new Error('connection lost');
+
+			UserModel.find = jest.fn().mockImplementation(() => {
+				throw dbError;
+			});
+
+			await expect(getUsersProfileDataByUserIds({ userIds: [VALID_ID] })).rejects.toMatchObject({
+				statusCode: 500,
+				cause: dbError,
 			});
 		});
 	});

@@ -1,12 +1,17 @@
-import { useState, useEffect, useContext, useMemo } from 'react';
+import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import ToastContext from '../../contexts/ToastContext';
 import { addUserPost, updateUserPostCaption, deleteUserPost } from '../../services/userPostService';
 import { uploadImageToCloudinary } from '../../services/cloudinaryService';
 import { getUsersProfileData, updateUserProfileData, followUser, unfollowUser } from '../../services/userService';
+import { ERROR_CODES } from '../../constants/errorCodes';
+import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
+import { getErrorCode, getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
 
 import ProfileHeader from '../ProfileHeader/ProfileHeader';
+import ProfileLoadError from '../ProfileLoadError/ProfileLoadError';
 import UserProfilePost from '../UserProfilePost/UserProfilePost';
 import Popup from '../Popup/Popup';
 import AddImagePostForm from '../AddImagePostForm/AddImagePostForm';
@@ -16,8 +21,6 @@ import DeletePostConfirm from '../DeletePostConfirm/DeletePostConfirm';
 import PlusIcon from '../icons/Plus';
 
 import './ProfileView.css';
-
-const DELETE_POST_FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 const isSamePost = (post, postId) => (post._id ?? post) === postId;
 
@@ -29,9 +32,12 @@ const ProfileView = (props) => {
 	const [postToEdit, setPostToEdit] = useState(null);
 	const [postToDelete, setPostToDelete] = useState(null);
 	const [isDeletingPost, setIsDeletingPost] = useState(false);
-	const [deletePostError, setDeletePostError] = useState('');
+	const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+	const [loadFailedUserId, setLoadFailedUserId] = useState(null);
+	const [reloadCount, setReloadCount] = useState(0);
 
-	const { jwtToken, loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
+	const { jwtToken, loggedInUser, updateLoggedInUser, endSession } = useContext(LoggedInUserContext);
+	const { showToast } = useContext(ToastContext);
 
 	const navigate = useNavigate();
 	const location = useLocation();
@@ -42,16 +48,74 @@ const ProfileView = (props) => {
 		return userId === loggedInUser?._id;
 	}, [userId, loggedInUser]);
 
+	const endSessionIfUnauthenticated = useCallback(
+		(error) => {
+			if (isUnauthenticatedError(error)) {
+				endSession();
+			}
+		},
+		[endSession],
+	);
+
+	const runWithSessionGuard = async (action) => {
+		try {
+			return await action();
+		} catch (error) {
+			endSessionIfUnauthenticated(error);
+
+			throw error;
+		}
+	};
+
 	useEffect(() => {
+		let isCurrentRequest = true;
+
+		setIsLoadingProfile(true);
+
 		getUsersProfileData({ userIds: [userId], jwtToken })
 			.then((result) => {
+				if (!isCurrentRequest) {
+					return;
+				}
+
 				setUserData(result[0]);
 				setUserPosts(result[0].posts);
+				setLoadFailedUserId(null);
 			})
-			.catch(() => {
-				console.log('something went wrong while trying to fetch user data');
+			.catch((error) => {
+				if (!isCurrentRequest) {
+					return;
+				}
+
+				if (getErrorCode(error) === ERROR_CODES.USER_NOT_FOUND) {
+					setUserData(null);
+					setLoadFailedUserId(null);
+
+					return;
+				}
+
+				if (isUnauthenticatedError(error)) {
+					endSession();
+
+					return;
+				}
+
+				setLoadFailedUserId(userId);
+			})
+			.finally(() => {
+				if (isCurrentRequest) {
+					setIsLoadingProfile(false);
+				}
 			});
-	}, [userId, jwtToken, isLoggedInUserProfile, loggedInUser]);
+
+		return () => {
+			isCurrentRequest = false;
+		};
+	}, [userId, jwtToken, isLoggedInUserProfile, loggedInUser, reloadCount, endSession]);
+
+	const retryProfileLoad = () => {
+		setReloadCount((count) => count + 1);
+	};
 
 	const openAddPictureForm = () => {
 		setIsAddPicturePopupOpen(true);
@@ -66,7 +130,7 @@ const ProfileView = (props) => {
 			return;
 		}
 
-		try {
+		await runWithSessionGuard(async () => {
 			const createdImage = await uploadImageToCloudinary(uploadedImage);
 
 			const savedUserPost = await addUserPost({ ...createdImage, caption }, jwtToken);
@@ -75,10 +139,7 @@ const ProfileView = (props) => {
 			setUserData((state) => ({ ...state, posts: [...state.posts, savedUserPost] }));
 
 			closeAddPictureForm();
-		} catch (error) {
-			// TODO add some error handling
-			console.log('Something went wrong while trying to uploade image');
-		}
+		});
 	};
 
 	const openEditProfileForm = () => {
@@ -89,57 +150,56 @@ const ProfileView = (props) => {
 		setIsEditProfileFormOpen(false);
 	};
 
-	const editProfileDataHandler = async (userUpdatedData) => {
-		let updatedProfileData = { ...userUpdatedData };
+	const editProfileDataHandler = (userUpdatedData) =>
+		runWithSessionGuard(async () => {
+			let updatedProfileData = { ...userUpdatedData };
 
-		if (updatedProfileData.profilePicture) {
-			const createdImageForProflePicrture = await uploadImageToCloudinary(updatedProfileData.profilePicture);
+			if (updatedProfileData.profilePicture) {
+				const createdImageForProflePicrture = await uploadImageToCloudinary(updatedProfileData.profilePicture);
 
-			updatedProfileData = {
-				...updatedProfileData,
-				profilePicture: createdImageForProflePicrture,
-			};
-		}
+				updatedProfileData = {
+					...updatedProfileData,
+					profilePicture: createdImageForProflePicrture,
+				};
+			}
 
-		const updatedUserData = await updateUserProfileData({
-			userId,
-			jwtToken,
-			updatedProfileData,
+			const updatedUserData = await updateUserProfileData({
+				userId,
+				jwtToken,
+				updatedProfileData,
+			});
+
+			setUserData(updatedUserData.user);
+			updateLoggedInUser(updatedUserData);
+
+			closeEditProfileForm();
 		});
-
-		setUserData(updatedUserData.user);
-		updateLoggedInUser(updatedUserData);
-
-		closeEditProfileForm();
-	};
 
 	const closeEditPostForm = () => {
 		setPostToEdit(null);
 	};
 
-	const editPostHandler = async (caption) => {
-		const updatedPost = await updateUserPostCaption({ userPostId: postToEdit._id, caption, jwtToken });
+	const editPostHandler = (caption) =>
+		runWithSessionGuard(async () => {
+			const updatedPost = await updateUserPostCaption({ userPostId: postToEdit._id, caption, jwtToken });
 
-		setUserPosts((state) => state.map((post) => (isSamePost(post, updatedPost._id) ? { ...post, caption: updatedPost.caption } : post)));
+			setUserPosts((state) => state.map((post) => (isSamePost(post, updatedPost._id) ? { ...post, caption: updatedPost.caption } : post)));
 
-		closeEditPostForm();
-	};
+			closeEditPostForm();
+		});
 
 	const openDeletePostConfirm = (post) => {
-		setDeletePostError('');
 		setPostToDelete(post);
 	};
 
 	const closeDeletePostConfirm = () => {
 		setPostToDelete(null);
-		setDeletePostError('');
 	};
 
 	const deletePostHandler = async () => {
 		const deletedPostId = postToDelete._id;
 
 		setIsDeletingPost(true);
-		setDeletePostError('');
 
 		try {
 			await deleteUserPost({ userPostId: deletedPostId, jwtToken });
@@ -149,7 +209,13 @@ const ProfileView = (props) => {
 
 			closeDeletePostConfirm();
 		} catch (error) {
-			setDeletePostError(error?.error || DELETE_POST_FALLBACK_ERROR);
+			closeDeletePostConfirm();
+
+			if (isUnauthenticatedError(error)) {
+				endSession();
+			} else {
+				showToast(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.DELETE_POST));
+			}
 		} finally {
 			setIsDeletingPost(false);
 		}
@@ -170,7 +236,9 @@ const ProfileView = (props) => {
 			});
 
 			updateLoggedInUser(updatedUserData);
-		} catch (error) {}
+		} catch (error) {
+			endSessionIfUnauthenticated(error);
+		}
 	};
 
 	const onUnfollowUserHandler = async (userIdToUnfollow) => {
@@ -182,8 +250,14 @@ const ProfileView = (props) => {
 			});
 
 			updateLoggedInUser(updatedUserData);
-		} catch (error) {}
+		} catch (error) {
+			endSessionIfUnauthenticated(error);
+		}
 	};
+
+	if (loadFailedUserId === userId && userData?._id !== userId) {
+		return <ProfileLoadError onRetryClick={retryProfileLoad} isRetrying={isLoadingProfile} />;
+	}
 
 	if (!userData) {
 		return null;
@@ -240,12 +314,7 @@ const ProfileView = (props) => {
 
 			{postToDelete ? (
 				<Popup title='Delete post' className='delete-post-popup' bodyClassName='bottom-sheet' onClosePopupClick={closeDeletePostConfirm}>
-					<DeletePostConfirm
-						onDeleteClick={deletePostHandler}
-						onCancelClick={closeDeletePostConfirm}
-						isDeleting={isDeletingPost}
-						errorMessage={deletePostError}
-					/>
+					<DeletePostConfirm onDeleteClick={deletePostHandler} onCancelClick={closeDeletePostConfirm} isDeleting={isDeletingPost} />
 				</Popup>
 			) : null}
 		</div>

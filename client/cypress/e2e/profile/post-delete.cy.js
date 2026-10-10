@@ -115,8 +115,10 @@ describe('post delete', () => {
 		});
 	});
 
-	it('shows an error in the popup and keeps the post when the request fails', () => {
-		cy.intercept('DELETE', '**/user-posts/**', { statusCode: 502, body: { error: 'Could not delete image' } }).as('failingDelete');
+	it('shows an error toast and keeps the post when the request fails', () => {
+		cy.intercept('DELETE', '**/user-posts/**', { statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }).as(
+			'failingDelete',
+		);
 
 		visitAsUser(profilePath, jwtToken);
 
@@ -125,7 +127,8 @@ describe('post delete', () => {
 
 		cy.wait('@failingDelete');
 
-		cy.contains('.delete-post-popup .form-error', 'Could not delete image').should('be.visible');
+		cy.get('.delete-post-popup').should('not.exist');
+		cy.contains('.toast-region .toast-message', "Couldn't delete the post. Try again.").should('be.visible');
 		cy.get('.profile-post').should('have.length', 2);
 		cy.get('.profile-stat').first().find('strong').should('have.text', '2');
 

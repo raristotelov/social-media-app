@@ -1,22 +1,44 @@
-// Central error handler. Logs the full original error server-side (including
-// the preserved `cause`) and returns only a safe message + status to the client.
+const AppError = require('../utils/AppError');
+const { ERROR_CODES, INTERNAL_ERROR_MESSAGE, BAD_REQUEST_MESSAGE } = require('../config/errorCodes');
+
+const MIN_CLIENT_ERROR_STATUS = 400;
+const MAX_CLIENT_ERROR_STATUS = 499;
+
+const isClientErrorStatus = (statusCode) => statusCode >= MIN_CLIENT_ERROR_STATUS && statusCode <= MAX_CLIENT_ERROR_STATUS;
+
+const toExpectedErrorResponse = (err) => {
+	if (err instanceof AppError && err.isOperational) {
+		const body = { code: err.code || ERROR_CODES.BAD_REQUEST, message: err.message };
+
+		if (err.fields) {
+			body.fields = err.fields;
+		}
+
+		return { statusCode: err.statusCode, body };
+	}
+
+	if (!(err instanceof AppError) && err.expose === true && isClientErrorStatus(err.statusCode)) {
+		return { statusCode: err.statusCode, body: { code: ERROR_CODES.BAD_REQUEST, message: BAD_REQUEST_MESSAGE } };
+	}
+
+	return null;
+};
+
+// Central error handler. Every error is logged in full (including the
+// preserved `cause`). Expected errors (operational AppErrors, malformed
+// requests) keep their status and code; anything else is answered with a
+// generic 500, so no internal text ever reaches the client.
 module.exports = (err, req, res, next) => {
 	console.error(err);
 	if (err.cause) {
 		console.error('Caused by:', err.cause);
 	}
 
-	const statusCode = err.statusCode || 500;
+	const expectedErrorResponse = toExpectedErrorResponse(err);
 
-	// Only expected (operational) errors expose their message; everything else
-	// is treated as unexpected and hidden behind a generic message.
-	const message = err.isOperational ? err.message : 'Something went wrong';
-
-	const body = { error: message };
-
-	if (err.isOperational && err.fields) {
-		body.fields = err.fields;
+	if (expectedErrorResponse) {
+		return res.status(expectedErrorResponse.statusCode).json(expectedErrorResponse.body);
 	}
 
-	res.status(statusCode).json(body);
+	return res.status(500).json({ code: ERROR_CODES.INTERNAL_ERROR, message: INTERNAL_ERROR_MESSAGE });
 };

@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import { useForm } from '../../hooks/useForm';
 import { MAX_BIO_LENGTH } from '../../constants/validation';
+import { ERROR_CODES } from '../../constants/errorCodes';
+import { ACTION_FALLBACK_MESSAGES, ERROR_MESSAGES } from '../../constants/errorMessages';
 
 import Button from '../Button/Button';
 import ImageInput from '../ImageInput/ImageInput';
@@ -45,24 +47,24 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 		const fields = {};
 
 		if (!formValues.email.trim()) {
-			fields.email = ['Email is required'];
+			fields.email = [ERROR_MESSAGES[ERROR_CODES.EMAIL_REQUIRED]];
 		}
 
 		if (!formValues.username.trim()) {
-			fields.username = ['Username is required'];
+			fields.username = [ERROR_MESSAGES[ERROR_CODES.USERNAME_REQUIRED]];
 		}
 
 		return { fields };
 	};
 
-	const { values, changeHandler, onSubmit, errors } = useForm(
+	const { values, changeHandler, onSubmit, errors, formError } = useForm(
 		{
 			email: userData.email,
 			username: userData.username,
 			bio: userData.bio ? userData.bio : '',
 		},
 		editProfileDataHandler,
-		{ validate },
+		{ validate, fallbackMessage: ACTION_FALLBACK_MESSAGES.SAVE_PROFILE },
 	);
 
 	return (
@@ -121,6 +123,12 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 
 				{errors.bio?.length ? <span className='field-error'>{errors.bio[0]}</span> : null}
 			</div>
+
+			{formError ? (
+				<p className='form-error edit-profile-error' role='alert'>
+					{formError}
+				</p>
+			) : null}
 
 			<div className='profile-form-button-row'>
 				<Button type='submit' label='Submit' />

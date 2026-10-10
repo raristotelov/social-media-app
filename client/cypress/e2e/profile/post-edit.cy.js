@@ -136,7 +136,9 @@ describe('post edit', () => {
 	});
 
 	it('shows an error in the popup and keeps it open when the request fails', () => {
-		cy.intercept('PATCH', '**/user-posts/**', { statusCode: 500, body: { error: 'Could not update the post' } }).as('failingEdit');
+		cy.intercept('PATCH', '**/user-posts/**', { statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }).as(
+			'failingEdit',
+		);
 
 		visitAsUser(profilePath, jwtToken);
 
@@ -146,7 +148,7 @@ describe('post edit', () => {
 
 		cy.wait('@failingEdit');
 
-		cy.contains('.popup-body .form-error', 'Could not update the post').should('be.visible');
+		cy.contains('.popup-body .form-error', "Couldn't save the caption. Try again.").should('be.visible');
 		cy.contains('.popup-title', 'Edit Picture').should('be.visible');
 	});
 

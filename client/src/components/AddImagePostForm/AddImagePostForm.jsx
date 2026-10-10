@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+import { ACTION_FALLBACK_MESSAGES, VALIDATION_MESSAGES } from '../../constants/errorMessages';
+import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
+
 import Button from '../Button/Button';
 import ImageInput from '../ImageInput/ImageInput';
 import PictureFrameIcon from '../icons/PictureFrameIcon';
@@ -10,22 +13,39 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 	const [uploadedImage, setUploadedImage] = useState(null);
 	const [caption, setCaption] = useState('');
 	const [pictureError, setPictureError] = useState('');
+	const [formError, setFormError] = useState('');
 
 	const pictureChangeHandler = (image) => {
 		setUploadedImage(image);
 		setPictureError('');
+		setFormError('');
 	};
 
-	const onSubmit = (e) => {
+	const captionChangeHandler = (e) => {
+		setCaption(e.target.value);
+		setFormError('');
+	};
+
+	const onSubmit = async (e) => {
 		e.preventDefault();
 
 		if (!uploadedImage) {
-			setPictureError('Please choose a picture');
+			setPictureError(VALIDATION_MESSAGES.PICTURE_REQUIRED);
 
 			return;
 		}
 
-		addImagePostHandler(uploadedImage, caption);
+		setFormError('');
+
+		try {
+			await addImagePostHandler(uploadedImage, caption);
+		} catch (error) {
+			if (isUnauthenticatedError(error)) {
+				return;
+			}
+
+			setFormError(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.UPLOAD_PICTURE));
+		}
 	};
 
 	return (
@@ -43,7 +63,13 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 				{pictureError ? <span className='field-error'>{pictureError}</span> : null}
 			</div>
 
-			<textarea className='caption-input' placeholder='Write a caption...' value={caption} onChange={(e) => setCaption(e.target.value)} />
+			<textarea className='caption-input' placeholder='Write a caption...' value={caption} onChange={captionChangeHandler} />
+
+			{formError ? (
+				<p className='form-error add-image-post-error' role='alert'>
+					{formError}
+				</p>
+			) : null}
 
 			<div className='button-row'>
 				<Button type='submit' label='Submit' />

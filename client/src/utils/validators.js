@@ -1,14 +1,17 @@
+import { ERROR_CODES } from '../constants/errorCodes';
+import { ERROR_MESSAGES, VALIDATION_MESSAGES } from '../constants/errorMessages';
+
 export const MIN_PASSWORD_LENGTH = 8;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const getEmailErrors = (email) => {
 	if (!email?.trim()) {
-		return ['Email is required'];
+		return [ERROR_MESSAGES[ERROR_CODES.EMAIL_REQUIRED]];
 	}
 
 	if (!emailPattern.test(email)) {
-		return ['Please provide a valid email address'];
+		return [ERROR_MESSAGES[ERROR_CODES.EMAIL_INVALID]];
 	}
 
 	return [];
@@ -16,13 +19,13 @@ const getEmailErrors = (email) => {
 
 const getPasswordErrors = (password) => {
 	if (!password) {
-		return ['Password is required'];
+		return [ERROR_MESSAGES[ERROR_CODES.PASSWORD_REQUIRED]];
 	}
 
 	const messages = [];
 
 	if (password.length < MIN_PASSWORD_LENGTH) {
-		messages.push(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+		messages.push(ERROR_MESSAGES[ERROR_CODES.PASSWORD_TOO_SHORT]);
 	}
 
 	return messages;
@@ -38,7 +41,7 @@ export const validateLogin = ({ email, password }) => {
 	}
 
 	if (!password) {
-		fields.password = ['Password is required'];
+		fields.password = [ERROR_MESSAGES[ERROR_CODES.PASSWORD_REQUIRED]];
 	}
 
 	return { fields };
@@ -55,7 +58,7 @@ export const validateSignUp = ({ email, username, password, repeatPassword }) =>
 	}
 
 	if (!username?.trim()) {
-		fields.username = ['Username is required'];
+		fields.username = [ERROR_MESSAGES[ERROR_CODES.USERNAME_REQUIRED]];
 	}
 
 	const passwordErrors = getPasswordErrors(password);
@@ -65,9 +68,9 @@ export const validateSignUp = ({ email, username, password, repeatPassword }) =>
 	}
 
 	if (!repeatPassword) {
-		fields.repeatPassword = ['Please repeat your password'];
+		fields.repeatPassword = [VALIDATION_MESSAGES.REPEAT_PASSWORD_REQUIRED];
 	} else if (password && password !== repeatPassword) {
-		formError = 'Passwords do not match';
+		formError = VALIDATION_MESSAGES.PASSWORDS_DO_NOT_MATCH;
 	}
 
 	return { fields, formError };

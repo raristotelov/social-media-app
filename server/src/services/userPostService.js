@@ -2,29 +2,30 @@ const mongoose = require('mongoose');
 
 const UserPostModel = require('../models/userPostModel');
 const UserModel = require('../models/userModel');
+const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 
 const findOwnedUserPost = async ({ userPostId, userId }) => {
 	if (!mongoose.isValidObjectId(userPostId)) {
-		throw new AppError('Post not found', 404);
+		throw new AppError('Post not found', 404, { code: ERROR_CODES.POST_NOT_FOUND });
 	}
 
 	const userPost = await UserPostModel.findById(userPostId);
 
 	if (!userPost) {
-		throw new AppError('Post not found', 404);
+		throw new AppError('Post not found', 404, { code: ERROR_CODES.POST_NOT_FOUND });
 	}
 
 	if (!userPost.userId || userPost.userId.toString() !== String(userId)) {
-		throw new AppError('You can only change your own posts', 403);
+		throw new AppError('You can only change your own posts', 403, { code: ERROR_CODES.POST_FORBIDDEN });
 	}
 
 	const isListedPost = await UserModel.exists({ _id: userId, posts: userPost._id });
 
 	if (!isListedPost) {
-		throw new AppError('Post not found', 404);
+		throw new AppError('Post not found', 404, { code: ERROR_CODES.POST_NOT_FOUND });
 	}
 
 	return userPost;
@@ -110,9 +111,7 @@ const unlikeUserPost = async ({ userPostId, userWhoUnlikedId }) => {
 const updateUserPostCaption = async ({ userPostId, userId, caption }) => {
 	try {
 		if (typeof caption !== 'string') {
-			const message = 'Caption must be text';
-
-			throw new AppError(message, 400, { fields: { caption: message } });
+			throw AppError.fromFields({ caption: ERROR_CODES.CAPTION_INVALID }, 400);
 		}
 
 		const userPost = await findOwnedUserPost({ userPostId, userId });

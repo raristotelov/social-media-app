@@ -84,14 +84,75 @@ describe('SignUpForm', () => {
 	});
 
 	it('renders a duplicate-email rejection under the email input', async () => {
-		const signUpHandler = jest.fn().mockRejectedValue({ fields: { email: 'Email already in use' } });
+		const signUpHandler = jest.fn().mockRejectedValue({ code: 'EMAIL_TAKEN', fields: { email: 'EMAIL_TAKEN' }, status: 409 });
 		const { container } = renderSignUpForm(signUpHandler);
 
 		fillValidSignUp();
 		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
-		const message = await screen.findByText('Email already in use');
+		const message = await screen.findByText('This email is already registered');
 		expect(message).toHaveClass('field-error');
+		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+	});
+
+	it('renders a taken username under the username input', async () => {
+		const signUpHandler = jest.fn().mockRejectedValue({ code: 'USERNAME_TAKEN', fields: { username: 'USERNAME_TAKEN' }, status: 409 });
+		const { container } = renderSignUpForm(signUpHandler);
+
+		fillValidSignUp();
+		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+		const message = await screen.findByText('This username is taken');
+		expect(message).toHaveClass('field-error');
+		expect(message.closest('.auth-input-wrapper').querySelector('#username')).toBeInTheDocument();
+		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+	});
+
+	it('renders several field codes, each under its own input', async () => {
+		const signUpHandler = jest.fn().mockRejectedValue({
+			code: 'EMAIL_INVALID',
+			fields: { email: 'EMAIL_INVALID', password: 'PASSWORD_TOO_LONG' },
+			status: 400,
+		});
+		renderSignUpForm(signUpHandler);
+
+		fillValidSignUp();
+		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+		expect(await screen.findByText('Please provide a valid email address')).toHaveClass('field-error');
+		expect(screen.getByText('Password must be at most 72 bytes')).toHaveClass('field-error');
+	});
+
+	it('shows the sign-up fallback copy as the form message for INTERNAL_ERROR', async () => {
+		const signUpHandler = jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+		const { container } = renderSignUpForm(signUpHandler);
+
+		fillValidSignUp();
+		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+		const message = await screen.findByText("Couldn't sign up. Try again.");
+		expect(message).toHaveClass('form-error');
+		expect(container.querySelector('.field-error')).not.toBeInTheDocument();
+	});
+
+	it('shows the sign-up fallback copy when the rejection has no usable code (e.g. a plain Error)', async () => {
+		const signUpHandler = jest.fn().mockRejectedValue(new Error('boom'));
+		renderSignUpForm(signUpHandler);
+
+		fillValidSignUp();
+		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+		expect(await screen.findByText("Couldn't sign up. Try again.")).toBeInTheDocument();
+	});
+
+	it('shows no form error for UNAUTHENTICATED', async () => {
+		const signUpHandler = jest.fn().mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+		const { container } = renderSignUpForm(signUpHandler);
+
+		fillValidSignUp();
+		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+		await screen.findByRole('button', { name: 'Submit' });
 		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
 	});
 });

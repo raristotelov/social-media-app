@@ -11,7 +11,8 @@ One system for every failure, server and client. Rolled out page by page: #30 co
 - `message` — for developers only. Never shown to users.
 - `fields` — `{ <field>: <CODE> }`, one code per invalid field.
 - Expected errors keep their real status (400 / 401 / 403 / 404 / 409).
-- Anything unexpected (database, Cloudinary, bugs) is logged in full with its stack and cause, and the response is always `500 { code: 'INTERNAL_ERROR', message: 'Something went wrong' }`. No internal text (Cloudinary ids, Mongoose messages) reaches the client.
+- Every error is logged in full with its stack and cause.
+- Anything unexpected (database, Cloudinary, bugs) is always answered with `500 { code: 'INTERNAL_ERROR', message: 'Something went wrong' }`. No internal text (Cloudinary ids, Mongoose messages) reaches the client.
 - A malformed id is a 404 with the resource's not-found code, never a 500.
 
 ## Codes and copy
@@ -36,7 +37,8 @@ Every code, its status and the copy the client shows: [error-messages.md](./erro
 
 - Component `Toast` ([556:1892](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=556-1892)): `text/primary` fill, 12px radius, 12/16 padding; alert icon in `feedback/error-inverse`; message 15px `background/surface`; close ×.
 - Desktop / tablet: bottom centre. Mobile: full width with 16px margins, 8px above the tab bar.
-- Dismissed by the × or automatically after 5 seconds; the timer pauses while hovered.
+- Dismissed by the × or automatically after 5 seconds; the timer pauses while hovered or focused.
+- An action raised from a popup (delete confirmation) closes the popup, then shows the toast.
 - A new toast replaces the one showing; they never stack.
 
 ## Figma frames

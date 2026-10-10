@@ -197,4 +197,80 @@ describe('EditProfileForm', () => {
 			expect(editProfileData).not.toHaveBeenCalled();
 		});
 	});
+
+	describe('submit failures', () => {
+		const submitChangedUsername = (editProfileData) => {
+			const rendered = renderEditProfileForm(editProfileData, jest.fn());
+
+			userEvent.clear(screen.getByPlaceholderText('Username'));
+			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			return rendered;
+		};
+
+		it.each([
+			['EMAIL_TAKEN', 'email', 'This email is already registered'],
+			['EMAIL_INVALID', 'email', 'Please provide a valid email address'],
+			['USERNAME_TAKEN', 'username', 'This username is taken'],
+			['BIO_TOO_LONG', 'bio', 'Bio must be at most 150 characters'],
+		])('shows %s under the %s field', async (code, field, copy) => {
+			const editProfileData = jest.fn().mockRejectedValue({ code, fields: { [field]: code }, status: 400 });
+			const { container } = submitChangedUsername(editProfileData);
+
+			const message = await screen.findByText(copy);
+			expect(message).toHaveClass('field-error');
+			expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+		});
+
+		it('shows a field code the form has no input for (PASSWORD_NOT_EDITABLE) as the form message', async () => {
+			const editProfileData = jest.fn().mockRejectedValue({
+				code: 'PASSWORD_NOT_EDITABLE',
+				fields: { password: 'PASSWORD_NOT_EDITABLE' },
+				status: 400,
+			});
+			const { container } = submitChangedUsername(editProfileData);
+
+			const message = await screen.findByText('Password cannot be changed from the profile form');
+			expect(message).toHaveClass('form-error');
+			expect(container.querySelector('.field-error')).not.toBeInTheDocument();
+		});
+
+		it('renders the form message with an alert role so it is announced', async () => {
+			submitChangedUsername(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
+
+			expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save your profile. Try again.");
+		});
+
+		it('shows the save-profile fallback copy for INTERNAL_ERROR', async () => {
+			submitChangedUsername(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
+
+			expect(await screen.findByText("Couldn't save your profile. Try again.")).toHaveClass('form-error');
+		});
+
+		it('shows the save-profile fallback copy for a network failure', async () => {
+			submitChangedUsername(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 0 }));
+
+			expect(await screen.findByText("Couldn't save your profile. Try again.")).toBeInTheDocument();
+		});
+
+		it('shows no form error for UNAUTHENTICATED', async () => {
+			const editProfileData = jest.fn().mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			const { container } = submitChangedUsername(editProfileData);
+
+			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
+			await screen.findByRole('button', { name: 'Submit' });
+			expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+			expect(container.querySelector('.field-error')).not.toBeInTheDocument();
+		});
+
+		it('clears the form message when the user edits a field again', async () => {
+			submitChangedUsername(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
+			await screen.findByText("Couldn't save your profile. Try again.");
+
+			userEvent.type(screen.getByPlaceholderText('Username'), 'x');
+
+			expect(screen.queryByText("Couldn't save your profile. Try again.")).not.toBeInTheDocument();
+		});
+	});
 });
