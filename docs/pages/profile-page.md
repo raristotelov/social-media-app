@@ -86,6 +86,18 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - A user can only edit/delete their own posts and edit their own profile and follows. Server ownership checks — To build (#28 item 1).
 - Emails are not exposed to anyone but the owner — To build (#28 item 2).
 
+## Errors — To build (#30)
+
+Behaviour per [error-handling.md](../error-handling.md); copy per [error-messages.md](../error-messages.md).
+
+- Profile fails to load: full-page load error with Retry, chrome stays.
+- `USER_NOT_FOUND`: blank page area until #29.
+- Delete post: `POST_NOT_FOUND`, `POST_FORBIDDEN`, fallback — toast.
+- Edit caption: `CAPTION_INVALID`, `POST_NOT_FOUND`, `POST_FORBIDDEN`, fallback — form.
+- Edit Profile: `EMAIL_REQUIRED`, `EMAIL_INVALID`, `EMAIL_TAKEN`, `USERNAME_REQUIRED`, `USERNAME_TAKEN`, `BIO_TOO_LONG`, `PASSWORD_NOT_EDITABLE`, fallback — form.
+- Upload Picture: fallback — form.
+- `UNAUTHENTICATED` on any of these: session ends, redirect to `/log-in`.
+
 ## Acceptance criteria
 
 ### Viewers
@@ -139,6 +151,8 @@ Base: `https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Desi
 | Account Menu | — | — | [252:467](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=252-467) / [355:2728](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=355-2728) |
 | Post Actions | [492:1829](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=492-1829) / [504:2071](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=504-2071) | [498:4128](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=498-4128) / [505:4372](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-4372) | [499:3450](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=499-3450) / [505:6191](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-6191) |
 | Delete Post | [495:1875](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=495-1875) / [504:2104](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=504-2104) | [498:4207](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=498-4207) / [505:4405](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-4405) | [503:3503](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=503-3503) / [505:6244](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-6244) |
+| Error Toast | [556:4062](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=556-4062) / [556:4092](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=556-4092) | [560:6493](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=560-6493) / [560:6530](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=560-6530) | [560:6639](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=560-6639) / [560:6693](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=560-6693) |
+| Load Error | [564:4266](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=564-4266) / [564:4320](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=564-4320) | [568:4272](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-4272) / [568:4326](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-4326) | [568:7407](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-7407) / [568:7475](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-7475) |
 | Edit Picture | [496:1913](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=496-1913) / [504:2141](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=504-2141) | [498:4290](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=498-4290) / [505:4442](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-4442) | [499:3503](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=499-3503) / [505:6297](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-6297) |
 
 Followers / following popup: no frames yet (Design pending).

@@ -41,6 +41,11 @@
 	resize: none;
 }
 
+.edit-user-profile-form .edit-profile-error {
+	width: 100%;
+	margin-top: 16px;
+}
+
 .profile-form-button-row {
 	margin-top: 40px;
 

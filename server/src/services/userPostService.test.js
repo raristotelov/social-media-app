@@ -8,6 +8,7 @@ const UserPostModel = require('../models/userPostModel');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const AppError = require('../utils/AppError');
+const { ERROR_CODES } = require('../config/errorCodes');
 const { updateUserPostCaption, deleteUserPost } = require('./userPostService');
 
 const OWNER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
@@ -48,6 +49,7 @@ describe('userPostService', () => {
 
 				await expect(act({ userPostId: 'not-an-object-id', userId: OWNER_ID })).rejects.toMatchObject({
 					statusCode: 404,
+					code: ERROR_CODES.POST_NOT_FOUND,
 					message: 'Post not found',
 				});
 
@@ -57,7 +59,10 @@ describe('userPostService', () => {
 			it('rejects with a 404 when no post has that id', async () => {
 				UserPostModel.findById = jest.fn().mockResolvedValue(null);
 
-				await expect(act({ userPostId: POST_ID, userId: OWNER_ID })).rejects.toMatchObject({ statusCode: 404 });
+				await expect(act({ userPostId: POST_ID, userId: OWNER_ID })).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.POST_NOT_FOUND,
+				});
 			});
 
 			it('rejects with a 403 when the post belongs to someone else, and changes nothing', async () => {
@@ -65,7 +70,10 @@ describe('userPostService', () => {
 
 				givenPostOwnedByCaller(post);
 
-				await expect(act({ userPostId: POST_ID, userId: OWNER_ID })).rejects.toMatchObject({ statusCode: 403 });
+				await expect(act({ userPostId: POST_ID, userId: OWNER_ID })).rejects.toMatchObject({
+					statusCode: 403,
+					code: ERROR_CODES.POST_FORBIDDEN,
+				});
 
 				expect(post.save).not.toHaveBeenCalled();
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
@@ -77,7 +85,10 @@ describe('userPostService', () => {
 			it('rejects with a 403 when the image has no owner recorded', async () => {
 				givenPostOwnedByCaller(buildPost({ userId: undefined }));
 
-				await expect(act({ userPostId: POST_ID, userId: OWNER_ID })).rejects.toMatchObject({ statusCode: 403 });
+				await expect(act({ userPostId: POST_ID, userId: OWNER_ID })).rejects.toMatchObject({
+					statusCode: 403,
+					code: ERROR_CODES.POST_FORBIDDEN,
+				});
 			});
 
 			it("rejects with a 404 for an image owned by the caller that is not in the caller's posts (e.g. a profile picture)", async () => {
@@ -86,7 +97,10 @@ describe('userPostService', () => {
 				UserPostModel.findById = jest.fn().mockResolvedValue(profilePicture);
 				UserModel.exists = jest.fn().mockResolvedValue(null);
 
-				await expect(act({ userPostId: POST_ID, userId: OWNER_ID })).rejects.toMatchObject({ statusCode: 404 });
+				await expect(act({ userPostId: POST_ID, userId: OWNER_ID })).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.POST_NOT_FOUND,
+				});
 
 				expect(UserModel.exists).toHaveBeenCalledWith({ _id: OWNER_ID, posts: POST_ID });
 				expect(profilePicture.save).not.toHaveBeenCalled();
@@ -132,7 +146,8 @@ describe('userPostService', () => {
 
 				await expect(updateUserPostCaption({ userPostId: POST_ID, userId: OWNER_ID, caption })).rejects.toMatchObject({
 					statusCode: 400,
-					fields: { caption: 'Caption must be text' },
+					code: ERROR_CODES.CAPTION_INVALID,
+					fields: { caption: ERROR_CODES.CAPTION_INVALID },
 				});
 
 				expect(post.save).not.toHaveBeenCalled();

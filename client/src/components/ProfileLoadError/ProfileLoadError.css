@@ -1,0 +1,41 @@
+.profile-load-error {
+	width: 100%;
+	min-height: 100vh;
+	padding: var(--header-height) 16px 0;
+	box-sizing: border-box;
+
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+
+	font-family: 'Mada';
+	color: var(--text-primary);
+	text-align: center;
+}
+
+.profile-load-error-heading {
+	margin: 0;
+
+	font-size: 26px;
+	font-weight: normal;
+	overflow-wrap: anywhere;
+}
+
+.profile-load-error-description {
+	margin: 0;
+
+	font-size: 15px;
+	overflow-wrap: anywhere;
+}
+
+.profile-load-error-action {
+	margin-top: 24px;
+}
+
+@media (max-width: 599px) {
+	.profile-load-error {
+		padding-bottom: var(--tab-bar-height);
+	}
+}

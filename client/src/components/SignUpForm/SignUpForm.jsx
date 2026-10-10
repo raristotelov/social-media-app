@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 
 import { useForm } from '../../hooks/useForm';
 import { validateSignUp } from '../../utils/validators';
+import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 
 import Button from '../Button/Button';
 
@@ -16,7 +17,7 @@ const SignUpForm = ({ signUpHandler }) => {
 			repeatPassword: '',
 		},
 		signUpHandler,
-		{ submitAllValues: true, validate: validateSignUp },
+		{ submitAllValues: true, validate: validateSignUp, fallbackMessage: ACTION_FALLBACK_MESSAGES.SIGN_UP },
 	);
 
 	return (

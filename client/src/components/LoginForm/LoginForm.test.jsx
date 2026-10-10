@@ -94,38 +94,73 @@ describe('LoginForm', () => {
 		expect(submitButton).not.toBeDisabled();
 	});
 
-	it('renders a field-level error under the password input when the rejection carries a fields object', async () => {
-		const loginHandler = jest.fn().mockRejectedValue({ fields: { password: 'Wrong password' } });
+	it('renders a field code under its input when the rejection carries a fields object', async () => {
+		const loginHandler = jest.fn().mockRejectedValue({ code: 'PASSWORD_REQUIRED', fields: { password: 'PASSWORD_REQUIRED' }, status: 400 });
 		const { container } = renderLoginForm(loginHandler);
 
 		fillValidCredentials();
 		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
-		const message = await screen.findByText('Wrong password');
+		const message = await screen.findByText('Password is required');
 		expect(message).toHaveClass('field-error');
 		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
 	});
 
-	it('renders a form-level error when the rejection carries only an error message', async () => {
-		const loginHandler = jest.fn().mockRejectedValue({ error: 'Invalid credentials' });
+	it('renders WRONG_CREDENTIALS as the form message, not under a field', async () => {
+		const loginHandler = jest.fn().mockRejectedValue({ code: 'WRONG_CREDENTIALS', status: 401 });
 		const { container } = renderLoginForm(loginHandler);
 
 		fillValidCredentials();
 		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
-		const message = await screen.findByText('Invalid credentials');
+		const message = await screen.findByText('Wrong email or password');
 		expect(message).toHaveClass('form-error');
 		expect(container.querySelector('.field-error')).not.toBeInTheDocument();
 	});
 
-	it('shows a generic fallback message when the rejection carries neither fields nor an error message', async () => {
-		const loginHandler = jest.fn().mockRejectedValue({});
+	it('shows the log-in fallback copy for INTERNAL_ERROR', async () => {
+		const loginHandler = jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 		renderLoginForm(loginHandler);
 
 		fillValidCredentials();
 		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
-		const message = await screen.findByText('Something went wrong. Please try again.');
+		const message = await screen.findByText("Couldn't log in. Try again.");
 		expect(message).toHaveClass('form-error');
+	});
+
+	it('shows the log-in fallback copy for a code the client does not know', async () => {
+		const loginHandler = jest.fn().mockRejectedValue({ code: 'SOMETHING_NEW', status: 418 });
+		renderLoginForm(loginHandler);
+
+		fillValidCredentials();
+		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+		expect(await screen.findByText("Couldn't log in. Try again.")).toBeInTheDocument();
+	});
+
+	it('shows no form error for UNAUTHENTICATED', async () => {
+		const loginHandler = jest.fn().mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+		const { container } = renderLoginForm(loginHandler);
+
+		fillValidCredentials();
+		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+		await screen.findByRole('button', { name: 'Submit' });
+		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+		expect(container.querySelector('.field-error')).not.toBeInTheDocument();
+	});
+
+	it('clears the form error when the user types again', async () => {
+		const loginHandler = jest.fn().mockRejectedValue({ code: 'WRONG_CREDENTIALS', status: 401 });
+		renderLoginForm(loginHandler);
+
+		fillValidCredentials();
+		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+		await screen.findByText('Wrong email or password');
+
+		userEvent.type(screen.getByPlaceholderText('Password'), '4');
+
+		expect(screen.queryByText('Wrong email or password')).not.toBeInTheDocument();
 	});
 });

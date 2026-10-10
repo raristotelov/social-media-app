@@ -50,6 +50,10 @@
 	color: var(--text-primary);
 }
 
+.caption-input.has-error {
+	border-color: var(--feedback-error);
+}
+
 .caption-input::placeholder {
 	color: var(--text-muted);
 	opacity: 1;
@@ -57,6 +61,11 @@
 
 .caption-input:focus {
 	outline: none;
+}
+
+.add-image-post-form .add-image-post-error {
+	width: 100%;
+	margin-top: 16px;
 }
 
 .button-row {

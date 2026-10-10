@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 
 import { useForm } from '../../hooks/useForm';
 import { validateLogin } from '../../utils/validators';
+import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 
 import Button from '../Button/Button';
 
@@ -14,7 +15,7 @@ const LoginForm = ({ loginHandler }) => {
 			password: '',
 		},
 		loginHandler,
-		{ submitAllValues: true, validate: validateLogin },
+		{ submitAllValues: true, validate: validateLogin, fallbackMessage: ACTION_FALLBACK_MESSAGES.LOG_IN },
 	);
 
 	return (

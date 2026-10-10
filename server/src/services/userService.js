@@ -1,9 +1,11 @@
 const JWT = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const mongoose = require('mongoose');
 
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const constants = require('../config/constants');
+const { ERROR_CODES, VALIDATION_ERROR_CODES, DUPLICATE_KEY_ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
@@ -34,27 +36,28 @@ const asFieldError = (error) => {
 	if (error.name === 'ValidationError') {
 		const fields = {};
 
-		Object.keys(error.errors).forEach((path) => {
-			fields[path] = error.errors[path].message;
-		});
+		for (const [path, pathError] of Object.entries(error.errors)) {
+			const code = VALIDATION_ERROR_CODES[path]?.[pathError.kind];
 
-		return new AppError(Object.values(fields).join(', '), 400, { cause: error, fields });
+			if (!code) {
+				return null;
+			}
+
+			fields[path] = code;
+		}
+
+		return AppError.fromFields(fields, 400, { cause: error });
 	}
 
 	if (error.code === 11000) {
 		const duplicatedField = Object.keys(error.keyPattern || {})[0];
+		const code = DUPLICATE_KEY_ERROR_CODES[duplicatedField];
 
-		const duplicateMessages = {
-			email: 'This email is already registered',
-			username: 'This username is taken',
-		};
+		if (!code) {
+			return null;
+		}
 
-		const message = duplicateMessages[duplicatedField] || 'Email or username already in use';
-
-		return new AppError(message, 409, {
-			cause: error,
-			fields: duplicatedField ? { [duplicatedField]: message } : undefined,
-		});
+		return AppError.fromFields({ [duplicatedField]: code }, 409, { cause: error });
 	}
 
 	return null;
@@ -62,16 +65,16 @@ const asFieldError = (error) => {
 
 const signUp = async ({ email, username, password }) => {
 	try {
-		if (typeof password !== 'string' || password.length < constants.MIN_PASSWORD_LENGTH) {
-			const message = `Password must be at least ${constants.MIN_PASSWORD_LENGTH} characters`;
+		if (typeof password !== 'string' || !password) {
+			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_REQUIRED }, 400);
+		}
 
-			throw new AppError(message, 400, { fields: { password: message } });
+		if (password.length < constants.MIN_PASSWORD_LENGTH) {
+			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_TOO_SHORT }, 400);
 		}
 
 		if (Buffer.byteLength(password, 'utf8') > constants.MAX_PASSWORD_BYTES) {
-			const message = `Password must be at most ${constants.MAX_PASSWORD_BYTES} bytes`;
-
-			throw new AppError(message, 400, { fields: { password: message } });
+			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_TOO_LONG }, 400);
 		}
 
 		const hashedPassword = await bcrypt.hash(password, constants.SALT_ROUNDS);
@@ -98,16 +101,20 @@ const signUp = async ({ email, username, password }) => {
 
 const login = async ({ email, password }) => {
 	try {
+		if (typeof email !== 'string' || typeof password !== 'string') {
+			throw new AppError('Wrong email or password', 401, { code: ERROR_CODES.WRONG_CREDENTIALS });
+		}
+
 		const dbUser = await UserModel.findOne({ email });
 
 		if (!dbUser) {
-			throw new AppError('Wrong email or password', 401);
+			throw new AppError('Wrong email or password', 401, { code: ERROR_CODES.WRONG_CREDENTIALS });
 		}
 
 		const passwordIsCorrect = await bcrypt.compare(password, dbUser.password);
 
 		if (!passwordIsCorrect) {
-			throw new AppError('Wrong email or password', 401);
+			throw new AppError('Wrong email or password', 401, { code: ERROR_CODES.WRONG_CREDENTIALS });
 		}
 
 		return signAuthToken(dbUser);
@@ -174,12 +181,22 @@ const getFollowedUsersPostsByUserIds = async ({ userIds }) => {
 	}
 };
 
-const getUsersProfileDataByUserIds = async ({ userIds }) => {
+const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds }) => {
 	try {
+		const userIds = [...new Set(requestedUserIds)];
+
+		if (!userIds.every((userId) => mongoose.isObjectIdOrHexString(userId))) {
+			throw new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
+		}
+
 		const usersResult = await UserModel.find({ _id: { $in: userIds } })
 			.select({ _id: 1, username: 1, email: 1, posts: 1, bio: 1, theme: 1, profilePicture: 1, following: 1, followers: 1 })
 			.populate({ path: 'posts' })
 			.populate({ path: 'profilePicture' });
+
+		if (usersResult.length !== userIds.length) {
+			throw new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
+		}
 
 		const usersWithFollowedUsersPostsResult = await getFollowedUsersPostsByUserIds({ userIds });
 
@@ -220,9 +237,7 @@ const destroyProfilePicture = async (profilePicture) => {
 const updateUserProfileData = async (userId, updatedProfileData) => {
 	try {
 		if (Object.prototype.hasOwnProperty.call(updatedProfileData, 'password')) {
-			throw new AppError('Password cannot be changed here', 400, {
-				fields: { password: 'Password cannot be changed from the profile form' },
-			});
+			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_NOT_EDITABLE }, 400);
 		}
 
 		const isRemovingProfilePicture = updatedProfileData.profilePicture === null;

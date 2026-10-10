@@ -42,16 +42,11 @@ describe('DeletePostConfirm', () => {
 		expect(onDeleteClick).not.toHaveBeenCalled();
 	});
 
-	it('shows no error message by default', () => {
+	it('renders no error message of its own (failures are shown as a toast by the page)', () => {
 		const { container } = renderConfirm();
 
 		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
-	});
-
-	it('shows the error message when one is given', () => {
-		renderConfirm({ errorMessage: 'Could not delete the post' });
-
-		expect(screen.getByText('Could not delete the post')).toBeInTheDocument();
+		expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 	});
 
 	it('disables Delete but keeps Cancel enabled while deleting', () => {

@@ -74,35 +74,71 @@ describe('EditPostForm', () => {
 		expect(editPostHandler).not.toHaveBeenCalled();
 	});
 
-	it('shows the server error message in the form when saving fails', async () => {
-		const editPostHandler = jest.fn().mockRejectedValue({ error: 'You can only change your own posts' });
-		renderEditPostForm(editPostHandler, jest.fn());
+	it('shows the copy for the error code as the form message when saving fails', async () => {
+		const editPostHandler = jest.fn().mockRejectedValue({ code: 'POST_FORBIDDEN', status: 403 });
+		const { container } = renderEditPostForm(editPostHandler, jest.fn());
 
 		userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' extra');
 		userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-		expect(await screen.findByText('You can only change your own posts')).toBeInTheDocument();
+		const message = await screen.findByText('You can only change your own posts');
+		expect(message).toHaveClass('form-error');
+		expect(container.querySelector('.field-error')).not.toBeInTheDocument();
 	});
 
-	it('shows a generic message when the failure carries no server message', async () => {
-		const editPostHandler = jest.fn().mockRejectedValue({});
+	it('shows POST_NOT_FOUND copy as the form message', async () => {
+		const editPostHandler = jest.fn().mockRejectedValue({ code: 'POST_NOT_FOUND', status: 404 });
 		renderEditPostForm(editPostHandler, jest.fn());
 
 		userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' extra');
 		userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-		expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+		expect(await screen.findByText('This post no longer exists')).toBeInTheDocument();
+	});
+
+	it('shows CAPTION_INVALID under the caption field', async () => {
+		const editPostHandler = jest.fn().mockRejectedValue({ code: 'CAPTION_INVALID', fields: { caption: 'CAPTION_INVALID' }, status: 400 });
+		const { container } = renderEditPostForm(editPostHandler, jest.fn());
+
+		userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' extra');
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+		const message = await screen.findByText('Caption must be text');
+		expect(message).toHaveClass('field-error');
+		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+	});
+
+	it('shows the edit-caption fallback copy for INTERNAL_ERROR', async () => {
+		const editPostHandler = jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+		renderEditPostForm(editPostHandler, jest.fn());
+
+		userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' extra');
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+		expect(await screen.findByText("Couldn't save the caption. Try again.")).toBeInTheDocument();
+	});
+
+	it('shows no form error for UNAUTHENTICATED', async () => {
+		const editPostHandler = jest.fn().mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+		const { container } = renderEditPostForm(editPostHandler, jest.fn());
+
+		userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' extra');
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+		await waitFor(() => expect(editPostHandler).toHaveBeenCalledTimes(1));
+		await screen.findByRole('button', { name: 'Save' });
+		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
 	});
 
 	it('keeps the form open after a failed save', async () => {
 		const onCancelClick = jest.fn();
-		const editPostHandler = jest.fn().mockRejectedValue({});
+		const editPostHandler = jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 		renderEditPostForm(editPostHandler, onCancelClick);
 
 		userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' extra');
 		userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-		await screen.findByText('Something went wrong. Please try again.');
+		await screen.findByText("Couldn't save the caption. Try again.");
 		expect(onCancelClick).not.toHaveBeenCalled();
 	});
 });

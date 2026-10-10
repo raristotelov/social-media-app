@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
 import useLocalStorage from './hooks/useLocalStorage';
 import LoggedInUserContext from './contexts/LoggedInUserContext';
 import { getUsersProfileData } from './services/userService';
+import { ERROR_CODES } from './constants/errorCodes';
+import { getErrorCode } from './utils/errors';
 
 import MainHeader from './components/Header/MainHeader';
 import MobileTopBar from './components/Header/MobileTopBar';
@@ -37,6 +39,11 @@ function App() {
 	const [storedTheme, setStoredTheme] = useLocalStorage('theme', null);
 
 	const navigate = useNavigate();
+
+	const endSession = useCallback(() => {
+		setJwtToken(null);
+		navigate('/log-in');
+	}, [setJwtToken, navigate]);
 
 	useEffect(() => {
 		const theme = loggedInUser?.theme || storedTheme || getOperatingSystemTheme();
@@ -73,15 +80,10 @@ function App() {
 			return;
 		}
 
-		const abandonSession = () => {
-			setJwtToken(null);
-			navigate('/log-in');
-		};
-
 		const userId = readUserIdFromToken(jwtToken);
 
 		if (!userId) {
-			abandonSession();
+			endSession();
 
 			return;
 		}
@@ -93,18 +95,20 @@ function App() {
 				if (result[0]) {
 					setLoggedInUser(result[0]);
 				} else {
-					abandonSession();
+					endSession();
 				}
 			})
 			.catch((error) => {
-				if (error?.status === 401 || error?.status === 403) {
-					abandonSession();
+				const errorCode = getErrorCode(error);
+
+				if (errorCode === ERROR_CODES.UNAUTHENTICATED || errorCode === ERROR_CODES.USER_NOT_FOUND) {
+					endSession();
 				}
 			})
 			.finally(() => {
 				setIsRestoringSession(false);
 			});
-	}, [jwtToken, loggedInUser, setJwtToken, navigate]);
+	}, [jwtToken, loggedInUser, endSession]);
 
 	const updateLoggedInUser = (updatedUser) => {
 		setLoggedInUser(updatedUser.user);
@@ -114,8 +118,7 @@ function App() {
 	const logoutHandler = (e) => {
 		e.preventDefault();
 
-		setJwtToken(null);
-		navigate('/log-in');
+		endSession();
 	};
 
 	const loggedInUserContextValues = {
@@ -125,6 +128,7 @@ function App() {
 		updateLoggedInUser,
 		setLoggedInUser,
 		isRestoringSession,
+		endSession,
 	};
 
 	if (isRestoringSession) {

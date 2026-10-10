@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
-export const useForm = (initialValues, onSubmitHandler, { submitAllValues = false, validate } = {}) => {
+import { getFormErrors, isUnauthenticatedError } from '../utils/errors';
+
+export const useForm = (initialValues, onSubmitHandler, { submitAllValues = false, validate, fallbackMessage } = {}) => {
 	const [values, setValues] = useState(initialValues);
 	const [errors, setErrors] = useState({});
 	const [formError, setFormError] = useState('');
@@ -58,17 +60,14 @@ export const useForm = (initialValues, onSubmitHandler, { submitAllValues = fals
 		try {
 			await onSubmitHandler(getSubmittedValues());
 		} catch (requestError) {
-			if (requestError?.fields) {
-				const fieldErrors = {};
-
-				Object.keys(requestError.fields).forEach((field) => {
-					fieldErrors[field] = [requestError.fields[field]];
-				});
-
-				setErrors(fieldErrors);
-			} else {
-				setFormError(requestError?.error || 'Something went wrong. Please try again.');
+			if (isUnauthenticatedError(requestError)) {
+				return;
 			}
+
+			const { fieldErrors, formError: submitFormError } = getFormErrors(requestError, Object.keys(initialValues), fallbackMessage);
+
+			setErrors(fieldErrors);
+			setFormError(submitFormError);
 		} finally {
 			setIsSubmitting(false);
 		}
