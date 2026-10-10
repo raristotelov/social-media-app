@@ -13,6 +13,18 @@ export const addUserPost = (data, jwtToken) => {
 	return request.post(`${serverUrl}/user-posts`, data);
 };
 
+export const updateUserPostCaption = ({ userPostId, caption, jwtToken }) => {
+	const request = requestFactory(jwtToken);
+
+	return request.patch(`${serverUrl}/user-posts/${userPostId}`, { caption });
+};
+
+export const deleteUserPost = ({ userPostId, jwtToken }) => {
+	const request = requestFactory(jwtToken);
+
+	return request.delete(`${serverUrl}/user-posts/${userPostId}`);
+};
+
 export const getFollowedUsersPosts = ({ jwtToken }) => {
 	const request = requestFactory(jwtToken);
 

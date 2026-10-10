@@ -1,0 +1,52 @@
+.post-actions-scrim {
+	display: contents;
+}
+
+.account-menu.post-actions-menu {
+	top: 44px;
+	right: 8px;
+}
+
+.post-actions-menu .post-actions-menu-row-danger {
+	color: var(--brand-red);
+}
+
+@media (max-width: 599px) {
+	.post-actions-scrim {
+		position: fixed;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		z-index: 2;
+
+		display: block;
+
+		background-color: rgba(0, 0, 0, 0.5);
+	}
+
+	.account-menu.post-actions-menu {
+		position: fixed;
+		top: auto;
+		right: 0;
+		bottom: 0;
+		left: 0;
+
+		width: 100%;
+		padding: 10px 0 24px;
+
+		border-width: 1px 0 0;
+		border-color: var(--border-divider);
+		border-radius: 16px 16px 0 0;
+		box-shadow: none;
+	}
+
+	.post-actions-menu::before {
+		margin-bottom: 14px;
+	}
+
+	.post-actions-menu .account-menu-row {
+		height: 53px;
+		padding: 0 24px;
+	}
+}

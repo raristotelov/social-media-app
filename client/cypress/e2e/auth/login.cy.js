@@ -1,5 +1,5 @@
-import { buildTestUser } from '../support/testUser';
-import { createUserViaApi } from '../support/api';
+import { buildTestUser } from '../../support/testUser';
+import { createUserViaApi } from '../../support/api';
 
 describe('login', () => {
 	const user = buildTestUser();

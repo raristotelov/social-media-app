@@ -1,4 +1,5 @@
 .profile-post {
+	position: relative;
 	width: calc((100% - 24px) / 3);
 	aspect-ratio: 1;
 }
@@ -9,8 +10,37 @@
 	object-fit: cover;
 }
 
+.post-actions-button {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+
+	width: 32px;
+	height: 32px;
+	padding: 0;
+
+	border: none;
+	border-radius: 50%;
+	background-color: transparent;
+	line-height: 0;
+}
+
+.post-actions-button:hover {
+	cursor: pointer;
+	background-color: var(--overlay-button-hover);
+}
+
+.post-actions-button svg {
+	filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
+}
+
 @media (max-width: 599px) {
 	.profile-post {
 		width: calc((100% - 4px) / 3);
+	}
+
+	.post-actions-button {
+		top: 6px;
+		right: 6px;
 	}
 }

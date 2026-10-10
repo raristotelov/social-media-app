@@ -27,13 +27,13 @@ const ProfileHeader = (props) => {
 				<span className='profile-stat'>
 					<strong>{totalPostsCount}</strong>
 
-					<span>posts</span>
+					<span>{totalPostsCount === 1 ? 'post' : 'posts'}</span>
 				</span>
 
 				<span className='profile-stat'>
 					<strong>{followersCount}</strong>
 
-					<span>followers</span>
+					<span>{followersCount === 1 ? 'follower' : 'followers'}</span>
 				</span>
 
 				<span className='profile-stat'>
