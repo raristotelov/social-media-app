@@ -8,9 +8,9 @@ How the Figma file is organised and the layout rules behind it. Tokens live in *
 
 | Page | Canvas | CSS range | Frames |
 |------|--------|-----------|--------|
-| Desktop | 1440×1024 | 1280px and up | 32 (16 light + 16 dark) |
-| Tablet | 768×1024 | 600–1279px | 34 (17 light + 17 dark) |
-| Mobile | 390×844 | below 600px | 32 (16 light + 16 dark) |
+| Desktop | 1440×1024 | 1280px and up | 40 (20 light + 20 dark) |
+| Tablet | 768×1024 | 600–1279px | 42 (21 light + 21 dark) |
+| Mobile | 390×844 | below 600px | 40 (20 light + 20 dark) |
 | Components | — | — | shared + per-breakpoint components |
 
 The CSS ranges live here rather than in the Figma page names — see [Breakpoints](#breakpoints) for why 600 is the line.
@@ -59,7 +59,7 @@ Mobile specifics: guest tab bar carries Popular · Log in · Sign up, member car
 
 On the **Components** page, grouped into sections:
 
-- **Shared — edit with caution.** `Input`, `Button` (Primary/Secondary × Default/Hover), `PostCard`, `Comment`, `Reply`, `Explore Tile`, `Profile Picture`, `Nav Item / Feed · Popular · Log In · Sign up`, `Story` (Unviewed/Viewed/Own), `Suggested User` (Link/Button), `Suggestion Card`, `Switch` (On/Off). Used by every breakpoint.
+- **Shared — edit with caution.** `Input`, `Button` (Primary/Secondary × Default/Hover), `PostCard`, `Comment`, `Reply`, `Explore Tile`, `Profile Picture`, `Nav Item / Feed · Popular · Log In · Sign up`, `Story` (Unviewed/Viewed/Own), `Suggested User` (Link/Button), `Suggestion Card`, `Switch` (On/Off), `Post Actions Button`, `Remove Picture Button`. Used by every breakpoint.
 - **Desktop.** `Header / Member`, `Header / Guest`, `Stories Tray / Desktop`, `Suggestions / Desktop`, `Suggestions / Empty Feed`.
 - **Tablet.** `Header / Member – 768`, `Header / Guest – 768`, `Stories Tray / 768`, `Suggestions / 768`.
 - **Mobile.** `Tab Bar / Member`, `Tab Bar / Guest`, `Top Bar / Mobile` (Right = Search / None / Menu), `Stories Tray / Mobile`, `Suggestions / Mobile`.
