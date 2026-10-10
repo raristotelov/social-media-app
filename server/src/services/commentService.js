@@ -97,10 +97,22 @@ const getCommentCountsForPosts = async (userPostIds) => {
 	}
 };
 
+const deleteCommentsForPost = async ({ userPostId }) => {
+	try {
+		const postComments = await CommentModel.find({ userPostId }).select({ _id: 1 });
+		const commentIds = postComments.map((comment) => comment._id);
+
+		await CommentModel.deleteMany({ $or: [{ userPostId }, { parentCommentId: { $in: commentIds } }] });
+	} catch (error) {
+		throw new AppError('Could not delete comments', 500, { cause: error });
+	}
+};
+
 module.exports = {
 	addComment,
 	getCommentsForPost,
 	likeComment,
 	unlikeComment,
 	getCommentCountsForPosts,
+	deleteCommentsForPost,
 };

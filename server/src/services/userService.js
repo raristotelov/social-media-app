@@ -211,6 +211,12 @@ const getUsersProfileDataBySearchWord = async ({ searchWord }) => {
 	}
 };
 
+const destroyProfilePicture = async (profilePicture) => {
+	await imageStorageService.deleteImage(profilePicture.imageIdentifier);
+
+	await UserPostModel.deleteOne({ _id: profilePicture._id });
+};
+
 const updateUserProfileData = async (userId, updatedProfileData) => {
 	try {
 		if (Object.prototype.hasOwnProperty.call(updatedProfileData, 'password')) {
@@ -219,20 +225,19 @@ const updateUserProfileData = async (userId, updatedProfileData) => {
 			});
 		}
 
+		const isRemovingProfilePicture = updatedProfileData.profilePicture === null;
+
 		let profilePicture = null;
+		let replacedProfilePicture = null;
+
+		if (updatedProfileData.profilePicture || isRemovingProfilePicture) {
+			const userWithProfilePicture = await UserModel.findOne({ _id: userId }).populate({ path: 'profilePicture' });
+
+			replacedProfilePicture = userWithProfilePicture.profilePicture;
+		}
 
 		if (updatedProfileData.profilePicture) {
 			const updatedProfilePicture = updatedProfileData.profilePicture;
-
-			const userWithProfilePicture = await UserModel.findOne({ _id: userId }).populate({ path: 'profilePicture' });
-
-			if (userWithProfilePicture.profilePicture) {
-				const replacedPicture = userWithProfilePicture.profilePicture;
-
-				await imageStorageService.deleteImage(replacedPicture.imageIdentifier);
-
-				await UserPostModel.deleteOne({ _id: replacedPicture._id });
-			}
 
 			profilePicture = new UserPostModel({
 				imageIdentifier: updatedProfilePicture.imageIdentifier,
@@ -247,11 +252,29 @@ const updateUserProfileData = async (userId, updatedProfileData) => {
 			updatedProfileData.profilePicture = profilePicture._id;
 		}
 
-		const user = await UserModel.findOneAndUpdate({ _id: userId }, updatedProfileData, {
-			new: true,
-			runValidators: true,
-			context: 'query',
-		}).populate('profilePicture');
+		let user;
+
+		try {
+			user = await UserModel.findOneAndUpdate({ _id: userId }, updatedProfileData, {
+				new: true,
+				runValidators: true,
+				context: 'query',
+			}).populate('profilePicture');
+		} catch (error) {
+			if (profilePicture) {
+				await UserPostModel.deleteOne({ _id: profilePicture._id });
+			}
+
+			throw error;
+		}
+
+		if (replacedProfilePicture) {
+			try {
+				await destroyProfilePicture(replacedProfilePicture);
+			} catch (error) {
+				console.error(`Could not delete replaced profile picture ${replacedProfilePicture.imageIdentifier}`, error);
+			}
+		}
 
 		const updatedUserData = getNeccessaryUserData(user);
 

@@ -40,4 +40,20 @@ router.post('/unlike/:userPostId', verifyJwtToken, async (req, res) => {
 	return res.json(userPostData);
 });
 
+router.patch('/:userPostId', verifyJwtToken, async (req, res) => {
+	const userPostData = await userPostService.updateUserPostCaption({
+		userPostId: req.params.userPostId,
+		userId: res.userId,
+		caption: req.body.caption,
+	});
+
+	return res.json(userPostData);
+});
+
+router.delete('/:userPostId', verifyJwtToken, async (req, res) => {
+	await userPostService.deleteUserPost({ userPostId: req.params.userPostId, userId: res.userId });
+
+	return res.status(204).end();
+});
+
 module.exports = router;

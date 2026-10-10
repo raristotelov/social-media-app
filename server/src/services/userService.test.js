@@ -1,6 +1,7 @@
 jest.mock('../models/userModel');
 jest.mock('../models/userPostModel');
 jest.mock('./commentService');
+jest.mock('./imageStorageService');
 jest.mock('bcrypt');
 jest.mock('jsonwebtoken');
 
@@ -8,9 +9,11 @@ const bcrypt = require('bcrypt');
 const JWT = require('jsonwebtoken');
 
 const UserModel = require('../models/userModel');
+const UserPostModel = require('../models/userPostModel');
+const imageStorageService = require('./imageStorageService');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
-const { login, signUp } = require('./userService');
+const { login, signUp, updateUserProfileData } = require('./userService');
 
 describe('userService', () => {
 	beforeEach(() => {
@@ -235,6 +238,313 @@ describe('userService', () => {
 				statusCode: 500,
 				message: 'Could not sign up',
 				cause: dbError,
+			});
+		});
+	});
+
+	describe('updateUserProfileData', () => {
+		const USER_ID = 'user1';
+		const existingPicture = { _id: 'picture1', imageIdentifier: 'old-picture-id', imageUrl: 'https://example.com/old.jpg' };
+
+		const givenUserWithPicture = (profilePicture) => {
+			UserModel.findOne = jest.fn().mockReturnValue({
+				populate: jest.fn().mockResolvedValue({ _id: USER_ID, profilePicture }),
+			});
+		};
+
+		const givenUpdateResolves = (user = { _id: USER_ID, username: 'realuser' }) => {
+			UserModel.findOneAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(user) });
+		};
+
+		const givenUpdateRejects = (error) => {
+			UserModel.findOneAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockRejectedValue(error) });
+		};
+
+		const buildDuplicateUsernameError = () => {
+			const duplicateKeyError = new Error('E11000 duplicate key error');
+
+			duplicateKeyError.code = 11000;
+			duplicateKeyError.keyPattern = { username: 1 };
+
+			return duplicateKeyError;
+		};
+
+		let consoleErrorSpy;
+
+		beforeEach(() => {
+			JWT.sign.mockReturnValue('signed.jwt.token');
+			imageStorageService.deleteImage.mockResolvedValue({ result: 'ok' });
+			UserPostModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+			consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			consoleErrorSpy.mockRestore();
+		});
+
+		describe('removing the profile picture (profilePicture: null)', () => {
+			it('destroys the Cloudinary asset, deletes the UserImage document and unsets the reference', async () => {
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, { profilePicture: null });
+
+				expect(imageStorageService.deleteImage).toHaveBeenCalledWith('old-picture-id');
+				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'picture1' });
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { profilePicture: null }, expect.any(Object));
+			});
+
+			it('updates the user first, then destroys the Cloudinary asset, then deletes the document', async () => {
+				const callOrder = [];
+
+				givenUserWithPicture(existingPicture);
+				imageStorageService.deleteImage.mockImplementation(async () => callOrder.push('cloudinary'));
+				UserPostModel.deleteOne.mockImplementation(async () => callOrder.push('document'));
+				UserModel.findOneAndUpdate = jest.fn().mockImplementation(() => {
+					callOrder.push('user');
+
+					return { populate: jest.fn().mockResolvedValue({ _id: USER_ID }) };
+				});
+
+				await updateUserProfileData(USER_ID, { profilePicture: null });
+
+				expect(callOrder).toEqual(['user', 'cloudinary', 'document']);
+			});
+
+			it('leaves the picture untouched and does not call deleteImage when the update fails (duplicate username)', async () => {
+				givenUserWithPicture(existingPicture);
+				givenUpdateRejects(buildDuplicateUsernameError());
+
+				await expect(updateUserProfileData(USER_ID, { username: 'taken', profilePicture: null })).rejects.toMatchObject({
+					statusCode: 409,
+					fields: { username: 'This username is taken' },
+				});
+
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+			});
+
+			it('leaves the picture untouched when the update fails with an unexpected error, and wraps it in a 500', async () => {
+				const dbError = new Error('connection lost');
+
+				givenUserWithPicture(existingPicture);
+				givenUpdateRejects(dbError);
+
+				await expect(updateUserProfileData(USER_ID, { profilePicture: null })).rejects.toMatchObject({
+					statusCode: 500,
+					message: 'Could not update user profile',
+					cause: dbError,
+				});
+
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+			});
+
+			it('returns the updated user without a profile picture', async () => {
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves({ _id: USER_ID, username: 'realuser', profilePicture: null });
+
+				const result = await updateUserProfileData(USER_ID, { profilePicture: null });
+
+				expect(result.user).toEqual({ _id: USER_ID, username: 'realuser' });
+				expect(result.user.profilePicture).toBeUndefined();
+			});
+
+			it('does not create a new UserImage document', async () => {
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, { profilePicture: null });
+
+				expect(UserPostModel).not.toHaveBeenCalled();
+			});
+
+			it('destroys nothing when the user has no picture, but still updates the user', async () => {
+				givenUserWithPicture(null);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, { profilePicture: null });
+
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledTimes(1);
+			});
+
+			it('still resolves with the updated user and logs the error when the post-save Cloudinary destroy fails', async () => {
+				const destroyError = new AppError('Could not delete image old-picture-id', 502);
+
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves({ _id: USER_ID, username: 'realuser' });
+				imageStorageService.deleteImage.mockRejectedValue(destroyError);
+
+				const result = await updateUserProfileData(USER_ID, { profilePicture: null });
+
+				expect(result.user).toEqual({ _id: USER_ID, username: 'realuser' });
+				expect(result.jwt).toBe('signed.jwt.token');
+				expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+				expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('old-picture-id'), destroyError);
+			});
+
+			it('does not log anything when the destroy succeeds', async () => {
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, { profilePicture: null });
+
+				expect(consoleErrorSpy).not.toHaveBeenCalled();
+			});
+		});
+
+		describe('replacing the profile picture', () => {
+			const newPicture = { imageIdentifier: 'new-picture-id', imageUrl: 'https://example.com/new.jpg' };
+
+			const buildUserPostModelMock = () => {
+				const save = jest.fn().mockResolvedValue(undefined);
+
+				UserPostModel.mockImplementation(function UserPostModelMock(data) {
+					Object.assign(this, data);
+					this._id = 'newPicture1';
+					this.save = save;
+				});
+
+				return save;
+			};
+
+			it('destroys the previous asset and document, saves the new image and points the user at it', async () => {
+				const save = buildUserPostModelMock();
+
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, { profilePicture: newPicture });
+
+				expect(imageStorageService.deleteImage).toHaveBeenCalledWith('old-picture-id');
+				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'picture1' });
+				expect(UserPostModel).toHaveBeenCalledWith({ ...newPicture, userId: USER_ID });
+				expect(save).toHaveBeenCalledTimes(1);
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { profilePicture: 'newPicture1' }, expect.any(Object));
+			});
+
+			it('saves the new image and updates the user first, then destroys the previous asset and document', async () => {
+				const callOrder = [];
+				const save = jest.fn().mockImplementation(async () => callOrder.push('save new'));
+
+				UserPostModel.mockImplementation(function UserPostModelMock(data) {
+					Object.assign(this, data);
+					this._id = 'newPicture1';
+					this.save = save;
+				});
+				givenUserWithPicture(existingPicture);
+				imageStorageService.deleteImage.mockImplementation(async () => callOrder.push('cloudinary'));
+				UserPostModel.deleteOne.mockImplementation(async (filter) => callOrder.push(`delete ${filter._id}`));
+				UserModel.findOneAndUpdate = jest.fn().mockImplementation(() => {
+					callOrder.push('user');
+
+					return { populate: jest.fn().mockResolvedValue({ _id: USER_ID }) };
+				});
+
+				await updateUserProfileData(USER_ID, { profilePicture: newPicture });
+
+				expect(callOrder).toEqual(['save new', 'user', 'cloudinary', 'delete picture1']);
+			});
+
+			it('deletes the new document and leaves the old picture untouched when the update fails (duplicate username)', async () => {
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateRejects(buildDuplicateUsernameError());
+
+				await expect(updateUserProfileData(USER_ID, { username: 'taken', profilePicture: newPicture })).rejects.toMatchObject({
+					statusCode: 409,
+					fields: { username: 'This username is taken' },
+				});
+
+				expect(UserPostModel.deleteOne).toHaveBeenCalledTimes(1);
+				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+			});
+
+			it('maps a validation failure to a 400 with fields, deleting the new document and leaving the old picture untouched', async () => {
+				const validationError = new Error('User validation failed');
+
+				validationError.name = 'ValidationError';
+				validationError.errors = { bio: { message: 'Bio is too long' } };
+
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateRejects(validationError);
+
+				await expect(updateUserProfileData(USER_ID, { bio: 'x', profilePicture: newPicture })).rejects.toMatchObject({
+					statusCode: 400,
+					fields: { bio: 'Bio is too long' },
+				});
+
+				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalledWith({ _id: 'picture1' });
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+			});
+
+			it('wraps an unexpected update failure in a 500, deleting the new document and leaving the old picture untouched', async () => {
+				const dbError = new Error('connection lost');
+
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateRejects(dbError);
+
+				await expect(updateUserProfileData(USER_ID, { profilePicture: newPicture })).rejects.toMatchObject({
+					statusCode: 500,
+					cause: dbError,
+				});
+
+				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+			});
+
+			it('still resolves with the updated user and logs the error when the post-save destroy of the old picture fails', async () => {
+				const destroyError = new AppError('Could not delete image old-picture-id', 502);
+
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves({ _id: USER_ID, username: 'realuser' });
+				imageStorageService.deleteImage.mockRejectedValue(destroyError);
+
+				const result = await updateUserProfileData(USER_ID, { profilePicture: newPicture });
+
+				expect(result.user).toEqual({ _id: USER_ID, username: 'realuser' });
+				expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('old-picture-id'), destroyError);
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalledWith({ _id: 'newPicture1' });
+			});
+
+			it('destroys nothing when the user had no previous picture', async () => {
+				buildUserPostModelMock();
+				givenUserWithPicture(null);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, { profilePicture: newPicture });
+
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+			});
+		});
+
+		describe('updates that do not touch the profile picture', () => {
+			it('does not look up or destroy the picture when profilePicture is absent', async () => {
+				UserModel.findOne = jest.fn();
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, { bio: 'New bio' });
+
+				expect(UserModel.findOne).not.toHaveBeenCalled();
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { bio: 'New bio' }, expect.any(Object));
+			});
+
+			it('rejects a password change with a 400 before touching the picture', async () => {
+				UserModel.findOne = jest.fn();
+
+				await expect(updateUserProfileData(USER_ID, { password: 'x', profilePicture: null })).rejects.toMatchObject({ statusCode: 400 });
+
+				expect(UserModel.findOne).not.toHaveBeenCalled();
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
 			});
 		});
 	});
