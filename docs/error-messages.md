@@ -1,6 +1,6 @@
 # Error Messages
 
-Status: In Development (#30)
+Status: Complete (#30)
 
 Every error code the server sends and the copy the client shows for it. The client's code map is the only place this copy lives in code. Contract and where each message appears: [error-handling.md](./error-handling.md).
 

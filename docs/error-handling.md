@@ -1,6 +1,6 @@
 # Error Handling
 
-Status: In Development (#30)
+Status: Complete (#30)
 
 One system for every failure, server and client. Rolled out page by page: #30 covers the auth pages and the profile page, and the routes they call (auth, user, user-post). Other pages adopt it when they are redesigned.
 

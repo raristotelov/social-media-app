@@ -86,7 +86,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - A user can only edit/delete their own posts and edit their own profile and follows. Server ownership checks — To build (#28 item 1).
 - Emails are not exposed to anyone but the owner — To build (#28 item 2).
 
-## Errors — To build (#30)
+## Errors — Built
 
 Behaviour per [error-handling.md](../error-handling.md); copy per [error-messages.md](../error-messages.md).
 
