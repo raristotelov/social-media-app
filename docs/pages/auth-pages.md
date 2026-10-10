@@ -15,7 +15,7 @@ The two entry pages for unauthenticated users. Both render the guest header (log
 - **Fields:** Email, Username, Password, Repeat password.
 - **Actions:** Submit calls `signUpHandler`; "Already have an account? Login" links to `/log-in`.
 
-## Errors — To build (#30)
+## Errors — Built
 
 Behaviour per [error-handling.md](../error-handling.md); copy per [error-messages.md](../error-messages.md).
 
