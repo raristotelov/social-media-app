@@ -73,4 +73,128 @@ describe('EditProfileForm', () => {
 		const bioField = screen.getByPlaceholderText('Bio');
 		expect(bioField.tagName).toBe('TEXTAREA');
 	});
+
+	describe('profile picture', () => {
+		const userDataWithPicture = { ...userData, profilePicture: { imageUrl: 'https://example.com/me.jpg' } };
+
+		const buildFile = () => new File(['(image)'], 'new.png', { type: 'image/png' });
+
+		const getFileInput = (container) => container.querySelector('input[type="file"]');
+
+		beforeEach(() => {
+			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
+			global.URL.revokeObjectURL = jest.fn();
+		});
+
+		it('shows the remove button when the user has a picture', () => {
+			renderEditProfileForm(jest.fn(), jest.fn(), userDataWithPicture);
+
+			expect(screen.getByRole('button', { name: 'Remove picture' })).toBeInTheDocument();
+		});
+
+		it('sends profilePicture: null and nothing else when the existing picture is removed and Submit is clicked', async () => {
+			const editProfileData = jest.fn();
+			renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+
+			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
+			expect(editProfileData).toHaveBeenCalledWith({ profilePicture: null });
+		});
+
+		it('does not call editProfileData or close the form on removal alone, until Submit is clicked', () => {
+			const editProfileData = jest.fn();
+			const onCancelClick = jest.fn();
+			renderEditProfileForm(editProfileData, onCancelClick, userDataWithPicture);
+
+			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+
+			expect(editProfileData).not.toHaveBeenCalled();
+			expect(onCancelClick).not.toHaveBeenCalled();
+		});
+
+		it('sends profilePicture: null together with other changed values', async () => {
+			const editProfileData = jest.fn();
+			renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+
+			userEvent.clear(screen.getByPlaceholderText('Bio'));
+			userEvent.type(screen.getByPlaceholderText('Bio'), 'New bio');
+			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ bio: 'New bio', profilePicture: null }));
+		});
+
+		it('sends the chosen file when a new picture is picked after removing the old one', async () => {
+			const editProfileData = jest.fn();
+			const file = buildFile();
+			const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+
+			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			userEvent.upload(getFileInput(container), file);
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
+			expect(editProfileData).toHaveBeenCalledWith({ profilePicture: file });
+		});
+
+		it('sends the chosen file when a replacement is picked without removing first', async () => {
+			const editProfileData = jest.fn();
+			const file = buildFile();
+			const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+
+			userEvent.upload(getFileInput(container), file);
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ profilePicture: file }));
+		});
+
+		it('sends nothing for the picture when a new file is chosen and then removed on a user who had no picture', async () => {
+			const editProfileData = jest.fn();
+			const onCancelClick = jest.fn();
+			const { container } = renderEditProfileForm(editProfileData, onCancelClick);
+
+			userEvent.upload(getFileInput(container), buildFile());
+			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await waitFor(() => expect(onCancelClick).toHaveBeenCalledTimes(1));
+			expect(editProfileData).not.toHaveBeenCalled();
+		});
+
+		it('sends profilePicture: null when a new file is chosen and then removed on a user who had a picture', async () => {
+			const editProfileData = jest.fn();
+			const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+
+			userEvent.upload(getFileInput(container), buildFile());
+			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ profilePicture: null }));
+		});
+
+		it('does not send profilePicture when the picture was never touched', async () => {
+			const editProfileData = jest.fn();
+			renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+
+			userEvent.clear(screen.getByPlaceholderText('Username'));
+			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ username: 'newname' }));
+		});
+
+		it('calls onCancelClick and sends nothing when Cancel is clicked after removing the picture', () => {
+			const editProfileData = jest.fn();
+			const onCancelClick = jest.fn();
+			renderEditProfileForm(editProfileData, onCancelClick, userDataWithPicture);
+
+			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+			expect(onCancelClick).toHaveBeenCalledTimes(1);
+			expect(editProfileData).not.toHaveBeenCalled();
+		});
+	});
 });

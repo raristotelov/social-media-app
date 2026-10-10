@@ -46,6 +46,11 @@
 
 .preview-wrapper img {
 	object-fit: contain;
+	cursor: pointer;
+}
+
+.preview-wrapper.removable {
+	position: relative;
 }
 
 .preview-wrapper .round-image {
@@ -83,5 +88,30 @@
 
 .preview-wrapper:hover .image-change-button {
 	display: flex;
+	cursor: pointer;
+}
+
+.image-remove-button {
+	position: absolute;
+	top: 5px;
+	right: 5px;
+
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	box-sizing: border-box;
+
+	display: flex;
+	justify-content: center;
+	align-items: center;
+
+	border: 1px solid var(--border-card);
+	border-radius: 12px;
+	background-color: var(--background-surface);
+	color: var(--text-primary);
+	line-height: 0;
+}
+
+.image-remove-button:hover {
 	cursor: pointer;
 }

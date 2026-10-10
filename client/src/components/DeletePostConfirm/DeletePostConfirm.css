@@ -1,0 +1,86 @@
+.delete-post-confirm {
+	width: 476px;
+	padding: 22px 40px 24px;
+	box-sizing: border-box;
+
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+
+	font-family: 'Mada';
+}
+
+.delete-post-message {
+	margin: 0;
+
+	font-family: 'Mada';
+	font-size: 15px;
+	color: var(--text-secondary);
+	text-align: center;
+}
+
+.delete-post-confirm .form-error {
+	width: 100%;
+	margin-top: 16px;
+}
+
+.delete-post-actions {
+	margin-top: 29px;
+
+	display: flex;
+	gap: 50px;
+}
+
+@media (min-width: 600px) {
+	.delete-post-popup .popup-title {
+		padding-top: 48px;
+	}
+}
+
+@media (max-width: 599px) {
+	.popup-container.delete-post-popup {
+		align-items: flex-end;
+	}
+
+	.delete-post-popup .popup-body {
+		height: auto;
+		padding: 10px 24px 24px;
+		border-top: 1px solid var(--border-divider);
+		border-radius: 16px 16px 0 0;
+
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 16px;
+	}
+
+	.delete-post-popup .popup-close {
+		display: none;
+	}
+
+	.delete-post-popup .popup-title {
+		height: auto;
+		border-bottom: none;
+	}
+
+	.delete-post-confirm {
+		width: 100%;
+		padding: 0;
+		gap: 16px;
+	}
+
+	.delete-post-confirm .form-error {
+		margin-top: 0;
+	}
+
+	.delete-post-actions {
+		width: 100%;
+		margin-top: 0;
+		gap: 12px;
+	}
+
+	.delete-post-actions button {
+		flex: 1 1 0;
+		min-width: 0;
+	}
+}

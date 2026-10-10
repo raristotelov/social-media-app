@@ -21,3 +21,43 @@ export const visitAsUser = (path, jwtToken) =>
 	});
 
 export const userIdFromToken = (jwtToken) => JSON.parse(atob(jwtToken.split('.')[1])).userId;
+
+const authHeaders = (jwtToken) => ({ 'X-Authorization': jwtToken });
+
+const buildFakeImage = () => {
+	const unique = `${Date.now()}${Math.floor(Math.random() * 100000)}`;
+
+	return {
+		imageIdentifier: `cypress_image_${unique}`,
+		imageUrl: `data:image/gif;base64,R0lGODlhAQABAAAAACw=#${unique}`,
+	};
+};
+
+export const createPostViaApi = (jwtToken, caption) =>
+	cy
+		.request({ method: 'POST', url: `${serverUrl}/user-posts`, headers: authHeaders(jwtToken), body: { ...buildFakeImage(), caption } })
+		.then((response) => response.body);
+
+export const setProfilePictureViaApi = (jwtToken) =>
+	cy
+		.request({
+			method: 'PATCH',
+			url: `${serverUrl}/users/update/${userIdFromToken(jwtToken)}`,
+			headers: authHeaders(jwtToken),
+			body: { profilePicture: buildFakeImage() },
+		})
+		.then((response) => response.body);
+
+export const getProfileViaApi = (userId) => cy.request(`${serverUrl}/users?userIds=${userId}`).then((response) => response.body[0]);
+
+export const deletePostViaApi = (jwtToken, userPostId, failOnStatusCode = true) =>
+	cy.request({ method: 'DELETE', url: `${serverUrl}/user-posts/${userPostId}`, headers: authHeaders(jwtToken), failOnStatusCode });
+
+export const editCaptionViaApi = (jwtToken, userPostId, caption, failOnStatusCode = true) =>
+	cy.request({
+		method: 'PATCH',
+		url: `${serverUrl}/user-posts/${userPostId}`,
+		headers: authHeaders(jwtToken),
+		body: { caption },
+		failOnStatusCode,
+	});

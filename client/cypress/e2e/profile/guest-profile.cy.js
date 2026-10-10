@@ -1,5 +1,5 @@
-import { buildTestUser } from '../support/testUser';
-import { createUserViaApi, userIdFromToken, loginViaApi } from '../support/api';
+import { buildTestUser } from '../../support/testUser';
+import { createUserViaApi, userIdFromToken, loginViaApi } from '../../support/api';
 
 describe('guest profile', () => {
 	const user = buildTestUser();

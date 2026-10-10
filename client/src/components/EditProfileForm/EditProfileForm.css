@@ -22,13 +22,16 @@
 	box-sizing: border-box;
 }
 
+.profile-form-profile-picture-wrapper .preview-wrapper img {
+	width: 100%;
+	height: 100%;
+	display: block;
+	object-fit: cover;
+}
+
 .profile-form-input-wrapper {
 	width: 100%;
 	margin-top: 46px;
-}
-
-.profile-form-profile-picture-wrapper + .profile-form-input-wrapper {
-	margin-top: 28px;
 }
 
 .edit-user-profile-form .profile-form-input-wrapper textarea {

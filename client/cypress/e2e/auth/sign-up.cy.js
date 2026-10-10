@@ -1,5 +1,5 @@
-import { buildTestUser } from '../support/testUser';
-import { createUserViaApi, serverUrl } from '../support/api';
+import { buildTestUser } from '../../support/testUser';
+import { createUserViaApi, serverUrl } from '../../support/api';
 
 describe('sign up', () => {
 	beforeEach(() => {

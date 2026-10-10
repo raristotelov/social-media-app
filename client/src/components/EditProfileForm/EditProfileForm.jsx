@@ -11,9 +11,20 @@ import './EditProfileForm.css';
 
 const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 	const [profilePicture, setProfilePicture] = useState(null);
+	const [isProfilePictureRemoved, setIsProfilePictureRemoved] = useState(false);
+
+	const profilePictureChangeHandler = (picture) => {
+		setProfilePicture(picture);
+		setIsProfilePictureRemoved(false);
+	};
+
+	const profilePictureRemoveHandler = () => {
+		setProfilePicture(null);
+		setIsProfilePictureRemoved(Boolean(userData?.profilePicture));
+	};
 
 	const editProfileDataHandler = (updatedValues) => {
-		if (!Object.keys(updatedValues).length && !profilePicture) {
+		if (!Object.keys(updatedValues).length && !profilePicture && !isProfilePictureRemoved) {
 			onCancelClick();
 
 			return;
@@ -23,6 +34,8 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 
 		if (profilePicture) {
 			updatedUserValues = { ...updatedValues, profilePicture };
+		} else if (isProfilePictureRemoved) {
+			updatedUserValues = { ...updatedValues, profilePicture: null };
 		}
 
 		return editProfileData(updatedUserValues);
@@ -57,7 +70,8 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 			<div className='profile-form-profile-picture-wrapper'>
 				<ImageInput
 					initialValue={userData?.profilePicture?.imageUrl}
-					onChange={setProfilePicture}
+					onChange={profilePictureChangeHandler}
+					onRemove={profilePictureRemoveHandler}
 					PlaceHolderImageProp={AddProfilePictureIcon}
 					isRoundImage={true}
 					iconWidthProp={60}

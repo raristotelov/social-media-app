@@ -35,8 +35,42 @@ describe('ProfileHeader', () => {
 
 		const stats = container.querySelectorAll('.profile-stat');
 		expect(stats[0]).toHaveTextContent('3posts');
-		expect(stats[1]).toHaveTextContent('1followers');
+		expect(stats[1]).toHaveTextContent('1follower');
 		expect(stats[2]).toHaveTextContent('2following');
+	});
+
+	describe('count labels', () => {
+		const buildItems = (count) => Array.from({ length: count }, (_, index) => ({ _id: `item${index}`, imageIdentifier: `item${index}` }));
+
+		const getStatText = (index, userDataOverrides) => {
+			const { container } = renderProfileHeader({ userData: buildUserData(userDataOverrides) });
+
+			return container.querySelectorAll('.profile-stat')[index].textContent;
+		};
+
+		it.each([
+			[0, '0posts'],
+			[1, '1post'],
+			[2, '2posts'],
+		])('labels %i posts as "%s"', (count, expected) => {
+			expect(getStatText(0, { posts: buildItems(count) })).toBe(expected);
+		});
+
+		it.each([
+			[0, '0followers'],
+			[1, '1follower'],
+			[2, '2followers'],
+		])('labels %i followers as "%s"', (count, expected) => {
+			expect(getStatText(1, { followers: buildItems(count) })).toBe(expected);
+		});
+
+		it.each([
+			[0, '0following'],
+			[1, '1following'],
+			[2, '2following'],
+		])('keeps the following label unchanged for %i', (count, expected) => {
+			expect(getStatText(2, { following: buildItems(count) })).toBe(expected);
+		});
 	});
 
 	it('renders the bio when present', () => {

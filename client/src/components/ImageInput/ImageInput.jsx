@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 
 import PictureFrameIcon from '../icons/PictureFrameIcon';
+import CloseSmallIcon from '../icons/CloseSmall';
 
 import './ImageInput.css';
 
@@ -14,7 +15,8 @@ const ImageInput = (props) => {
 
 	const inputRef = useRef(null);
 
-	const { onChange, initialValue, placeholderText, isRoundImage, PlaceHolderImageProp, iconWidthProp, iconHeightProp, fontSizeProp } = props;
+	const { onChange, onRemove, initialValue, placeholderText, isRoundImage, PlaceHolderImageProp, iconWidthProp, iconHeightProp, fontSizeProp } =
+		props;
 
 	useEffect(() => {
 		if (initialValue) {
@@ -41,8 +43,25 @@ const ImageInput = (props) => {
 	}, [uploadedImage, initialValue]);
 
 	const onChangeHandler = (e) => {
-		setUploadedImage(e.target.files[0]);
-		onChange(e.target.files[0]);
+		const selectedImage = e.target.files[0];
+
+		if (!selectedImage) {
+			return;
+		}
+
+		setUploadedImage(selectedImage);
+		onChange(selectedImage);
+	};
+
+	const openFilePicker = (e) => {
+		e.preventDefault();
+		inputRef.current.click();
+	};
+
+	const removeImageHandler = () => {
+		inputRef.current.value = '';
+		setUploadedImage(null);
+		onRemove();
 	};
 
 	const getImageInputWrapperClasses = () => {
@@ -64,6 +83,10 @@ const ImageInput = (props) => {
 
 		if (isRoundImage) {
 			previewWrapperClasses = previewWrapperClasses.concat(' round-image');
+		}
+
+		if (onRemove) {
+			previewWrapperClasses = previewWrapperClasses.concat(' removable');
 		}
 
 		if (!uploadedImage) {
@@ -91,17 +114,17 @@ const ImageInput = (props) => {
 			</div>
 
 			<div className={getPreviewWrapperClasses()}>
-				<img src={imagePreview} alt='preview' />
+				<img src={imagePreview} alt='preview' onClick={openFilePicker} />
 
-				<button
-					onClick={(e) => {
-						e.preventDefault();
-						inputRef.current.click();
-					}}
-					className='image-change-button'
-				>
+				<button onClick={openFilePicker} className='image-change-button'>
 					Change
 				</button>
+
+				{onRemove ? (
+					<button type='button' className='image-remove-button' onClick={removeImageHandler} aria-label='Remove picture'>
+						<CloseSmallIcon iconColorProp='currentColor' />
+					</button>
+				) : null}
 			</div>
 		</Fragment>
 	);

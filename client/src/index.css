@@ -13,6 +13,7 @@
 	--avatar-placeholder-disc: #e8e8e8;
 	--avatar-placeholder-figure: #9a9a9a;
 	--feedback-error: #c62828;
+	--overlay-button-hover: rgba(0, 0, 0, 0.4);
 
 	/* MainHeader and TabBar are position: fixed, so page content must reserve this space. */
 	--header-height: 54px;
@@ -32,6 +33,7 @@
 	--avatar-placeholder-disc: #2a2a2a;
 	--avatar-placeholder-figure: #5a5a5a;
 	--feedback-error: #ff6b6b;
+	--overlay-button-hover: rgba(0, 0, 0, 0.4);
 }
 
 body {
@@ -122,5 +124,18 @@ code {
 	.form-error {
 		width: 100%;
 		max-width: 450px;
+	}
+
+	.bottom-sheet::before {
+		content: '';
+		display: block;
+		align-self: center;
+		flex-shrink: 0;
+
+		width: 40px;
+		height: 4px;
+		border-radius: 2px;
+
+		background-color: var(--border-divider);
 	}
 }
