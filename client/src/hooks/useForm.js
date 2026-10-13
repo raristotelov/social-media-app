@@ -2,18 +2,22 @@ import { useState } from 'react';
 
 import { getFormErrors, isUnauthenticatedError } from '../utils/errors';
 
-export const useForm = (initialValues, onSubmitHandler, { submitAllValues = false, validate, fallbackMessage } = {}) => {
+export const useForm = (initialValues, onSubmitHandler, { submitAllValues = false, validate, fallbackMessage, extraFieldNames = [] } = {}) => {
 	const [values, setValues] = useState(initialValues);
 	const [errors, setErrors] = useState({});
 	const [formError, setFormError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
+	const clearFieldError = (name) => {
+		setErrors((state) => (state[name]?.length ? { ...state, [name]: [] } : state));
+		setFormError((state) => (state ? '' : state));
+	};
+
 	const changeHandler = (e) => {
 		const { name, value } = e.target;
 
 		setValues((state) => ({ ...state, [name]: value }));
-		setErrors((state) => (state[name]?.length ? { ...state, [name]: [] } : state));
-		setFormError((state) => (state ? '' : state));
+		clearFieldError(name);
 	};
 
 	const getSubmittedValues = () => {
@@ -64,7 +68,11 @@ export const useForm = (initialValues, onSubmitHandler, { submitAllValues = fals
 				return;
 			}
 
-			const { fieldErrors, formError: submitFormError } = getFormErrors(requestError, Object.keys(initialValues), fallbackMessage);
+			const { fieldErrors, formError: submitFormError } = getFormErrors(
+				requestError,
+				[...Object.keys(initialValues), ...extraFieldNames],
+				fallbackMessage,
+			);
 
 			setErrors(fieldErrors);
 			setFormError(submitFormError);
@@ -76,6 +84,7 @@ export const useForm = (initialValues, onSubmitHandler, { submitAllValues = fals
 	return {
 		values,
 		changeHandler,
+		clearFieldError,
 		onSubmit,
 		isSubmitting,
 		errors,

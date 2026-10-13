@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const UserPostModel = require('../models/userPostModel');
 const UserModel = require('../models/userModel');
+const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const commentService = require('./commentService');
@@ -41,12 +42,28 @@ const getAllUserPosts = async (userId) => {
 	}
 };
 
-const addUserPost = async (postData, userId) => {
+const rollbackAddedUserPost = async ({ userPost, imageIdentifier }) => {
+	if (userPost) {
+		try {
+			await UserPostModel.deleteOne({ _id: userPost._id });
+		} catch (error) {
+			console.error(`Could not remove post ${userPost._id} after a failed save`, error);
+		}
+	}
+
+	await imageStorageService.discardUploadedImage(imageIdentifier);
+};
+
+const addUserPost = async ({ caption, imageFile }, userId) => {
+	const uploadedImage = await imageStorageService.uploadImage({ file: imageFile, fieldName: constants.POST_IMAGE_FIELD });
+
+	let userPost;
+
 	try {
-		const userPost = new UserPostModel({
-			imageIdentifier: postData.imageIdentifier,
-			imageUrl: postData.imageUrl,
-			caption: postData.caption,
+		userPost = new UserPostModel({
+			imageIdentifier: uploadedImage.imageIdentifier,
+			imageUrl: uploadedImage.imageUrl,
+			caption,
 			userId,
 		});
 
@@ -60,6 +77,8 @@ const addUserPost = async (postData, userId) => {
 
 		return userPost;
 	} catch (error) {
+		await rollbackAddedUserPost({ userPost, imageIdentifier: uploadedImage.imageIdentifier });
+
 		throw new AppError('Could not save the user post', 500, { cause: error });
 	}
 };

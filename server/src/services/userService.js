@@ -234,50 +234,70 @@ const destroyProfilePicture = async (profilePicture) => {
 	await UserPostModel.deleteOne({ _id: profilePicture._id });
 };
 
-const updateUserProfileData = async (userId, updatedProfileData) => {
+const rollbackProfilePicture = async ({ profilePicture, uploadedImage }) => {
+	if (profilePicture) {
+		try {
+			await UserPostModel.deleteOne({ _id: profilePicture._id });
+		} catch (error) {
+			console.error(`Could not remove profile picture record ${profilePicture._id} after a failed update`, error);
+		}
+	}
+
+	await imageStorageService.discardUploadedImage(uploadedImage.imageIdentifier);
+};
+
+const updateUserProfileData = async (userId, updatedProfileData, profilePictureFile) => {
 	try {
 		if (Object.prototype.hasOwnProperty.call(updatedProfileData, 'password')) {
 			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_NOT_EDITABLE }, 400);
 		}
 
-		const isRemovingProfilePicture = updatedProfileData.profilePicture === null;
+		const profileUpdate = { ...updatedProfileData };
+		const isRemovingProfilePicture = profileUpdate.profilePicture === null;
 
-		let profilePicture = null;
+		// A client-supplied Cloudinary id could point at another user's image, which would later be destroyed.
+		if (Object.prototype.hasOwnProperty.call(profileUpdate, 'profilePicture') && !isRemovingProfilePicture) {
+			throw new AppError('profilePicture can only be set by uploading a file', 400, { code: ERROR_CODES.BAD_REQUEST });
+		}
+
 		let replacedProfilePicture = null;
 
-		if (updatedProfileData.profilePicture || isRemovingProfilePicture) {
+		if (profilePictureFile || isRemovingProfilePicture) {
 			const userWithProfilePicture = await UserModel.findOne({ _id: userId }).populate({ path: 'profilePicture' });
 
 			replacedProfilePicture = userWithProfilePicture.profilePicture;
 		}
 
-		if (updatedProfileData.profilePicture) {
-			const updatedProfilePicture = updatedProfileData.profilePicture;
+		let uploadedImage = null;
 
-			profilePicture = new UserPostModel({
-				imageIdentifier: updatedProfilePicture.imageIdentifier,
-				imageUrl: updatedProfilePicture.imageUrl,
-				userId,
-			});
-
-			await profilePicture.save();
+		if (profilePictureFile) {
+			uploadedImage = await imageStorageService.uploadImage({ file: profilePictureFile, fieldName: constants.PROFILE_PICTURE_FIELD });
 		}
 
-		if (profilePicture) {
-			updatedProfileData.profilePicture = profilePicture._id;
-		}
-
+		let profilePicture = null;
 		let user;
 
 		try {
-			user = await UserModel.findOneAndUpdate({ _id: userId }, updatedProfileData, {
+			if (uploadedImage) {
+				profilePicture = new UserPostModel({
+					imageIdentifier: uploadedImage.imageIdentifier,
+					imageUrl: uploadedImage.imageUrl,
+					userId,
+				});
+
+				await profilePicture.save();
+
+				profileUpdate.profilePicture = profilePicture._id;
+			}
+
+			user = await UserModel.findOneAndUpdate({ _id: userId }, profileUpdate, {
 				new: true,
 				runValidators: true,
 				context: 'query',
 			}).populate('profilePicture');
 		} catch (error) {
-			if (profilePicture) {
-				await UserPostModel.deleteOne({ _id: profilePicture._id });
+			if (uploadedImage) {
+				await rollbackProfilePicture({ profilePicture, uploadedImage });
 			}
 
 			throw error;

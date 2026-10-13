@@ -50,11 +50,12 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 
 - Opened from the Upload Picture tile. Image chooser + caption input; Submit / Cancel.
 - Cancel closes it. Submitting with no picture shows "Please choose a picture". — Built
-- Error message in the popup on upload/save failure. — To build (#15)
+- Error message in the popup on upload/save failure. — Built (#30)
 - Submit disabled while the request is in flight. — To build (#15)
-- Validation before upload: JPEG, PNG and WebP only (`accept` on the file input; the Cloudinary upload preset allows the same formats as a backstop). Other files show a message and nothing is sent. — To build (#15)
+- Validation before upload: JPEG, PNG and WebP only (`accept` on the file input plus a client check). Other files show `IMAGE_TYPE_INVALID` copy and nothing is sent. The server repeats the check. — To build (#15)
 - The image is resized in the browser to a 2048px long edge at high JPEG quality before upload. — To build (#15)
-- No orphaned Cloudinary image when the server save fails. — To build (#15)
+- The image is sent to the API, which uploads it to Cloudinary (signed) and saves the post; no browser upload, no unsigned preset. Requests over 10 MB are rejected (`IMAGE_TOO_LARGE`). — To build (#15)
+- No orphaned Cloudinary image when the server save fails: the server deletes the upload before responding. — To build (#15)
 - Mobile: full-screen view with close icon + title. — Built
 
 ## Edit Profile popup (own profile)
@@ -68,7 +69,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 ### Profile picture input
 
 - No picture: empty round input with add-profile-picture icon; click opens the file picker. — Built
-- Same validation and 2048px resize as the Upload Picture popup (shared `ImageInput`). — To build (#15)
+- Same validation, 2048px resize, server upload and Submit disabled in flight as the Upload Picture popup (shared `ImageInput`). — To build (#15)
 - Has picture: hover "Change" overlay. — Built
 - Has picture: clicking the picture opens the file picker on every device. — Built
 - Has picture: small × button (24px, top-right of the picture, always visible) removes it. — Built
@@ -147,6 +148,7 @@ Base: `https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Desi
 | Other User | [111:153](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=111-153) / [350:1128](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=350-1128) | [277:891](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=277-891) / [354:3033](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=354-3033) | [231:503](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=231-503) / [355:2658](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=355-2658) |
 | Edit Profile | [105:147](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=105-147) / [350:1148](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=350-1148) | [277:935](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=277-935) / [354:3052](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=354-3052) | [240:463](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=240-463) / [355:2690](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=355-2690) |
 | Edit Profile – No Picture | [534:2199](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=534-2199) / [534:2291](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=534-2291) | [534:4690](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=534-4690) / [534:4782](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=534-4782) | [534:6470](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=534-6470) / [534:6498](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=534-6498) |
+| Edit Profile – Picture Error | [571:4688](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=571-4688) / [571:4758](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=571-4758) | [573:4832](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=573-4832) / [573:4902](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=573-4902) | [573:7824](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=573-7824) / [573:7847](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=573-7847) |
 | Upload Picture | [105:189](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=105-189) / [350:1189](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=350-1189) | [277:976](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=277-976) / [354:3093](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=354-3093) | [241:463](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=241-463) / [355:2710](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=355-2710) |
 | Account Menu | — | — | [252:467](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=252-467) / [355:2728](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=355-2728) |
 | Post Actions | [492:1829](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=492-1829) / [504:2071](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=504-2071) | [498:4128](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=498-4128) / [505:4372](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-4372) | [499:3450](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=499-3450) / [505:6191](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-6191) |

@@ -18,6 +18,10 @@ const mongoose = UserModel.base;
 
 const testEmailPattern = new RegExp(`^${TEST_EMAIL_PREFIX.replace('+', '\\+')}.*${TEST_EMAIL_DOMAIN.replace('.', '\\.')}$`);
 
+const loadServerEnv = () => {
+	require('dotenv').config({ path: path.join(SERVER_ROOT, '.env') });
+};
+
 const getConnectionString = () => {
 	if (process.env.MONGODB_URI) {
 		return process.env.MONGODB_URI;
@@ -25,7 +29,7 @@ const getConnectionString = () => {
 
 	// Fall back to the server's own env file so the connection string lives in one
 	// place instead of being duplicated into the client.
-	require('dotenv').config({ path: path.join(SERVER_ROOT, '.env') });
+	loadServerEnv();
 
 	if (!process.env.MONGODB_URI) {
 		throw new Error('MONGODB_URI is not set. Cypress cleanup needs it — export it before running Cypress, or set it in server/.env.');
@@ -44,6 +48,43 @@ const withConnection = async (work) => {
 	}
 };
 
+let imageStorageService;
+
+// The server's Cloudinary config reads process.env the moment it is required, so the
+// server's env file has to be loaded before the service is, not after.
+const getImageStorageService = () => {
+	if (!imageStorageService) {
+		loadServerEnv();
+
+		imageStorageService = require(path.join(SERVER_ROOT, 'src/services/imageStorageService'));
+	}
+
+	return imageStorageService;
+};
+
+// Destroys exactly the given Cloudinary images, never a folder or prefix, because local
+// development images live in the same folder. An image that is already gone counts as done.
+const destroyImagesById = async (imageIdentifiers) => {
+	if (!imageIdentifiers.length) {
+		return;
+	}
+
+	const { deleteImage } = getImageStorageService();
+
+	const results = await Promise.allSettled(imageIdentifiers.map((imageIdentifier) => deleteImage(imageIdentifier)));
+
+	const failedIdentifiers = imageIdentifiers.filter((imageIdentifier, index) => results[index].status === 'rejected');
+
+	if (failedIdentifiers.length) {
+		const firstFailure = results.find((result) => result.status === 'rejected');
+
+		throw new Error(
+			`Could not delete Cloudinary image(s) ${failedIdentifiers.join(', ')}. The test accounts were left in place so the next cleanup can retry.`,
+			{ cause: firstFailure.reason },
+		);
+	}
+};
+
 // Removes the given accounts and every trace of them, including marks they left on
 // other people's records.
 const removeUsersById = async (testUserIds) => {
@@ -51,8 +92,14 @@ const removeUsersById = async (testUserIds) => {
 		return { users: 0, posts: 0, comments: 0 };
 	}
 
-	const testUserPosts = await UserPostModel.find({ userId: { $in: testUserIds } }).select({ _id: 1 });
+	// Profile pictures are stored as posts owned by their user, so this one query finds
+	// every image the test users uploaded.
+	const testUserPosts = await UserPostModel.find({ userId: { $in: testUserIds } }).select({ _id: 1, imageIdentifier: 1 });
 	const testUserPostIds = testUserPosts.map((post) => post._id);
+
+	// Images go first: if this throws, the database still points at them and a later
+	// cleanup can find and retry them.
+	await destroyImagesById([...new Set(testUserPosts.map((post) => post.imageIdentifier).filter(Boolean))]);
 
 	// Comments written by a test user, plus anyone else's comments on their posts,
 	// which would otherwise be orphaned.

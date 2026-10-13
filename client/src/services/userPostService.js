@@ -1,5 +1,7 @@
 import { requestFactory } from './requester';
 import { serverUrl } from '../constants/serverUrl';
+import { UPLOAD_FIELDS } from '../constants/validation';
+import { buildFormData } from '../utils/formData';
 
 export const getAllUserPosts = (jwtToken) => {
 	const request = requestFactory(jwtToken);
@@ -7,10 +9,10 @@ export const getAllUserPosts = (jwtToken) => {
 	return request.get(`${serverUrl}/user-posts`);
 };
 
-export const addUserPost = (data, jwtToken) => {
+export const addUserPost = ({ image, caption }, jwtToken) => {
 	const request = requestFactory(jwtToken);
 
-	return request.post(`${serverUrl}/user-posts`, data);
+	return request.post(`${serverUrl}/user-posts`, buildFormData({ [UPLOAD_FIELDS.POST_IMAGE]: image, caption }));
 };
 
 export const updateUserPostCaption = ({ userPostId, caption, jwtToken }) => {

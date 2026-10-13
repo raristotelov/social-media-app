@@ -3,6 +3,8 @@ const router = Router();
 
 const { userService } = require('../services');
 const verifyJwtToken = require('../middlewares/verifyJwtToken');
+const uploadImage = require('../middlewares/uploadImage');
+const constants = require('../config/constants');
 
 router.post('/sign-up', async (req, res) => {
 	const userData = await userService.signUp(req.body);
@@ -33,10 +35,10 @@ router.get('/', async (req, res) => {
 	return res.json(usersAccountData);
 });
 
-router.patch('/update/:userId', verifyJwtToken, async (req, res) => {
+router.patch('/update/:userId', verifyJwtToken, uploadImage(constants.PROFILE_PICTURE_FIELD), async (req, res) => {
 	const userId = req.params.userId;
 
-	const userAccountData = await userService.updateUserProfileData(userId, req.body);
+	const userAccountData = await userService.updateUserProfileData(userId, req.body, req.file);
 
 	return res.json(userAccountData);
 });

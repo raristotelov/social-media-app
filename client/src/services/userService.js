@@ -1,5 +1,7 @@
 import { requestFactory } from './requester';
 import { serverUrl } from '../constants/serverUrl';
+import { UPLOAD_FIELDS } from '../constants/validation';
+import { buildFormData } from '../utils/formData';
 
 export const signUp = (data) => {
 	const request = requestFactory();
@@ -32,7 +34,9 @@ export const getUsersProfileData = ({ userIds, searchWord, jwtToken }) => {
 export const updateUserProfileData = ({ userId, jwtToken, updatedProfileData }) => {
 	const request = requestFactory(jwtToken);
 
-	return request.patch(`${serverUrl}/users/update/${userId}`, updatedProfileData);
+	const isUploadingProfilePicture = updatedProfileData[UPLOAD_FIELDS.PROFILE_PICTURE] instanceof Blob;
+
+	return request.patch(`${serverUrl}/users/update/${userId}`, isUploadingProfilePicture ? buildFormData(updatedProfileData) : updatedProfileData);
 };
 
 export const followUser = ({ userId, userIdToFollow, jwtToken }) => {

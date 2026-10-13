@@ -5,7 +5,7 @@ import {
 	loginViaApi,
 	visitAsUser,
 	userIdFromToken,
-	createPostViaApi,
+	uploadPostViaApi,
 	getProfileViaApi,
 	deletePostViaApi,
 } from '../../support/api';
@@ -47,8 +47,8 @@ describe('post delete', () => {
 			otherJwtToken = token;
 		});
 
-		cy.then(() => createPostViaApi(jwtToken, 'first caption')).then((post) => posts.push(post));
-		cy.then(() => createPostViaApi(jwtToken, 'second caption')).then((post) => posts.push(post));
+		cy.then(() => uploadPostViaApi(jwtToken, 'first caption')).then((post) => posts.push(post));
+		cy.then(() => uploadPostViaApi(jwtToken, 'second caption')).then((post) => posts.push(post));
 
 		cy.intercept('DELETE', '**/user-posts/**').as('deleteRequest');
 	});

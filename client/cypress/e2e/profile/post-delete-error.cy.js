@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, createPostViaApi, getProfileViaApi } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, uploadPostViaApi, getProfileViaApi } from '../../support/api';
 
 describe('post delete error toast', () => {
 	let user;
@@ -28,8 +28,8 @@ describe('post delete error toast', () => {
 			profilePath = `/user/${userId}`;
 		});
 
-		cy.then(() => createPostViaApi(jwtToken, 'first caption'));
-		cy.then(() => createPostViaApi(jwtToken, 'second caption'));
+		cy.then(() => uploadPostViaApi(jwtToken, 'first caption'));
+		cy.then(() => uploadPostViaApi(jwtToken, 'second caption'));
 	});
 
 	afterEach(() => {

@@ -6,7 +6,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getUsersProfileData, followUser, unfollowUser, updateUserProfileData } from '../../services/userService';
 import { addUserPost, updateUserPostCaption, deleteUserPost } from '../../services/userPostService';
-import { uploadImageToCloudinary } from '../../services/cloudinaryService';
+import { resizeImage } from '../../utils/images';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -14,7 +14,10 @@ import ProfileView from './ProfileView';
 
 jest.mock('../../services/userService');
 jest.mock('../../services/userPostService');
-jest.mock('../../services/cloudinaryService');
+jest.mock('../../utils/images', () => ({
+	...jest.requireActual('../../utils/images'),
+	resizeImage: jest.fn(),
+}));
 
 const mockNavigate = jest.fn();
 
@@ -167,10 +170,13 @@ describe('ProfileView post actions and profile picture removal', () => {
 	describe('uploading a post', () => {
 		const createdImage = { imageIdentifier: 'img3', imageUrl: 'https://example.com/3.jpg' };
 		const savedPost = { _id: 'post3', ...createdImage, caption: 'Third caption' };
+		const chosenFile = new File(['(image)'], 'new.png', { type: 'image/png' });
+		const resizedFile = new File(['(resized)'], 'new.jpg', { type: 'image/jpeg' });
 
 		beforeEach(() => {
 			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
 			global.URL.revokeObjectURL = jest.fn();
+			resizeImage.mockResolvedValue(resizedFile);
 		});
 
 		afterEach(() => {
@@ -179,13 +185,12 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 		const submitUpload = () => {
 			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
-			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), new File(['(image)'], 'new.png', { type: 'image/png' }));
+			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
 			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Third caption');
 			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
 		};
 
 		it('adds the tile and updates the header post count immediately after a successful upload', async () => {
-			uploadImageToCloudinary.mockResolvedValue(createdImage);
 			addUserPost.mockResolvedValue(savedPost);
 			await renderOwnProfile();
 
@@ -193,11 +198,91 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 			await waitFor(() => expect(screen.getAllByAltText('user-post')).toHaveLength(3));
 			expect(getPostsCountText()).toBe('3posts');
-			expect(addUserPost).toHaveBeenCalledWith({ ...createdImage, caption: 'Third caption' }, 'token123');
+		});
+
+		it('resizes the chosen file and sends the resized file with the caption to the server', async () => {
+			addUserPost.mockResolvedValue(savedPost);
+			await renderOwnProfile();
+
+			submitUpload();
+
+			await waitFor(() => expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Third caption' }, 'token123'));
+			expect(resizeImage).toHaveBeenCalledTimes(1);
+			expect(resizeImage).toHaveBeenCalledWith(chosenFile);
+		});
+
+		it('resizes before sending the request', async () => {
+			const callOrder = [];
+
+			resizeImage.mockImplementation(async () => {
+				callOrder.push('resize');
+
+				return resizedFile;
+			});
+			addUserPost.mockImplementation(async () => {
+				callOrder.push('request');
+
+				return savedPost;
+			});
+			await renderOwnProfile();
+
+			submitUpload();
+
+			await waitFor(() => expect(addUserPost).toHaveBeenCalled());
+			expect(callOrder).toEqual(['resize', 'request']);
+		});
+
+		it('closes the popup after a successful upload', async () => {
+			addUserPost.mockResolvedValue(savedPost);
+			await renderOwnProfile();
+
+			submitUpload();
+
+			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Upload Picture' })).not.toBeInTheDocument());
+		});
+
+		it('disables Submit while the upload is in flight and sends one request', async () => {
+			let resolveUpload;
+
+			addUserPost.mockReturnValue(
+				new Promise((resolve) => {
+					resolveUpload = resolve;
+				}),
+			);
+			await renderOwnProfile();
+
+			submitUpload();
+
+			await waitFor(() => expect(addUserPost).toHaveBeenCalledTimes(1));
+			expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
+
+			resolveUpload(savedPost);
+			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Upload Picture' })).not.toBeInTheDocument());
+			expect(addUserPost).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows the size message under the picture and keeps the popup open when the server answers IMAGE_TOO_LARGE', async () => {
+			addUserPost.mockRejectedValue({ code: 'IMAGE_TOO_LARGE', fields: { image: 'IMAGE_TOO_LARGE' }, status: 413 });
+			await renderOwnProfile();
+
+			submitUpload();
+
+			const message = await screen.findByText('This image is over 10 MB');
+			expect(message).toHaveClass('field-error');
+			expect(screen.getByRole('heading', { name: 'Upload Picture' })).toBeInTheDocument();
+			expect(document.querySelector('.form-error')).not.toBeInTheDocument();
+		});
+
+		it('shows the type message under the picture when the server answers IMAGE_TYPE_INVALID', async () => {
+			addUserPost.mockRejectedValue({ code: 'IMAGE_TYPE_INVALID', fields: { image: 'IMAGE_TYPE_INVALID' }, status: 400 });
+			await renderOwnProfile();
+
+			submitUpload();
+
+			expect(await screen.findByText('Choose a JPEG, PNG or WebP image')).toHaveClass('field-error');
 		});
 
 		it('shows the singular label when the first post is uploaded', async () => {
-			uploadImageToCloudinary.mockResolvedValue(createdImage);
 			addUserPost.mockResolvedValue(savedPost);
 			await renderOwnProfile({ profile: { posts: [] } });
 
@@ -209,7 +294,6 @@ describe('ProfileView post actions and profile picture removal', () => {
 		});
 
 		it('leaves the post count unchanged when the save fails', async () => {
-			uploadImageToCloudinary.mockResolvedValue(createdImage);
 			addUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			jest.spyOn(console, 'log').mockImplementation(() => {});
 			await renderOwnProfile();
@@ -222,7 +306,6 @@ describe('ProfileView post actions and profile picture removal', () => {
 		});
 
 		it('shows the upload-picture fallback copy in the popup when the save fails', async () => {
-			uploadImageToCloudinary.mockResolvedValue(createdImage);
 			addUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			await renderOwnProfile();
 
@@ -233,8 +316,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			expect(screen.getByRole('heading', { name: 'Upload Picture' })).toBeInTheDocument();
 		});
 
-		it('shows the upload-picture fallback copy in the popup when the Cloudinary upload fails', async () => {
-			uploadImageToCloudinary.mockRejectedValue(new Error('network down'));
+		it('shows the upload-picture fallback copy in the popup when resizing fails, and sends no request', async () => {
+			resizeImage.mockRejectedValue(new Error('The source image could not be decoded'));
 			await renderOwnProfile();
 
 			submitUpload();
@@ -244,7 +327,6 @@ describe('ProfileView post actions and profile picture removal', () => {
 		});
 
 		it('ends the session and shows no form error when the save fails with UNAUTHENTICATED', async () => {
-			uploadImageToCloudinary.mockResolvedValue(createdImage);
 			addUserPost.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = await renderOwnProfile();
 
@@ -560,6 +642,112 @@ describe('ProfileView post actions and profile picture removal', () => {
 		});
 	});
 
+	describe('uploading a profile picture from Edit Profile', () => {
+		const chosenFile = new File(['(image)'], 'me.png', { type: 'image/png' });
+		const resizedFile = new File(['(resized)'], 'me.jpg', { type: 'image/jpeg' });
+		const profile = { email: 'jane@example.com' };
+
+		beforeEach(() => {
+			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
+			global.URL.revokeObjectURL = jest.fn();
+			resizeImage.mockResolvedValue(resizedFile);
+		});
+
+		const chooseProfilePictureAndSubmit = () => {
+			userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
+			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+		};
+
+		it('resizes the chosen file and sends the resized file to the server', async () => {
+			const updatedUser = { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] };
+
+			updateUserProfileData.mockResolvedValue({ user: updatedUser, jwt: 'new.jwt' });
+			await renderOwnProfile({ profile });
+
+			chooseProfilePictureAndSubmit();
+
+			await waitFor(() =>
+				expect(updateUserProfileData).toHaveBeenCalledWith({
+					userId: 'user2',
+					jwtToken: 'token123',
+					updatedProfileData: { profilePicture: resizedFile },
+				}),
+			);
+			expect(resizeImage).toHaveBeenCalledTimes(1);
+			expect(resizeImage).toHaveBeenCalledWith(chosenFile);
+		});
+
+		it('resizes before sending the request', async () => {
+			const callOrder = [];
+
+			resizeImage.mockImplementation(async () => {
+				callOrder.push('resize');
+
+				return resizedFile;
+			});
+			updateUserProfileData.mockImplementation(async () => {
+				callOrder.push('request');
+
+				return { user: { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] }, jwt: 'new.jwt' };
+			});
+			await renderOwnProfile({ profile });
+
+			chooseProfilePictureAndSubmit();
+
+			await waitFor(() => expect(updateUserProfileData).toHaveBeenCalled());
+			expect(callOrder).toEqual(['resize', 'request']);
+		});
+
+		it('refreshes the logged-in user and closes the popup after a successful upload', async () => {
+			const updatedUser = { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] };
+
+			updateUserProfileData.mockResolvedValue({ user: updatedUser, jwt: 'new.jwt' });
+			const { updateLoggedInUser } = await renderOwnProfile({ profile });
+
+			chooseProfilePictureAndSubmit();
+
+			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith({ user: updatedUser, jwt: 'new.jwt' }));
+			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Profile' })).not.toBeInTheDocument());
+		});
+
+		it('does not resize anything when only text fields change', async () => {
+			updateUserProfileData.mockResolvedValue({ user: { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] }, jwt: 'j' });
+			await renderOwnProfile({ profile });
+
+			userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
+			userEvent.clear(screen.getByPlaceholderText('Bio'));
+			userEvent.type(screen.getByPlaceholderText('Bio'), 'New bio');
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await waitFor(() =>
+				expect(updateUserProfileData).toHaveBeenCalledWith(expect.objectContaining({ updatedProfileData: { bio: 'New bio' } })),
+			);
+			expect(resizeImage).not.toHaveBeenCalled();
+		});
+
+		it('shows the size message under the picture and keeps the popup open when the server answers IMAGE_TOO_LARGE', async () => {
+			updateUserProfileData.mockRejectedValue({ code: 'IMAGE_TOO_LARGE', fields: { profilePicture: 'IMAGE_TOO_LARGE' }, status: 413 });
+			await renderOwnProfile({ profile });
+
+			chooseProfilePictureAndSubmit();
+
+			expect(await screen.findByText('This image is over 10 MB')).toHaveClass('field-error');
+			expect(screen.getByRole('heading', { name: 'Edit Profile' })).toBeInTheDocument();
+		});
+
+		it('shows the save-profile fallback and keeps the popup open when resizing fails, sending no request', async () => {
+			resizeImage.mockRejectedValue(new Error('The source image could not be decoded'));
+			await renderOwnProfile({ profile });
+
+			chooseProfilePictureAndSubmit();
+
+			expect(await screen.findByText("Couldn't save your profile. Try again.")).toHaveClass('form-error');
+			expect(updateUserProfileData).not.toHaveBeenCalled();
+			expect(screen.getByRole('heading', { name: 'Edit Profile' })).toBeInTheDocument();
+		});
+	});
+
 	describe('removing the profile picture from Edit Profile', () => {
 		const profileWithPicture = {
 			email: 'jane@example.com',
@@ -590,7 +778,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 					updatedProfileData: { profilePicture: null },
 				}),
 			);
-			expect(uploadImageToCloudinary).not.toHaveBeenCalled();
+			expect(resizeImage).not.toHaveBeenCalled();
 			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith({ user: updatedUser, jwt: 'new.jwt' }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Profile' })).not.toBeInTheDocument());
 		});

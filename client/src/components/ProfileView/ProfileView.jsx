@@ -4,11 +4,11 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
 import { addUserPost, updateUserPostCaption, deleteUserPost } from '../../services/userPostService';
-import { uploadImageToCloudinary } from '../../services/cloudinaryService';
 import { getUsersProfileData, updateUserProfileData, followUser, unfollowUser } from '../../services/userService';
 import { ERROR_CODES } from '../../constants/errorCodes';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 import { getErrorCode, getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
+import { resizeImage } from '../../utils/images';
 
 import ProfileHeader from '../ProfileHeader/ProfileHeader';
 import ProfileLoadError from '../ProfileLoadError/ProfileLoadError';
@@ -131,9 +131,9 @@ const ProfileView = (props) => {
 		}
 
 		await runWithSessionGuard(async () => {
-			const createdImage = await uploadImageToCloudinary(uploadedImage);
+			const resizedImage = await resizeImage(uploadedImage);
 
-			const savedUserPost = await addUserPost({ ...createdImage, caption }, jwtToken);
+			const savedUserPost = await addUserPost({ image: resizedImage, caption }, jwtToken);
 
 			setUserPosts((state) => [...state, savedUserPost]);
 			setUserData((state) => ({ ...state, posts: [...state.posts, savedUserPost] }));
@@ -155,11 +155,9 @@ const ProfileView = (props) => {
 			let updatedProfileData = { ...userUpdatedData };
 
 			if (updatedProfileData.profilePicture) {
-				const createdImageForProflePicrture = await uploadImageToCloudinary(updatedProfileData.profilePicture);
-
 				updatedProfileData = {
 					...updatedProfileData,
-					profilePicture: createdImageForProflePicrture,
+					profilePicture: await resizeImage(updatedProfileData.profilePicture),
 				};
 			}
 

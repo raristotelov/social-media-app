@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { useForm } from '../../hooks/useForm';
-import { MAX_BIO_LENGTH } from '../../constants/validation';
+import { MAX_BIO_LENGTH, UPLOAD_FIELDS } from '../../constants/validation';
 import { ERROR_CODES } from '../../constants/errorCodes';
 import { ACTION_FALLBACK_MESSAGES, ERROR_MESSAGES } from '../../constants/errorMessages';
 
@@ -14,18 +14,25 @@ import './EditProfileForm.css';
 const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 	const [profilePicture, setProfilePicture] = useState(null);
 	const [isProfilePictureRemoved, setIsProfilePictureRemoved] = useState(false);
+	const [invalidPictureError, setInvalidPictureError] = useState('');
 
 	const profilePictureChangeHandler = (picture) => {
 		setProfilePicture(picture);
 		setIsProfilePictureRemoved(false);
+		setInvalidPictureError('');
+		clearFieldError(UPLOAD_FIELDS.PROFILE_PICTURE);
 	};
 
 	const profilePictureRemoveHandler = () => {
 		setProfilePicture(null);
 		setIsProfilePictureRemoved(Boolean(userData?.profilePicture));
+		setInvalidPictureError('');
+		clearFieldError(UPLOAD_FIELDS.PROFILE_PICTURE);
 	};
 
 	const editProfileDataHandler = (updatedValues) => {
+		setInvalidPictureError('');
+
 		if (!Object.keys(updatedValues).length && !profilePicture && !isProfilePictureRemoved) {
 			onCancelClick();
 
@@ -57,15 +64,17 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 		return { fields };
 	};
 
-	const { values, changeHandler, onSubmit, errors, formError } = useForm(
+	const { values, changeHandler, clearFieldError, onSubmit, isSubmitting, errors, formError } = useForm(
 		{
 			email: userData.email,
 			username: userData.username,
 			bio: userData.bio ? userData.bio : '',
 		},
 		editProfileDataHandler,
-		{ validate, fallbackMessage: ACTION_FALLBACK_MESSAGES.SAVE_PROFILE },
+		{ validate, fallbackMessage: ACTION_FALLBACK_MESSAGES.SAVE_PROFILE, extraFieldNames: [UPLOAD_FIELDS.PROFILE_PICTURE] },
 	);
+
+	const pictureError = invalidPictureError || errors[UPLOAD_FIELDS.PROFILE_PICTURE]?.[0] || '';
 
 	return (
 		<form id='edit-user-profile-form' onSubmit={onSubmit} className='edit-user-profile-form'>
@@ -74,12 +83,15 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 					initialValue={userData?.profilePicture?.imageUrl}
 					onChange={profilePictureChangeHandler}
 					onRemove={profilePictureRemoveHandler}
+					onInvalidFile={setInvalidPictureError}
 					PlaceHolderImageProp={AddProfilePictureIcon}
 					isRoundImage={true}
 					iconWidthProp={60}
 					iconHeightProp={60}
 					fontSizeProp={13}
 				/>
+
+				{pictureError ? <span className='field-error'>{pictureError}</span> : null}
 			</div>
 
 			<div className='profile-form-input-wrapper'>
@@ -131,7 +143,7 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 			) : null}
 
 			<div className='profile-form-button-row'>
-				<Button type='submit' label='Submit' />
+				<Button type='submit' label='Submit' disabled={isSubmitting} />
 
 				<Button type='button' label='Cancel' variant='secondary' onClick={onCancelClick} />
 			</div>

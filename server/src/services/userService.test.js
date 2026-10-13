@@ -469,7 +469,8 @@ describe('userService', () => {
 		});
 
 		describe('replacing the profile picture', () => {
-			const newPicture = { imageIdentifier: 'new-picture-id', imageUrl: 'https://example.com/new.jpg' };
+			const profilePictureFile = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), originalname: 'me.jpg' };
+			const uploadedImage = { imageIdentifier: 'new-picture-id', imageUrl: 'https://example.com/new.jpg' };
 
 			const buildUserPostModelMock = () => {
 				const save = jest.fn().mockResolvedValue(undefined);
@@ -483,19 +484,58 @@ describe('userService', () => {
 				return save;
 			};
 
+			beforeEach(() => {
+				imageStorageService.uploadImage.mockResolvedValue(uploadedImage);
+				imageStorageService.discardUploadedImage.mockResolvedValue(undefined);
+			});
+
+			it('uploads the received file under the profile picture field', async () => {
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, {}, profilePictureFile);
+
+				expect(imageStorageService.uploadImage).toHaveBeenCalledWith({ file: profilePictureFile, fieldName: 'profilePicture' });
+			});
+
 			it('destroys the previous asset and document, saves the new image and points the user at it', async () => {
 				const save = buildUserPostModelMock();
 
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves();
 
-				await updateUserProfileData(USER_ID, { profilePicture: newPicture });
+				await updateUserProfileData(USER_ID, {}, profilePictureFile);
 
 				expect(imageStorageService.deleteImage).toHaveBeenCalledWith('old-picture-id');
 				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'picture1' });
-				expect(UserPostModel).toHaveBeenCalledWith({ ...newPicture, userId: USER_ID });
+				expect(UserPostModel).toHaveBeenCalledWith({ ...uploadedImage, userId: USER_ID });
 				expect(save).toHaveBeenCalledTimes(1);
 				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { profilePicture: 'newPicture1' }, expect.any(Object));
+			});
+
+			it('applies other profile fields sent together with the new picture', async () => {
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, { bio: 'New bio' }, profilePictureFile);
+
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith(
+					{ _id: USER_ID },
+					{ bio: 'New bio', profilePicture: 'newPicture1' },
+					expect.any(Object),
+				);
+			});
+
+			it('returns the updated user data with a fresh token', async () => {
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves({ _id: USER_ID, username: 'realuser' });
+
+				const result = await updateUserProfileData(USER_ID, {}, profilePictureFile);
+
+				expect(result).toEqual({ user: { _id: USER_ID, username: 'realuser' }, jwt: 'signed.jwt.token' });
 			});
 
 			it('saves the new image and updates the user first, then destroys the previous asset and document', async () => {
@@ -516,17 +556,61 @@ describe('userService', () => {
 					return { populate: jest.fn().mockResolvedValue({ _id: USER_ID }) };
 				});
 
-				await updateUserProfileData(USER_ID, { profilePicture: newPicture });
+				await updateUserProfileData(USER_ID, {}, profilePictureFile);
 
 				expect(callOrder).toEqual(['save new', 'user', 'cloudinary', 'delete picture1']);
 			});
 
-			it('deletes the new document and leaves the old picture untouched when the update fails (duplicate username)', async () => {
+			it('does not discard the new image when everything succeeds', async () => {
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+
+				await updateUserProfileData(USER_ID, {}, profilePictureFile);
+
+				expect(imageStorageService.discardUploadedImage).not.toHaveBeenCalled();
+			});
+
+			it('propagates an upload rejection (e.g. wrong type) and changes nothing', async () => {
+				const typeError = new AppError('profilePicture: IMAGE_TYPE_INVALID', 400, {
+					code: ERROR_CODES.IMAGE_TYPE_INVALID,
+					fields: { profilePicture: ERROR_CODES.IMAGE_TYPE_INVALID },
+				});
+
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+				imageStorageService.uploadImage.mockRejectedValue(typeError);
+
+				await expect(updateUserProfileData(USER_ID, {}, profilePictureFile)).rejects.toMatchObject({
+					statusCode: 400,
+					code: ERROR_CODES.IMAGE_TYPE_INVALID,
+					fields: { profilePicture: ERROR_CODES.IMAGE_TYPE_INVALID },
+				});
+
+				expect(UserPostModel).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+				expect(imageStorageService.discardUploadedImage).not.toHaveBeenCalled();
+			});
+
+			it('propagates a Cloudinary upload failure as a 502 and leaves the old picture untouched', async () => {
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				imageStorageService.uploadImage.mockRejectedValue(new AppError('Could not upload image', 502));
+
+				await expect(updateUserProfileData(USER_ID, {}, profilePictureFile)).rejects.toMatchObject({ statusCode: 502 });
+
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+			});
+
+			it('deletes the new document, destroys the new image and leaves the old picture untouched when the update fails (duplicate username)', async () => {
 				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateRejects(buildDuplicateUsernameError());
 
-				await expect(updateUserProfileData(USER_ID, { username: 'taken', profilePicture: newPicture })).rejects.toMatchObject({
+				await expect(updateUserProfileData(USER_ID, { username: 'taken' }, profilePictureFile)).rejects.toMatchObject({
 					statusCode: 409,
 					code: ERROR_CODES.USERNAME_TAKEN,
 					fields: { username: ERROR_CODES.USERNAME_TAKEN },
@@ -534,6 +618,7 @@ describe('userService', () => {
 
 				expect(UserPostModel.deleteOne).toHaveBeenCalledTimes(1);
 				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
 			});
 
@@ -547,7 +632,7 @@ describe('userService', () => {
 				givenUserWithPicture(existingPicture);
 				givenUpdateRejects(validationError);
 
-				await expect(updateUserProfileData(USER_ID, { bio: 'x', profilePicture: newPicture })).rejects.toMatchObject({
+				await expect(updateUserProfileData(USER_ID, { bio: 'x' }, profilePictureFile)).rejects.toMatchObject({
 					statusCode: 400,
 					code: ERROR_CODES.BIO_TOO_LONG,
 					fields: { bio: ERROR_CODES.BIO_TOO_LONG },
@@ -555,6 +640,7 @@ describe('userService', () => {
 
 				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
 				expect(UserPostModel.deleteOne).not.toHaveBeenCalledWith({ _id: 'picture1' });
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
 			});
 
@@ -565,13 +651,50 @@ describe('userService', () => {
 				givenUserWithPicture(existingPicture);
 				givenUpdateRejects(dbError);
 
-				await expect(updateUserProfileData(USER_ID, { profilePicture: newPicture })).rejects.toMatchObject({
+				await expect(updateUserProfileData(USER_ID, {}, profilePictureFile)).rejects.toMatchObject({
 					statusCode: 500,
 					cause: dbError,
 				});
 
 				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+			});
+
+			it('deletes nothing from the database but still destroys the new image when saving the new picture record fails', async () => {
+				const saveError = new Error('connection lost');
+
+				UserPostModel.mockImplementation(function UserPostModelMock(data) {
+					Object.assign(this, data);
+					this._id = 'newPicture1';
+					this.save = jest.fn().mockRejectedValue(saveError);
+				});
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
+
+				await expect(updateUserProfileData(USER_ID, {}, profilePictureFile)).rejects.toMatchObject({
+					statusCode: 500,
+					cause: saveError,
+				});
+
+				expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+			});
+
+			it('still destroys the new image, logs, and answers with the update error when removing the new record fails', async () => {
+				const dbError = new Error('connection lost');
+				const deleteError = new Error('delete failed');
+
+				buildUserPostModelMock();
+				givenUserWithPicture(existingPicture);
+				givenUpdateRejects(dbError);
+				UserPostModel.deleteOne.mockRejectedValue(deleteError);
+
+				await expect(updateUserProfileData(USER_ID, {}, profilePictureFile)).rejects.toMatchObject({ statusCode: 500, cause: dbError });
+
+				expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('newPicture1'), deleteError);
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 			});
 
 			it('still resolves with the updated user and logs the error when the post-save destroy of the old picture fails', async () => {
@@ -582,11 +705,12 @@ describe('userService', () => {
 				givenUpdateResolves({ _id: USER_ID, username: 'realuser' });
 				imageStorageService.deleteImage.mockRejectedValue(destroyError);
 
-				const result = await updateUserProfileData(USER_ID, { profilePicture: newPicture });
+				const result = await updateUserProfileData(USER_ID, {}, profilePictureFile);
 
 				expect(result.user).toEqual({ _id: USER_ID, username: 'realuser' });
 				expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('old-picture-id'), destroyError);
 				expect(UserPostModel.deleteOne).not.toHaveBeenCalledWith({ _id: 'newPicture1' });
+				expect(imageStorageService.discardUploadedImage).not.toHaveBeenCalled();
 			});
 
 			it('destroys nothing when the user had no previous picture', async () => {
@@ -594,10 +718,46 @@ describe('userService', () => {
 				givenUserWithPicture(null);
 				givenUpdateResolves();
 
-				await updateUserProfileData(USER_ID, { profilePicture: newPicture });
+				await updateUserProfileData(USER_ID, {}, profilePictureFile);
 
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
 				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+			});
+		});
+
+		describe('a profilePicture value in the body', () => {
+			const rejectedValues = [
+				['a Cloudinary-style object', { imageIdentifier: 'someone-elses-image', imageUrl: 'https://example.com/other.jpg' }],
+				['a string id', 'someone-elses-image'],
+				['an empty string', ''],
+				['undefined', undefined],
+				['a number', 0],
+			];
+
+			it.each(rejectedValues)('rejects %s with a 400 BAD_REQUEST before touching anything', async (_name, value) => {
+				UserModel.findOne = jest.fn();
+				UserModel.findOneAndUpdate = jest.fn();
+
+				await expect(updateUserProfileData(USER_ID, { profilePicture: value })).rejects.toMatchObject({
+					statusCode: 400,
+					code: ERROR_CODES.BAD_REQUEST,
+				});
+
+				expect(UserModel.findOne).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
+				expect(imageStorageService.uploadImage).not.toHaveBeenCalled();
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+			});
+
+			it('rejects a non-null profilePicture even when a file is also uploaded, so it cannot override the stored upload', async () => {
+				UserModel.findOneAndUpdate = jest.fn();
+
+				await expect(
+					updateUserProfileData(USER_ID, { profilePicture: 'someone-elses-image' }, { buffer: Buffer.from([0xff, 0xd8, 0xff]) }),
+				).rejects.toMatchObject({ statusCode: 400, code: ERROR_CODES.BAD_REQUEST });
+
+				expect(imageStorageService.uploadImage).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
 			});
 		});
 

@@ -24,29 +24,37 @@ export const userIdFromToken = (jwtToken) => JSON.parse(atob(jwtToken.split('.')
 
 const authHeaders = (jwtToken) => ({ 'X-Authorization': jwtToken });
 
-const buildFakeImage = () => {
-	const unique = `${Date.now()}${Math.floor(Math.random() * 100000)}`;
+const FIXTURE_IMAGE = 'test-image.png';
 
-	return {
-		imageIdentifier: `cypress_image_${unique}`,
-		imageUrl: `data:image/gif;base64,R0lGODlhAQABAAAAACw=#${unique}`,
-	};
-};
-
-export const createPostViaApi = (jwtToken, caption) =>
+const loadFixtureImage = () =>
 	cy
-		.request({ method: 'POST', url: `${serverUrl}/user-posts`, headers: authHeaders(jwtToken), body: { ...buildFakeImage(), caption } })
-		.then((response) => response.body);
+		.fixture(FIXTURE_IMAGE, 'binary')
+		.then((binary) => new File([Cypress.Blob.binaryStringToBlob(binary, 'image/png')], FIXTURE_IMAGE, { type: 'image/png' }));
 
-export const setProfilePictureViaApi = (jwtToken) =>
-	cy
-		.request({
-			method: 'PATCH',
-			url: `${serverUrl}/users/update/${userIdFromToken(jwtToken)}`,
-			headers: authHeaders(jwtToken),
-			body: { profilePicture: buildFakeImage() },
+const decodeJsonBody = (body) => JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body));
+
+const uploadImageViaApi = ({ method, url, jwtToken, imageField, fields = {} }) =>
+	loadFixtureImage()
+		.then((image) => {
+			const body = new FormData();
+
+			body.append(imageField, image);
+			Object.entries(fields).forEach(([name, value]) => body.append(name, value));
+
+			return cy.request({ method, url, headers: authHeaders(jwtToken), body });
 		})
-		.then((response) => response.body);
+		.then((response) => decodeJsonBody(response.body));
+
+export const uploadPostViaApi = (jwtToken, caption) =>
+	uploadImageViaApi({ method: 'POST', url: `${serverUrl}/user-posts`, jwtToken, imageField: 'image', fields: { caption } });
+
+export const uploadProfilePictureViaApi = (jwtToken) =>
+	uploadImageViaApi({
+		method: 'PATCH',
+		url: `${serverUrl}/users/update/${userIdFromToken(jwtToken)}`,
+		jwtToken,
+		imageField: 'profilePicture',
+	}).then((response) => response.user.profilePicture);
 
 export const getProfileViaApi = (userId) => cy.request(`${serverUrl}/users?userIds=${userId}`).then((response) => response.body[0]);
 

@@ -9,7 +9,7 @@ const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
-const { updateUserPostCaption, deleteUserPost } = require('./userPostService');
+const { addUserPost, updateUserPostCaption, deleteUserPost } = require('./userPostService');
 
 const OWNER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const OTHER_USER_ID = '64b7f0a1c2d3e4f5a6b7c8d2';
@@ -106,6 +106,185 @@ describe('userPostService', () => {
 				expect(profilePicture.save).not.toHaveBeenCalled();
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
 				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+			});
+		});
+	});
+
+	describe('addUserPost', () => {
+		const imageFile = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), originalname: 'photo.jpg' };
+		const uploadedImage = { imageIdentifier: 'new-cloudinary-id', imageUrl: 'https://example.com/new.jpg' };
+
+		const buildUserPostModelMock = (save = jest.fn().mockResolvedValue(undefined)) => {
+			UserPostModel.mockImplementation(function UserPostModelMock(data) {
+				Object.assign(this, data);
+				this._id = 'newPost1';
+				this.save = save;
+			});
+
+			return save;
+		};
+
+		let consoleErrorSpy;
+
+		beforeEach(() => {
+			imageStorageService.uploadImage.mockResolvedValue(uploadedImage);
+			imageStorageService.discardUploadedImage.mockResolvedValue(undefined);
+			UserPostModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+			UserModel.findByIdAndUpdate.mockResolvedValue({});
+			consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			consoleErrorSpy.mockRestore();
+		});
+
+		it('uploads the received file through the image storage service under the post image field', async () => {
+			buildUserPostModelMock();
+
+			await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID);
+
+			expect(imageStorageService.uploadImage).toHaveBeenCalledWith({ file: imageFile, fieldName: 'image' });
+		});
+
+		it('saves a post carrying the uploaded image, the caption and the owner', async () => {
+			const save = buildUserPostModelMock();
+
+			await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID);
+
+			expect(UserPostModel).toHaveBeenCalledWith({ ...uploadedImage, caption: 'Sunset', userId: OWNER_ID });
+			expect(save).toHaveBeenCalledTimes(1);
+		});
+
+		it("adds the new post to the owner's posts", async () => {
+			buildUserPostModelMock();
+
+			await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID);
+
+			expect(UserModel.findByIdAndUpdate).toHaveBeenCalledWith(OWNER_ID, { $addToSet: { posts: 'newPost1' } });
+		});
+
+		it('resolves with the saved post', async () => {
+			buildUserPostModelMock();
+
+			const result = await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID);
+
+			expect(result).toMatchObject({ _id: 'newPost1', imageIdentifier: 'new-cloudinary-id', caption: 'Sunset' });
+		});
+
+		it('does not discard the image or remove the post on success', async () => {
+			buildUserPostModelMock();
+
+			await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID);
+
+			expect(imageStorageService.discardUploadedImage).not.toHaveBeenCalled();
+			expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+		});
+
+		it('propagates an upload failure unchanged and saves nothing', async () => {
+			const uploadError = new AppError('Could not upload image', 502);
+
+			buildUserPostModelMock();
+			imageStorageService.uploadImage.mockRejectedValue(uploadError);
+
+			await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toBe(uploadError);
+
+			expect(UserPostModel).not.toHaveBeenCalled();
+			expect(UserModel.findByIdAndUpdate).not.toHaveBeenCalled();
+			expect(imageStorageService.discardUploadedImage).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			[
+				'wrong type',
+				new AppError('image: IMAGE_TYPE_INVALID', 400, {
+					code: ERROR_CODES.IMAGE_TYPE_INVALID,
+					fields: { image: ERROR_CODES.IMAGE_TYPE_INVALID },
+				}),
+			],
+			[
+				'over 10 MB',
+				new AppError('image: IMAGE_TOO_LARGE', 413, { code: ERROR_CODES.IMAGE_TOO_LARGE, fields: { image: ERROR_CODES.IMAGE_TOO_LARGE } }),
+			],
+		])('surfaces the %s rejection with its status, code and field', async (_name, validationError) => {
+			buildUserPostModelMock();
+			imageStorageService.uploadImage.mockRejectedValue(validationError);
+
+			await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toMatchObject({
+				statusCode: validationError.statusCode,
+				code: validationError.code,
+				fields: validationError.fields,
+			});
+		});
+
+		describe('when saving the post fails', () => {
+			it('destroys the uploaded image and answers with a 500 that keeps the cause', async () => {
+				const saveError = new Error('connection lost');
+
+				buildUserPostModelMock(jest.fn().mockRejectedValue(saveError));
+
+				await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toMatchObject({
+					statusCode: 500,
+					message: 'Could not save the user post',
+					cause: saveError,
+				});
+
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-cloudinary-id');
+			});
+
+			it('does not touch the owner and removes the post record it tried to save', async () => {
+				buildUserPostModelMock(jest.fn().mockRejectedValue(new Error('connection lost')));
+
+				await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toBeInstanceOf(AppError);
+
+				expect(UserModel.findByIdAndUpdate).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPost1' });
+			});
+		});
+
+		describe('when adding the post to the owner fails', () => {
+			it('removes the post record and destroys the uploaded image', async () => {
+				const updateError = new Error('connection lost');
+
+				buildUserPostModelMock();
+				UserModel.findByIdAndUpdate.mockRejectedValue(updateError);
+
+				await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toMatchObject({
+					statusCode: 500,
+					message: 'Could not save the user post',
+					cause: updateError,
+				});
+
+				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPost1' });
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-cloudinary-id');
+			});
+		});
+
+		describe('rollback resilience', () => {
+			it('still destroys the image, logs, and answers with the 500 when removing the post record fails', async () => {
+				const deleteError = new Error('delete failed');
+
+				buildUserPostModelMock(jest.fn().mockRejectedValue(new Error('connection lost')));
+				UserPostModel.deleteOne.mockRejectedValue(deleteError);
+
+				await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toMatchObject({
+					statusCode: 500,
+					message: 'Could not save the user post',
+				});
+
+				expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('newPost1'), deleteError);
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-cloudinary-id');
+			});
+
+			it('removes the post record before destroying the image', async () => {
+				const callOrder = [];
+
+				buildUserPostModelMock(jest.fn().mockRejectedValue(new Error('connection lost')));
+				UserPostModel.deleteOne.mockImplementation(async () => callOrder.push('record'));
+				imageStorageService.discardUploadedImage.mockImplementation(async () => callOrder.push('image'));
+
+				await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toBeInstanceOf(AppError);
+
+				expect(callOrder).toEqual(['record', 'image']);
 			});
 		});
 	});

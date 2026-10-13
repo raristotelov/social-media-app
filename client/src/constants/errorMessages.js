@@ -13,6 +13,8 @@ export const ERROR_MESSAGES = Object.freeze({
 	[ERROR_CODES.PASSWORD_NOT_EDITABLE]: 'Password cannot be changed from the profile form',
 	[ERROR_CODES.BIO_TOO_LONG]: 'Bio must be at most 150 characters',
 	[ERROR_CODES.CAPTION_INVALID]: 'Caption must be text',
+	[ERROR_CODES.IMAGE_TYPE_INVALID]: 'Choose a JPEG, PNG or WebP image',
+	[ERROR_CODES.IMAGE_TOO_LARGE]: 'This image is over 10 MB',
 	[ERROR_CODES.POST_NOT_FOUND]: 'This post no longer exists',
 	[ERROR_CODES.POST_FORBIDDEN]: 'You can only change your own posts',
 });

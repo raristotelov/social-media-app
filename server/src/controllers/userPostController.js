@@ -3,6 +3,8 @@ const router = Router();
 
 const { userPostService } = require('../services');
 const verifyJwtToken = require('../middlewares/verifyJwtToken');
+const uploadImage = require('../middlewares/uploadImage');
+const constants = require('../config/constants');
 
 router.get('/', verifyJwtToken, async (req, res) => {
 	const userPostsData = await userPostService.getAllUserPosts(res.userId);
@@ -10,8 +12,8 @@ router.get('/', verifyJwtToken, async (req, res) => {
 	return res.json(userPostsData);
 });
 
-router.post('/', verifyJwtToken, async (req, res) => {
-	const userPostData = await userPostService.addUserPost(req.body, res.userId);
+router.post('/', verifyJwtToken, uploadImage(constants.POST_IMAGE_FIELD), async (req, res) => {
+	const userPostData = await userPostService.addUserPost({ caption: req.body?.caption, imageFile: req.file }, res.userId);
 
 	return res.json(userPostData);
 });

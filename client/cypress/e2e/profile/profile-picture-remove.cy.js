@@ -1,5 +1,13 @@
 import { buildTestUser } from '../../support/testUser';
-import { serverUrl, createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, setProfilePictureViaApi, getProfileViaApi } from '../../support/api';
+import {
+	serverUrl,
+	createUserViaApi,
+	loginViaApi,
+	visitAsUser,
+	userIdFromToken,
+	uploadProfilePictureViaApi,
+	getProfileViaApi,
+} from '../../support/api';
 
 describe('profile picture removal', () => {
 	let user;
@@ -28,8 +36,8 @@ describe('profile picture removal', () => {
 			profilePath = `/user/${userId}`;
 		});
 
-		cy.then(() => setProfilePictureViaApi(jwtToken)).then((result) => {
-			picture = result.user.profilePicture;
+		cy.then(() => uploadProfilePictureViaApi(jwtToken)).then((uploadedPicture) => {
+			picture = uploadedPicture;
 		});
 
 		cy.intercept('PATCH', '**/users/update/**').as('updateRequest');
