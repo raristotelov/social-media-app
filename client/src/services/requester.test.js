@@ -62,6 +62,58 @@ describe('requester', () => {
 				body: JSON.stringify({ a: 1 }),
 			});
 		});
+
+		describe('with a FormData body', () => {
+			const buildFormData = () => {
+				const formData = new FormData();
+
+				formData.append('caption', 'Sunset');
+
+				return formData;
+			};
+
+			it('sends the FormData as the body untouched, so it is not JSON-stringified', async () => {
+				const formData = buildFormData();
+
+				fetch.mockResolvedValue(buildResponse({ body: {} }));
+
+				await requestFactory().post(URL, formData);
+
+				expect(fetch.mock.calls[0][1].body).toBe(formData);
+			});
+
+			it('sets no content-type header, leaving the browser to add the multipart boundary', async () => {
+				fetch.mockResolvedValue(buildResponse({ body: {} }));
+
+				await requestFactory().post(URL, buildFormData());
+
+				expect(fetch).toHaveBeenCalledWith(URL, { method: 'POST', body: expect.any(FormData) });
+			});
+
+			it('still sends only the token header', async () => {
+				fetch.mockResolvedValue(buildResponse({ body: {} }));
+
+				await requestFactory('token123').patch(URL, buildFormData());
+
+				expect(fetch).toHaveBeenCalledWith(URL, { method: 'PATCH', body: expect.any(FormData), headers: { 'X-Authorization': 'token123' } });
+			});
+
+			it('still normalises an error response for a FormData request', async () => {
+				fetch.mockResolvedValue(
+					buildResponse({
+						status: 413,
+						body: { code: 'IMAGE_TOO_LARGE', message: 'image: IMAGE_TOO_LARGE', fields: { image: 'IMAGE_TOO_LARGE' } },
+					}),
+				);
+
+				const error = await catchError(requestFactory('token').post(URL, buildFormData()));
+
+				expect(error).toBeInstanceOf(RequestError);
+				expect(error.code).toBe('IMAGE_TOO_LARGE');
+				expect(error.fields).toEqual({ image: 'IMAGE_TOO_LARGE' });
+				expect(error.status).toBe(413);
+			});
+		});
 	});
 
 	describe('error normalisation', () => {

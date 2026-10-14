@@ -56,7 +56,9 @@ const request = async (method, token, url, data) => {
 	if (method !== 'GET') {
 		options.method = method;
 
-		if (data) {
+		if (data instanceof FormData) {
+			options.body = data;
+		} else if (data) {
 			options.headers = {
 				'content-type': 'application/json',
 			};

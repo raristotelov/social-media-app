@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 
+import { ERROR_CODES } from '../../constants/errorCodes';
+import { ERROR_MESSAGES } from '../../constants/errorMessages';
+import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_BYTES } from '../../constants/validation';
+import { isAcceptedImageType } from '../../utils/images';
+
 import PictureFrameIcon from '../icons/PictureFrameIcon';
 import CloseSmallIcon from '../icons/CloseSmall';
 
@@ -15,8 +20,18 @@ const ImageInput = (props) => {
 
 	const inputRef = useRef(null);
 
-	const { onChange, onRemove, initialValue, placeholderText, isRoundImage, PlaceHolderImageProp, iconWidthProp, iconHeightProp, fontSizeProp } =
-		props;
+	const {
+		onChange,
+		onRemove,
+		onInvalidFile,
+		initialValue,
+		placeholderText,
+		isRoundImage,
+		PlaceHolderImageProp,
+		iconWidthProp,
+		iconHeightProp,
+		fontSizeProp,
+	} = props;
 
 	useEffect(() => {
 		if (initialValue) {
@@ -46,6 +61,20 @@ const ImageInput = (props) => {
 		const selectedImage = e.target.files[0];
 
 		if (!selectedImage) {
+			return;
+		}
+
+		if (!isAcceptedImageType(selectedImage)) {
+			inputRef.current.value = '';
+			onInvalidFile?.(ERROR_MESSAGES[ERROR_CODES.IMAGE_TYPE_INVALID]);
+
+			return;
+		}
+
+		if (selectedImage.size > MAX_IMAGE_BYTES) {
+			inputRef.current.value = '';
+			onInvalidFile?.(ERROR_MESSAGES[ERROR_CODES.IMAGE_TOO_LARGE]);
+
 			return;
 		}
 
@@ -110,7 +139,7 @@ const ImageInput = (props) => {
 					{placeholderText ? <span style={{ fontSize: `${fontSize}px` }}>{placeholderText}</span> : null}
 				</label>
 
-				<input type='file' id='picture' name='picture' onChange={onChangeHandler} ref={inputRef} />
+				<input type='file' id='picture' name='picture' accept={ACCEPTED_IMAGE_TYPES.join(',')} onChange={onChangeHandler} ref={inputRef} />
 			</div>
 
 			<div className={getPreviewWrapperClasses()}>

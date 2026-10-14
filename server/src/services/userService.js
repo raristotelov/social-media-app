@@ -63,6 +63,25 @@ const asFieldError = (error) => {
 	return null;
 };
 
+const createUserNotFoundError = () => new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
+
+const assertValidUserIds = (userIds) => {
+	if (!userIds.every((userId) => mongoose.isObjectIdOrHexString(userId))) {
+		throw createUserNotFoundError();
+	}
+};
+
+const assertUsersExist = async (userIds) => {
+	assertValidUserIds(userIds);
+
+	const uniqueUserIds = [...new Set(userIds)];
+	const existingUsersCount = await UserModel.countDocuments({ _id: { $in: uniqueUserIds } });
+
+	if (existingUsersCount !== uniqueUserIds.length) {
+		throw createUserNotFoundError();
+	}
+};
+
 const signUp = async ({ email, username, password }) => {
 	try {
 		if (typeof password !== 'string' || !password) {
@@ -234,50 +253,86 @@ const destroyProfilePicture = async (profilePicture) => {
 	await UserPostModel.deleteOne({ _id: profilePicture._id });
 };
 
-const updateUserProfileData = async (userId, updatedProfileData) => {
+const rollbackProfilePicture = async ({ profilePicture, uploadedImage }) => {
+	if (profilePicture) {
+		try {
+			await UserPostModel.deleteOne({ _id: profilePicture._id });
+		} catch (error) {
+			console.error(`Could not remove profile picture record ${profilePicture._id} after a failed update`, error);
+		}
+	}
+
+	await imageStorageService.discardUploadedImage(uploadedImage.imageIdentifier);
+};
+
+const updateUserProfileData = async (userId, updatedProfileData, profilePictureFile) => {
 	try {
 		if (Object.prototype.hasOwnProperty.call(updatedProfileData, 'password')) {
 			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_NOT_EDITABLE }, 400);
 		}
 
-		const isRemovingProfilePicture = updatedProfileData.profilePicture === null;
+		const hasDisallowedField = Object.keys(updatedProfileData).some((field) => !constants.ALLOWED_PROFILE_UPDATE_FIELDS.includes(field));
 
-		let profilePicture = null;
+		if (hasDisallowedField) {
+			throw new AppError('Only profile fields can be updated', 400, { code: ERROR_CODES.BAD_REQUEST });
+		}
+
+		const profileUpdate = { ...updatedProfileData };
+		const isRemovingProfilePicture = profileUpdate.profilePicture === null;
+
+		// A client-supplied Cloudinary id could point at another user's image, which would later be destroyed.
+		if (Object.prototype.hasOwnProperty.call(profileUpdate, 'profilePicture') && !isRemovingProfilePicture) {
+			throw new AppError('profilePicture can only be set by uploading a file', 400, { code: ERROR_CODES.BAD_REQUEST });
+		}
+
+		assertValidUserIds([userId]);
+
 		let replacedProfilePicture = null;
 
-		if (updatedProfileData.profilePicture || isRemovingProfilePicture) {
+		if (profilePictureFile || isRemovingProfilePicture) {
 			const userWithProfilePicture = await UserModel.findOne({ _id: userId }).populate({ path: 'profilePicture' });
+
+			if (!userWithProfilePicture) {
+				throw createUserNotFoundError();
+			}
 
 			replacedProfilePicture = userWithProfilePicture.profilePicture;
 		}
 
-		if (updatedProfileData.profilePicture) {
-			const updatedProfilePicture = updatedProfileData.profilePicture;
+		let uploadedImage = null;
 
-			profilePicture = new UserPostModel({
-				imageIdentifier: updatedProfilePicture.imageIdentifier,
-				imageUrl: updatedProfilePicture.imageUrl,
-				userId,
-			});
-
-			await profilePicture.save();
+		if (profilePictureFile) {
+			uploadedImage = await imageStorageService.uploadImage({ file: profilePictureFile, fieldName: constants.PROFILE_PICTURE_FIELD });
 		}
 
-		if (profilePicture) {
-			updatedProfileData.profilePicture = profilePicture._id;
-		}
-
+		let profilePicture = null;
 		let user;
 
 		try {
-			user = await UserModel.findOneAndUpdate({ _id: userId }, updatedProfileData, {
+			if (uploadedImage) {
+				profilePicture = new UserPostModel({
+					imageIdentifier: uploadedImage.imageIdentifier,
+					imageUrl: uploadedImage.imageUrl,
+					userId,
+				});
+
+				await profilePicture.save();
+
+				profileUpdate.profilePicture = profilePicture._id;
+			}
+
+			user = await UserModel.findOneAndUpdate({ _id: userId }, profileUpdate, {
 				new: true,
 				runValidators: true,
 				context: 'query',
 			}).populate('profilePicture');
+
+			if (!user) {
+				throw createUserNotFoundError();
+			}
 		} catch (error) {
-			if (profilePicture) {
-				await UserPostModel.deleteOne({ _id: profilePicture._id });
+			if (uploadedImage) {
+				await rollbackProfilePicture({ profilePicture, uploadedImage });
 			}
 
 			throw error;
@@ -310,25 +365,37 @@ const updateUserProfileData = async (userId, updatedProfileData) => {
 };
 
 const followUser = async (userId, userIdToFollow) => {
+	if (userId === userIdToFollow) {
+		throw new AppError('Users cannot follow themselves', 400, { code: ERROR_CODES.BAD_REQUEST });
+	}
+
 	try {
+		await assertUsersExist([userId, userIdToFollow]);
+
 		const currentlyLoggedUser = await UserModel.findOneAndUpdate(
 			{ _id: userId },
-			{ $push: { following: userIdToFollow } },
+			{ $addToSet: { following: userIdToFollow } },
 			{ new: true },
 		).populate('profilePicture');
 
-		await UserModel.updateOne({ _id: userIdToFollow }, { $push: { followers: userId } }, { new: true });
+		await UserModel.updateOne({ _id: userIdToFollow }, { $addToSet: { followers: userId } }, { new: true });
 
 		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser);
 
 		return updatedUserData;
 	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
 		throw new AppError('Could not follow user', 500, { cause: error });
 	}
 };
 
 const unfollowUser = async (userId, userIdToUnfollow) => {
 	try {
+		await assertUsersExist([userId, userIdToUnfollow]);
+
 		const currentlyLoggedUser = await UserModel.findOneAndUpdate(
 			{ _id: userId },
 			{ $pull: { following: userIdToUnfollow } },
@@ -341,6 +408,10 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 
 		return updatedUserData;
 	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
 		throw new AppError('Could not unfollow user', 500, { cause: error });
 	}
 };

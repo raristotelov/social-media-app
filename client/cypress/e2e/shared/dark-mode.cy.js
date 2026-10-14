@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, setThemeViaApi } from '../../support/api';
 
 describe('dark mode', () => {
 	const user = buildTestUser();
@@ -14,6 +14,10 @@ describe('dark mode', () => {
 			jwtToken = token;
 			profilePath = `/user/${userIdFromToken(token)}`;
 		});
+	});
+
+	beforeEach(() => {
+		setThemeViaApi(jwtToken, 'light');
 	});
 
 	after(() => {

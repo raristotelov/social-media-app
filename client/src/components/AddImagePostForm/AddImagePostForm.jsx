@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { ACTION_FALLBACK_MESSAGES, VALIDATION_MESSAGES } from '../../constants/errorMessages';
-import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
+import { UPLOAD_FIELDS } from '../../constants/validation';
+import { getFormErrors, isUnauthenticatedError } from '../../utils/errors';
 
 import Button from '../Button/Button';
 import ImageInput from '../ImageInput/ImageInput';
@@ -14,6 +15,8 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 	const [caption, setCaption] = useState('');
 	const [pictureError, setPictureError] = useState('');
 	const [formError, setFormError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const isSubmittingRef = useRef(false);
 
 	const pictureChangeHandler = (image) => {
 		setUploadedImage(image);
@@ -29,13 +32,20 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 	const onSubmit = async (e) => {
 		e.preventDefault();
 
+		if (isSubmittingRef.current) {
+			return;
+		}
+
 		if (!uploadedImage) {
 			setPictureError(VALIDATION_MESSAGES.PICTURE_REQUIRED);
 
 			return;
 		}
 
+		setPictureError('');
 		setFormError('');
+		isSubmittingRef.current = true;
+		setIsSubmitting(true);
 
 		try {
 			await addImagePostHandler(uploadedImage, caption);
@@ -44,7 +54,17 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 				return;
 			}
 
-			setFormError(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.UPLOAD_PICTURE));
+			const { fieldErrors, formError: submitFormError } = getFormErrors(
+				error,
+				[UPLOAD_FIELDS.POST_IMAGE],
+				ACTION_FALLBACK_MESSAGES.UPLOAD_PICTURE,
+			);
+
+			setPictureError(fieldErrors[UPLOAD_FIELDS.POST_IMAGE]?.[0] ?? '');
+			setFormError(submitFormError);
+		} finally {
+			isSubmittingRef.current = false;
+			setIsSubmitting(false);
 		}
 	};
 
@@ -53,6 +73,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 			<div className={`add-image-post-image-wrapper ${pictureError ? 'has-error' : ''}`.trim()}>
 				<ImageInput
 					onChange={pictureChangeHandler}
+					onInvalidFile={setPictureError}
 					PlaceHolderImageProp={PictureFrameIcon}
 					placeholderText='Choose a Picture'
 					iconWidthProp={90}
@@ -72,7 +93,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 			) : null}
 
 			<div className='button-row'>
-				<Button type='submit' label='Submit' />
+				<Button type='submit' label='Submit' disabled={isSubmitting} />
 
 				<Button type='button' label='Cancel' variant='secondary' onClick={onCancelClick} />
 			</div>

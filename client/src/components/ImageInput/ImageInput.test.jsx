@@ -15,6 +15,16 @@ const renderImageInput = (props = {}) => {
 
 const buildFile = (name = 'new.png') => new File(['(image)'], name, { type: 'image/png' });
 
+const MAX_BYTES = 10 * 1024 * 1024;
+
+const buildFileOfSize = (size, { name = 'photo.jpg', type = 'image/jpeg' } = {}) => {
+	const file = new File(['(image)'], name, { type });
+
+	Object.defineProperty(file, 'size', { value: size });
+
+	return file;
+};
+
 describe('ImageInput', () => {
 	let openPickerSpy;
 
@@ -45,6 +55,138 @@ describe('ImageInput', () => {
 
 			expect(onChange).not.toHaveBeenCalled();
 			expect(screen.getByAltText('preview')).toHaveAttribute('src', initialPicture);
+		});
+	});
+
+	describe('file type', () => {
+		it('only offers JPEG, PNG and WebP in the file picker', () => {
+			const { fileInput } = renderImageInput();
+
+			expect(fileInput).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
+		});
+
+		it.each([
+			['image/jpeg', 'photo.jpg'],
+			['image/png', 'photo.png'],
+			['image/webp', 'photo.webp'],
+		])('accepts a %s file', (type, name) => {
+			const onInvalidFile = jest.fn();
+			const { onChange, fileInput } = renderImageInput({ onInvalidFile });
+			const file = buildFileOfSize(1024, { name, type });
+
+			userEvent.upload(fileInput, file);
+
+			expect(onChange).toHaveBeenCalledWith(file);
+			expect(onInvalidFile).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			['a GIF', 'animation.gif', 'image/gif'],
+			['an SVG', 'logo.svg', 'image/svg+xml'],
+			['a PDF', 'document.pdf', 'application/pdf'],
+			['a text file', 'notes.txt', 'text/plain'],
+			['a file with no detectable type', 'mystery', ''],
+		])('rejects %s with the type message and does not pass it on', (_name, fileName, type) => {
+			const onInvalidFile = jest.fn();
+			const { onChange, fileInput } = renderImageInput({ onInvalidFile });
+
+			userEvent.upload(fileInput, buildFileOfSize(1024, { name: fileName, type }));
+
+			expect(onInvalidFile).toHaveBeenCalledTimes(1);
+			expect(onInvalidFile).toHaveBeenCalledWith('Choose a JPEG, PNG or WebP image');
+			expect(onChange).not.toHaveBeenCalled();
+		});
+
+		it('clears the file input after rejecting a wrong type, so the same file can be chosen again', () => {
+			const { fileInput } = renderImageInput({ onInvalidFile: jest.fn() });
+			const valueSetterSpy = jest.spyOn(fileInput, 'value', 'set');
+
+			userEvent.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
+
+			expect(valueSetterSpy).toHaveBeenCalledWith('');
+		});
+
+		it('does not show a preview for a rejected file', () => {
+			const { container, fileInput } = renderImageInput({ onInvalidFile: jest.fn() });
+
+			userEvent.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
+
+			expect(container.querySelector('.preview-wrapper')).toHaveClass('hidden');
+			expect(global.URL.createObjectURL).not.toHaveBeenCalled();
+		});
+
+		it('keeps the current picture when a wrong file is chosen as a replacement', () => {
+			const { onChange, fileInput } = renderImageInput({ initialValue: initialPicture, onInvalidFile: jest.fn() });
+
+			userEvent.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
+
+			expect(onChange).not.toHaveBeenCalled();
+			expect(screen.getByAltText('preview')).toHaveAttribute('src', initialPicture);
+		});
+
+		it('does not throw when a wrong file is chosen and no onInvalidFile handler is given', () => {
+			const { onChange, fileInput } = renderImageInput();
+
+			expect(() => userEvent.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }))).not.toThrow();
+			expect(onChange).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('file size', () => {
+		it('accepts a file of exactly 10 MB', () => {
+			const onInvalidFile = jest.fn();
+			const { onChange, fileInput } = renderImageInput({ onInvalidFile });
+			const file = buildFileOfSize(MAX_BYTES);
+
+			userEvent.upload(fileInput, file);
+
+			expect(onChange).toHaveBeenCalledWith(file);
+			expect(onInvalidFile).not.toHaveBeenCalled();
+		});
+
+		it('rejects a file one byte over 10 MB with the size message and does not pass it on', () => {
+			const onInvalidFile = jest.fn();
+			const { onChange, fileInput } = renderImageInput({ onInvalidFile });
+
+			userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
+
+			expect(onInvalidFile).toHaveBeenCalledTimes(1);
+			expect(onInvalidFile).toHaveBeenCalledWith('This image is over 10 MB');
+			expect(onChange).not.toHaveBeenCalled();
+		});
+
+		it('clears the file input after rejecting an oversized file', () => {
+			const { fileInput } = renderImageInput({ onInvalidFile: jest.fn() });
+			const valueSetterSpy = jest.spyOn(fileInput, 'value', 'set');
+
+			userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
+
+			expect(valueSetterSpy).toHaveBeenCalledWith('');
+		});
+
+		it('does not show a preview for an oversized file', () => {
+			const { container, fileInput } = renderImageInput({ onInvalidFile: jest.fn() });
+
+			userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
+
+			expect(container.querySelector('.preview-wrapper')).toHaveClass('hidden');
+		});
+
+		it('checks the type before the size, so an oversized wrong-type file gets the type message', () => {
+			const onInvalidFile = jest.fn();
+			const { fileInput } = renderImageInput({ onInvalidFile });
+
+			userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1, { name: 'video.mp4', type: 'video/mp4' }));
+
+			expect(onInvalidFile).toHaveBeenCalledTimes(1);
+			expect(onInvalidFile).toHaveBeenCalledWith('Choose a JPEG, PNG or WebP image');
+		});
+
+		it('does not throw when an oversized file is chosen and no onInvalidFile handler is given', () => {
+			const { onChange, fileInput } = renderImageInput();
+
+			expect(() => userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1))).not.toThrow();
+			expect(onChange).not.toHaveBeenCalled();
 		});
 	});
 

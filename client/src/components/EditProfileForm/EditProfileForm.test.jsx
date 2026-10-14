@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import EditProfileForm from './EditProfileForm';
@@ -195,6 +195,273 @@ describe('EditProfileForm', () => {
 
 			expect(onCancelClick).toHaveBeenCalledTimes(1);
 			expect(editProfileData).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('while saving', () => {
+		const buildDeferred = () => {
+			const deferred = {};
+
+			deferred.promise = new Promise((resolve, reject) => {
+				deferred.resolve = resolve;
+				deferred.reject = reject;
+			});
+
+			return deferred;
+		};
+
+		const changeUsername = () => {
+			userEvent.clear(screen.getByPlaceholderText('Username'));
+			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
+		};
+
+		it('enables Submit before anything is sent', () => {
+			renderEditProfileForm(jest.fn(), jest.fn());
+
+			expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+		});
+
+		it('disables Submit while the request is in flight', async () => {
+			const request = buildDeferred();
+
+			renderEditProfileForm(jest.fn().mockReturnValue(request.promise), jest.fn());
+			changeUsername();
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
+
+			request.resolve();
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+		});
+
+		it('keeps Cancel enabled while the request is in flight', async () => {
+			const request = buildDeferred();
+
+			renderEditProfileForm(jest.fn().mockReturnValue(request.promise), jest.fn());
+			changeUsername();
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+
+			request.resolve();
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+		});
+
+		it('sends one request when Submit is double-clicked', async () => {
+			const request = buildDeferred();
+			const editProfileData = jest.fn().mockReturnValue(request.promise);
+
+			renderEditProfileForm(editProfileData, jest.fn());
+			changeUsername();
+			userEvent.dblClick(screen.getByRole('button', { name: 'Submit' }));
+
+			expect(editProfileData).toHaveBeenCalledTimes(1);
+
+			request.resolve();
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+		});
+
+		it('sends one request when the form is submitted twice synchronously before React re-renders, and allows a new submit once it settles', async () => {
+			const request = buildDeferred();
+			const editProfileData = jest.fn().mockReturnValue(request.promise);
+
+			const { container } = renderEditProfileForm(editProfileData, jest.fn());
+			const form = container.querySelector('form');
+
+			changeUsername();
+			act(() => {
+				form.requestSubmit();
+				form.requestSubmit();
+			});
+
+			expect(editProfileData).toHaveBeenCalledTimes(1);
+
+			request.resolve();
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+
+			act(() => {
+				form.requestSubmit();
+			});
+
+			expect(editProfileData).toHaveBeenCalledTimes(2);
+
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+		});
+
+		it('enables Submit again after a failed request', async () => {
+			renderEditProfileForm(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }), jest.fn());
+			changeUsername();
+			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+			await screen.findByRole('alert');
+
+			expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+		});
+	});
+
+	describe('profile picture errors', () => {
+		const MAX_BYTES = 10 * 1024 * 1024;
+		const TYPE_MESSAGE = 'Choose a JPEG, PNG or WebP image';
+		const SIZE_MESSAGE = 'This image is over 10 MB';
+
+		const buildFile = (name = 'new.png', type = 'image/png') => new File(['(image)'], name, { type });
+
+		const buildOversizedFile = () => {
+			const file = buildFile('huge.jpg', 'image/jpeg');
+
+			Object.defineProperty(file, 'size', { value: MAX_BYTES + 1 });
+
+			return file;
+		};
+
+		const getFileInput = (container) => container.querySelector('input[type="file"]');
+
+		const getPictureWrapper = (container) => container.querySelector('.profile-form-profile-picture-wrapper');
+
+		beforeEach(() => {
+			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
+			global.URL.revokeObjectURL = jest.fn();
+		});
+
+		describe('choosing a file in the browser', () => {
+			it('shows the type message under the picture for a file that is not JPEG, PNG or WebP', () => {
+				const { container } = renderEditProfileForm(jest.fn(), jest.fn());
+
+				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+
+				expect(within(getPictureWrapper(container)).getByText(TYPE_MESSAGE)).toHaveClass('field-error');
+			});
+
+			it('shows the size message under the picture for a file over 10 MB', () => {
+				const { container } = renderEditProfileForm(jest.fn(), jest.fn());
+
+				userEvent.upload(getFileInput(container), buildOversizedFile());
+
+				expect(within(getPictureWrapper(container)).getByText(SIZE_MESSAGE)).toHaveClass('field-error');
+			});
+
+			it('does not use the form message for a rejected file', () => {
+				const { container } = renderEditProfileForm(jest.fn(), jest.fn());
+
+				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+
+				expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+			});
+
+			it('sends nothing for a rejected file, and closes the form as an untouched submit', async () => {
+				const editProfileData = jest.fn();
+				const onCancelClick = jest.fn();
+				const { container } = renderEditProfileForm(editProfileData, onCancelClick);
+
+				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+				await waitFor(() => expect(onCancelClick).toHaveBeenCalledTimes(1));
+				expect(editProfileData).not.toHaveBeenCalled();
+			});
+
+			it('clears the message when a valid file is chosen', () => {
+				const { container } = renderEditProfileForm(jest.fn(), jest.fn());
+
+				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				userEvent.upload(getFileInput(container), buildFile());
+
+				expect(screen.queryByText(TYPE_MESSAGE)).not.toBeInTheDocument();
+			});
+
+			it('clears the message when the picture is removed', () => {
+				const userDataWithPicture = { ...userData, profilePicture: { imageUrl: 'https://example.com/me.jpg' } };
+				const { container } = renderEditProfileForm(jest.fn(), jest.fn(), userDataWithPicture);
+
+				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+
+				expect(screen.queryByText(TYPE_MESSAGE)).not.toBeInTheDocument();
+			});
+
+			it('clears the message when the form is submitted with other changes', async () => {
+				const editProfileData = jest.fn().mockResolvedValue(undefined);
+				const { container } = renderEditProfileForm(editProfileData, jest.fn());
+
+				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				userEvent.clear(screen.getByPlaceholderText('Username'));
+				userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
+				userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+				await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ username: 'newname' }));
+				expect(screen.queryByText(TYPE_MESSAGE)).not.toBeInTheDocument();
+			});
+		});
+
+		describe('rejected by the server', () => {
+			const submitNewPictureRejectedWith = async (error) => {
+				const editProfileData = jest.fn().mockRejectedValue(error);
+				const view = renderEditProfileForm(editProfileData, jest.fn());
+
+				userEvent.upload(getFileInput(view.container), buildFile());
+				userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+				await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+
+				return view;
+			};
+
+			it('shows IMAGE_TYPE_INVALID under the picture and no form message', async () => {
+				const { container } = await submitNewPictureRejectedWith({
+					code: 'IMAGE_TYPE_INVALID',
+					fields: { profilePicture: 'IMAGE_TYPE_INVALID' },
+					status: 400,
+				});
+
+				expect(within(getPictureWrapper(container)).getByText(TYPE_MESSAGE)).toHaveClass('field-error');
+				expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+			});
+
+			it('shows IMAGE_TOO_LARGE under the picture and no form message', async () => {
+				const { container } = await submitNewPictureRejectedWith({
+					code: 'IMAGE_TOO_LARGE',
+					fields: { profilePicture: 'IMAGE_TOO_LARGE' },
+					status: 413,
+				});
+
+				expect(within(getPictureWrapper(container)).getByText(SIZE_MESSAGE)).toHaveClass('field-error');
+				expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+			});
+
+			it('shows the save-profile fallback as the form message, not under the picture, for an unexpected error', async () => {
+				const { container } = await submitNewPictureRejectedWith({ code: 'INTERNAL_ERROR', status: 500 });
+
+				expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save your profile. Try again.");
+				expect(getPictureWrapper(container).querySelector('.field-error')).not.toBeInTheDocument();
+			});
+
+			it('clears the picture message when another file is chosen', async () => {
+				const { container } = await submitNewPictureRejectedWith({
+					code: 'IMAGE_TOO_LARGE',
+					fields: { profilePicture: 'IMAGE_TOO_LARGE' },
+					status: 413,
+				});
+
+				userEvent.upload(getFileInput(container), buildFile('other.png'));
+
+				expect(screen.queryByText(SIZE_MESSAGE)).not.toBeInTheDocument();
+			});
+
+			it('clears the picture message when the picture is removed', async () => {
+				const userDataWithPicture = { ...userData, profilePicture: { imageUrl: 'https://example.com/me.jpg' } };
+				const editProfileData = jest
+					.fn()
+					.mockRejectedValue({ code: 'IMAGE_TOO_LARGE', fields: { profilePicture: 'IMAGE_TOO_LARGE' }, status: 413 });
+				const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+
+				userEvent.upload(getFileInput(container), buildFile());
+				userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+				await screen.findByText(SIZE_MESSAGE);
+
+				userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+
+				expect(screen.queryByText(SIZE_MESSAGE)).not.toBeInTheDocument();
+			});
 		});
 	});
 

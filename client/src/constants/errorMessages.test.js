@@ -15,6 +15,8 @@ describe('ERROR_MESSAGES', () => {
 		['PASSWORD_NOT_EDITABLE', 'Password cannot be changed from the profile form'],
 		['BIO_TOO_LONG', 'Bio must be at most 150 characters'],
 		['CAPTION_INVALID', 'Caption must be text'],
+		['IMAGE_TYPE_INVALID', 'Choose a JPEG, PNG or WebP image'],
+		['IMAGE_TOO_LARGE', 'This image is over 10 MB'],
 		['POST_NOT_FOUND', 'This post no longer exists'],
 		['POST_FORBIDDEN', 'You can only change your own posts'],
 	])('has the documented copy for %s', (code, copy) => {
@@ -26,7 +28,7 @@ describe('ERROR_MESSAGES', () => {
 	});
 
 	it('has copy for exactly the codes the spec documents, and no other', () => {
-		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(14);
+		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(16);
 	});
 });
 

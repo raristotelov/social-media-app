@@ -4,7 +4,7 @@ import {
 	loginViaApi,
 	visitAsUser,
 	userIdFromToken,
-	createPostViaApi,
+	uploadPostViaApi,
 	getProfileViaApi,
 	editCaptionViaApi,
 } from '../../support/api';
@@ -45,7 +45,7 @@ describe('post edit', () => {
 			otherJwtToken = token;
 		});
 
-		cy.then(() => createPostViaApi(jwtToken, 'original caption')).then((created) => {
+		cy.then(() => uploadPostViaApi(jwtToken, 'original caption')).then((created) => {
 			post = created;
 		});
 
