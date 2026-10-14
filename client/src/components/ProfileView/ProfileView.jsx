@@ -275,7 +275,7 @@ const ProfileView = (props) => {
 			<section className='profile-posts-wrapper'>
 				{isLoggedInUserProfile ? (
 					<button className='add-post-button' onClick={openAddPictureForm}>
-						<PlusIcon iconColorProp='#B5B5B5' />
+						<PlusIcon iconColorProp='currentColor' />
 
 						<span>Upload Picture</span>
 					</button>

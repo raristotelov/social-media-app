@@ -58,6 +58,16 @@ export const uploadProfilePictureViaApi = (jwtToken) =>
 
 export const getProfileViaApi = (userId) => cy.request(`${serverUrl}/users?userIds=${userId}`).then((response) => response.body[0]);
 
+export const searchUsersViaApi = (searchWord) =>
+	cy.request({ method: 'GET', url: `${serverUrl}/users`, qs: { searchWord } }).then((response) => response.body);
+
+export const followUserViaApi = (jwtToken, userIdToFollow) =>
+	cy.request({
+		method: 'POST',
+		url: `${serverUrl}/users/${userIdFromToken(jwtToken)}/follow/${userIdToFollow}`,
+		headers: authHeaders(jwtToken),
+	});
+
 export const deletePostViaApi = (jwtToken, userPostId, failOnStatusCode = true) =>
 	cy.request({ method: 'DELETE', url: `${serverUrl}/user-posts/${userPostId}`, headers: authHeaders(jwtToken), failOnStatusCode });
 

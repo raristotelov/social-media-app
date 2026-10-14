@@ -26,7 +26,7 @@ const MainHeader = ({ logoutHandler }) => {
 	const loggedUserLinks = (
 		<div className='navigation-links'>
 			<Link to='/' title='Feed' className={`navigation-item-icon ${currentPath === '/user-feed' ? 'navigation-item-active' : ''}`}>
-				<HouseIcon iconColorProp={'#4b4b4b'} />
+				<HouseIcon iconColorProp='currentColor' />
 
 				<span>Feed</span>
 			</Link>
@@ -36,7 +36,7 @@ const MainHeader = ({ logoutHandler }) => {
 				title='Popular'
 				className={`navigation-item-icon ${currentPath === '/popular-posts' ? 'navigation-item-active' : ''}`}
 			>
-				<FlameIcon iconColorProp={'#4b4b4b'} />
+				<FlameIcon iconColorProp='currentColor' />
 
 				<span>Popular</span>
 			</Link>

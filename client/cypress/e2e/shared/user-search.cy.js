@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, followUserViaApi, searchUsersViaApi } from '../../support/api';
 
 describe('user search', () => {
 	const user = buildTestUser();
@@ -7,18 +7,22 @@ describe('user search', () => {
 
 	let jwtToken;
 	let ownProfilePath;
+	let searchedUserId;
 	let searchedProfilePath;
 
 	before(() => {
 		createUserViaApi(user);
 
 		createUserViaApi(searchedUser).then((response) => {
-			searchedProfilePath = `/user/${userIdFromToken(response.body)}`;
+			searchedUserId = userIdFromToken(response.body);
+			searchedProfilePath = `/user/${searchedUserId}`;
 		});
 
 		loginViaApi(user).then((token) => {
 			jwtToken = token;
 			ownProfilePath = `/user/${userIdFromToken(token)}`;
+
+			followUserViaApi(token, searchedUserId);
 		});
 	});
 
@@ -37,6 +41,48 @@ describe('user search', () => {
 
 		cy.location('pathname').should('eq', searchedProfilePath);
 		cy.contains('.profile-header .username', searchedUser.username).should('be.visible');
+	});
+
+	it('shows the designed result row with the real follower count on desktop', () => {
+		cy.viewport(1440, 900);
+		visitAsUser(ownProfilePath, jwtToken);
+
+		cy.get('.search-input').type(searchedUser.username);
+
+		cy.contains('.search-results-dropdown .search-result', searchedUser.username).within(() => {
+			cy.get('.search-result-username').should('have.text', searchedUser.username);
+			cy.get('.search-result-followers').should('have.text', '1 follower');
+		});
+	});
+
+	it('shows the designed result row with the real follower count on tablet', () => {
+		cy.viewport(768, 1024);
+		visitAsUser(ownProfilePath, jwtToken);
+
+		cy.get('.search-input').type(searchedUser.username);
+
+		cy.contains('.search-results-dropdown .search-result', searchedUser.username).within(() => {
+			cy.get('.search-result-followers').should('have.text', '1 follower');
+		});
+	});
+
+	it('shows the real follower count in the mobile result row', () => {
+		cy.viewport(390, 844);
+		visitAsUser('/user-feed', jwtToken);
+
+		cy.get('.mobile-top-bar-action[aria-label="Search"]').click();
+		cy.get('.mobile-search-field').type(searchedUser.username);
+
+		cy.contains('.search-result', searchedUser.username).find('.search-result-followers').should('have.text', '1 follower');
+	});
+
+	it('returns follower data but no email from the search endpoint', () => {
+		searchUsersViaApi(searchedUser.username).then((users) => {
+			expect(users).to.have.length(1);
+			expect(users[0]).to.have.property('username', searchedUser.username);
+			expect(users[0].followers).to.have.length(1);
+			expect(users[0]).not.to.have.property('email');
+		});
 	});
 
 	it('lets a guest search', () => {

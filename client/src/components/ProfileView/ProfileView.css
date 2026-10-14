@@ -51,6 +51,7 @@
 .add-post-button svg {
 	width: 80px;
 	height: 80px;
+	color: var(--text-secondary);
 }
 
 .add-post-button span {

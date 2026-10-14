@@ -28,6 +28,11 @@ describe('guest profile', () => {
 		cy.get('.profile-posts-wrapper').should('exist');
 	});
 
+	it('shows no Upload Picture tile to a guest', () => {
+		cy.contains('.profile-header .username', user.username).should('be.visible');
+		cy.get('.add-post-button').should('not.exist');
+	});
+
 	it('shows guest navigation rather than the account menu', () => {
 		cy.viewport(1440, 900);
 		cy.visit(profilePath);
