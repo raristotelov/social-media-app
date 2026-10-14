@@ -4,9 +4,7 @@
 	right: 0;
 	z-index: 2;
 
-	/* Fixed, so the menu never resizes with the username above it. 160 is the
-	   narrowest that fits the Dark mode row: 16 + label 69 + switch 44 + 16. */
-	width: 160px;
+	width: max-content;
 	padding: 8px 0;
 	box-sizing: border-box;
 

@@ -14,7 +14,15 @@ const imageStorageService = require('./imageStorageService');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
-const { login, signUp, updateUserProfileData, followUser, unfollowUser, getUsersProfileDataByUserIds } = require('./userService');
+const {
+	login,
+	signUp,
+	updateUserProfileData,
+	followUser,
+	unfollowUser,
+	getUsersProfileDataByUserIds,
+	getUsersProfileDataBySearchWord,
+} = require('./userService');
 
 describe('userService', () => {
 	beforeEach(() => {
@@ -1099,6 +1107,63 @@ describe('userService', () => {
 			});
 
 			await expect(getUsersProfileDataByUserIds({ userIds: [VALID_ID] })).rejects.toMatchObject({
+				statusCode: 500,
+				cause: dbError,
+			});
+		});
+	});
+
+	describe('getUsersProfileDataBySearchWord', () => {
+		const givenSearchResolves = (users) => {
+			const populate = jest.fn();
+			const select = jest.fn().mockReturnValue({ populate });
+
+			populate.mockReturnValueOnce({ populate }).mockResolvedValueOnce(users);
+			UserModel.find = jest.fn().mockReturnValue({ select });
+
+			return select;
+		};
+
+		it('matches usernames starting with the search word, case-insensitively', async () => {
+			givenSearchResolves([]);
+
+			await getUsersProfileDataBySearchWord({ searchWord: 'jan' });
+
+			expect(UserModel.find).toHaveBeenCalledWith({ username: { $regex: '^jan', $options: 'i' } });
+		});
+
+		it('selects followers so the follower count can be shown', async () => {
+			const select = givenSearchResolves([]);
+
+			await getUsersProfileDataBySearchWord({ searchWord: 'jan' });
+
+			expect(select).toHaveBeenCalledWith(expect.objectContaining({ followers: 1 }));
+		});
+
+		it('does not select email', async () => {
+			const select = givenSearchResolves([]);
+
+			await getUsersProfileDataBySearchWord({ searchWord: 'jan' });
+
+			expect(select.mock.calls[0][0]).not.toHaveProperty('email');
+		});
+
+		it('returns the users found', async () => {
+			const users = [{ _id: 'user1', username: 'janedoe', followers: ['user2', 'user3'] }];
+
+			givenSearchResolves(users);
+
+			await expect(getUsersProfileDataBySearchWord({ searchWord: 'jan' })).resolves.toBe(users);
+		});
+
+		it('wraps an unexpected database failure in a 500 AppError', async () => {
+			const dbError = new Error('connection lost');
+
+			UserModel.find = jest.fn().mockImplementation(() => {
+				throw dbError;
+			});
+
+			await expect(getUsersProfileDataBySearchWord({ searchWord: 'jan' })).rejects.toMatchObject({
 				statusCode: 500,
 				cause: dbError,
 			});

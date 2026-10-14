@@ -167,6 +167,34 @@ describe('ProfileView post actions and profile picture removal', () => {
 		});
 	});
 
+	describe('upload picture tile visibility', () => {
+		it('shows the Upload Picture tile on your own profile', async () => {
+			await renderOwnProfile();
+
+			expect(screen.getByRole('button', { name: /Upload Picture/ })).toBeInTheDocument();
+		});
+
+		it('draws the Plus icon on the Upload Picture tile in currentColor so it follows the theme', async () => {
+			await renderOwnProfile();
+
+			expect(screen.getByRole('button', { name: /Upload Picture/ }).querySelector('path')).toHaveAttribute('stroke', 'currentColor');
+		});
+
+		it("hides the Upload Picture tile on another user's profile", async () => {
+			await renderOwnProfile({ loggedInUser: { _id: 'user1', username: 'johndoe', following: [] } });
+
+			expect(screen.getAllByAltText('user-post')).toHaveLength(2);
+			expect(screen.queryByRole('button', { name: /Upload Picture/ })).not.toBeInTheDocument();
+		});
+
+		it('hides the Upload Picture tile from a guest', async () => {
+			await renderOwnProfile({ loggedInUser: null });
+
+			expect(screen.getAllByAltText('user-post')).toHaveLength(2);
+			expect(screen.queryByRole('button', { name: /Upload Picture/ })).not.toBeInTheDocument();
+		});
+	});
+
 	describe('uploading a post', () => {
 		const createdImage = { imageIdentifier: 'img3', imageUrl: 'https://example.com/3.jpg' };
 		const savedPost = { _id: 'post3', ...createdImage, caption: 'Third caption' };

@@ -25,17 +25,21 @@ const SearchResults = ({ results, isLoading, onResultClick, className = '' }) =>
 
 	return (
 		<div className={classNames}>
-			{results.map((user) => (
-				<Link to={`/user/${user._id}`} key={user._id} className='search-result' onClick={onResultClick}>
-					<span className='search-result-avatar' />
+			{results.map((user) => {
+				const followersCount = user.followers?.length || 0;
 
-					<span className='search-result-text'>
-						<span className='search-result-username'>{user.username}</span>
+				return (
+					<Link to={`/user/${user._id}`} key={user._id} className='search-result' onClick={onResultClick}>
+						<span className='search-result-avatar' />
 
-						<span className='search-result-followers'>{`${user.followers?.length || 0} followers`}</span>
-					</span>
-				</Link>
-			))}
+						<span className='search-result-text'>
+							<span className='search-result-username'>{user.username}</span>
+
+							<span className='search-result-followers'>{`${followersCount} ${followersCount === 1 ? 'follower' : 'followers'}`}</span>
+						</span>
+					</Link>
+				);
+			})}
 		</div>
 	);
 };

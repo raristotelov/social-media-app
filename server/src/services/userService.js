@@ -237,7 +237,7 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds }) => {
 const getUsersProfileDataBySearchWord = async ({ searchWord }) => {
 	try {
 		const users = await UserModel.find({ username: { $regex: `^${searchWord}`, $options: 'i' } })
-			.select({ _id: 1, username: 1, email: 1, posts: 1, bio: 1, profilePicture: 1 })
+			.select({ _id: 1, username: 1, posts: 1, bio: 1, profilePicture: 1, followers: 1 })
 			.populate({ path: 'posts' })
 			.populate({ path: 'profilePicture' });
 
