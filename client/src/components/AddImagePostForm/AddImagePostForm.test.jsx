@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { RequestError } from '../../services/requester';
@@ -134,6 +134,32 @@ describe('AddImagePostForm', () => {
 			expect(addImagePostHandler).toHaveBeenCalledTimes(1);
 
 			request.resolve();
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+		});
+
+		it('sends one request when the form is submitted twice synchronously before React re-renders, and allows a new submit once it settles', async () => {
+			const request = buildDeferred();
+			const addImagePostHandler = jest.fn().mockReturnValue(request.promise);
+			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const form = container.querySelector('form');
+
+			chooseImage(container);
+			act(() => {
+				form.requestSubmit();
+				form.requestSubmit();
+			});
+
+			expect(addImagePostHandler).toHaveBeenCalledTimes(1);
+
+			request.resolve();
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+
+			act(() => {
+				form.requestSubmit();
+			});
+
+			expect(addImagePostHandler).toHaveBeenCalledTimes(2);
+
 			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
 		});
 

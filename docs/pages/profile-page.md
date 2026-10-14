@@ -51,11 +51,11 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - Opened from the Upload Picture tile. Image chooser + caption input; Submit / Cancel.
 - Cancel closes it. Submitting with no picture shows "Please choose a picture". — Built
 - Error message in the popup on upload/save failure. — Built (#30)
-- Submit disabled while the request is in flight. — To build (#15)
-- Validation before upload: JPEG, PNG and WebP only (`accept` on the file input plus a client check). Other files show `IMAGE_TYPE_INVALID` copy and nothing is sent. The server repeats the check. — To build (#15)
-- The image is resized in the browser to a 2048px long edge at high JPEG quality before upload. — To build (#15)
-- The image is sent to the API, which uploads it to Cloudinary (signed) and saves the post; no browser upload, no unsigned preset. Requests over 10 MB are rejected (`IMAGE_TOO_LARGE`). — To build (#15)
-- No orphaned Cloudinary image when the server save fails: the server deletes the upload before responding. — To build (#15)
+- Submit disabled while the request is in flight. — Built (#15)
+- Validation before upload: JPEG, PNG and WebP only (`accept` on the file input plus a client check). Other files show `IMAGE_TYPE_INVALID` copy and nothing is sent. The server repeats the check. — Built (#15)
+- The image is resized in the browser to a 2048px long edge at high JPEG quality before upload. — Built (#15)
+- The image is sent to the API, which uploads it to Cloudinary (signed) and saves the post; no browser upload, no unsigned preset. Requests over 10 MB are rejected (`IMAGE_TOO_LARGE`). — Built (#15)
+- No orphaned Cloudinary image when the server save fails: the server deletes the upload before responding. — Built (#15)
 - Mobile: full-screen view with close icon + title. — Built
 
 ## Edit Profile popup (own profile)
@@ -69,7 +69,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 ### Profile picture input
 
 - No picture: empty round input with add-profile-picture icon; click opens the file picker. — Built
-- Same validation, 2048px resize, server upload and Submit disabled in flight as the Upload Picture popup (shared `ImageInput`). — To build (#15)
+- Same validation, 2048px resize, server upload and Submit disabled in flight as the Upload Picture popup (shared `ImageInput`). — Built (#15)
 - Has picture: hover "Change" overlay. — Built
 - Has picture: clicking the picture opens the file picker on every device. — Built
 - Has picture: small × button (24px, top-right of the picture, always visible) removes it. — Built

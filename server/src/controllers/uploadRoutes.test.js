@@ -12,6 +12,7 @@ const userController = require('./userController');
 const userPostController = require('./userPostController');
 const errorHandler = require('../middlewares/errorHandler');
 const constants = require('../config/constants');
+const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
 
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
@@ -176,6 +177,35 @@ describe('upload routes', () => {
 
 			expect(response.status).toBe(200);
 			expect(userService.updateUserProfileData).toHaveBeenCalledWith(USER_ID, { profilePicture: null }, undefined);
+		});
+
+		it('forwards a disallowed field to the service untouched and relays its 400 BAD_REQUEST', async () => {
+			userService.updateUserProfileData.mockRejectedValue(
+				new AppError('Only profile fields can be updated', 400, { code: ERROR_CODES.BAD_REQUEST }),
+			);
+
+			const response = await fetch(url(), {
+				method: 'PATCH',
+				headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+				body: JSON.stringify({ followers: ['someone'], bio: 'New bio' }),
+			});
+
+			expect(response.status).toBe(400);
+			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.BAD_REQUEST });
+			expect(userService.updateUserProfileData).toHaveBeenCalledWith(USER_ID, { followers: ['someone'], bio: 'New bio' }, undefined);
+		});
+
+		it('relays a 404 USER_NOT_FOUND from the service', async () => {
+			userService.updateUserProfileData.mockRejectedValue(new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND }));
+
+			const response = await fetch(url(), {
+				method: 'PATCH',
+				headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+				body: JSON.stringify({ bio: 'New bio' }),
+			});
+
+			expect(response.status).toBe(404);
+			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.USER_NOT_FOUND });
 		});
 
 		it('answers 401 without a token and never calls the service', async () => {

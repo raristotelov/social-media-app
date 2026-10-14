@@ -69,3 +69,11 @@ export const editCaptionViaApi = (jwtToken, userPostId, caption, failOnStatusCod
 		body: { caption },
 		failOnStatusCode,
 	});
+
+export const setThemeViaApi = (jwtToken, theme) =>
+	cy.request({
+		method: 'PATCH',
+		url: `${serverUrl}/users/update/${userIdFromToken(jwtToken)}`,
+		headers: authHeaders(jwtToken),
+		body: { theme },
+	});

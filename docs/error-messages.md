@@ -23,7 +23,7 @@ Every error code the server sends and the copy the client shows for it. The clie
 | `CAPTION_INVALID` | 400 | field `caption` | Caption must be text |
 | `IMAGE_TYPE_INVALID` | 400 | image field, post upload and profile update (#15) | Choose a JPEG, PNG or WebP image |
 | `IMAGE_TOO_LARGE` | 413 | image field, upload over 10 MB (#15) | This image is over 10 MB |
-| `USER_NOT_FOUND` | 404 | Profile load, unknown or malformed user id | — (blank page until #29) |
+| `USER_NOT_FOUND` | 404 | Profile load, profile update, follow / unfollow, unknown or malformed user id | — (blank page until #29) |
 | `POST_NOT_FOUND` | 404 | Post edit / delete | This post no longer exists |
 | `POST_FORBIDDEN` | 403 | Post edit / delete on someone else's post | You can only change your own posts |
 | `BAD_REQUEST` | 400 | Malformed request body; 4xx errors not yet given their own code | The action's fallback (below) |

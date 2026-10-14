@@ -56,7 +56,10 @@ describe('post upload errors', () => {
 		});
 
 		it('rejects a file that is not JPEG, PNG or WebP with the type message and sends no request', () => {
-			fileInput().selectFile({ contents: 'just some text', fileName: 'notes.txt', mimeType: 'text/plain' }, { force: true });
+			fileInput().selectFile(
+				{ contents: Cypress.Buffer.from('just some text'), fileName: 'notes.txt', mimeType: 'text/plain' },
+				{ force: true },
+			);
 
 			pictureError().should('be.visible').and('have.text', TYPE_MESSAGE);
 			cy.get('#add-image-post-form .preview-wrapper').should('not.be.visible');
@@ -80,7 +83,10 @@ describe('post upload errors', () => {
 		});
 
 		it('sends nothing when Submit is clicked after a rejected file, and asks for a picture', () => {
-			fileInput().selectFile({ contents: 'just some text', fileName: 'notes.txt', mimeType: 'text/plain' }, { force: true });
+			fileInput().selectFile(
+				{ contents: Cypress.Buffer.from('just some text'), fileName: 'notes.txt', mimeType: 'text/plain' },
+				{ force: true },
+			);
 			submitButton().click();
 
 			pictureError().should('have.text', 'Please choose a picture');
@@ -88,7 +94,10 @@ describe('post upload errors', () => {
 		});
 
 		it('clears the message when a valid picture is chosen afterwards', () => {
-			fileInput().selectFile({ contents: 'just some text', fileName: 'notes.txt', mimeType: 'text/plain' }, { force: true });
+			fileInput().selectFile(
+				{ contents: Cypress.Buffer.from('just some text'), fileName: 'notes.txt', mimeType: 'text/plain' },
+				{ force: true },
+			);
 			pictureError().should('be.visible');
 
 			fileInput().selectFile(FIXTURE_IMAGE, { force: true });
@@ -247,7 +256,10 @@ describe('post upload errors', () => {
 			visitAsUser(profilePath, jwtToken);
 			openUploadPopup();
 
-			fileInput().selectFile({ contents: 'just some text', fileName: 'notes.txt', mimeType: 'text/plain' }, { force: true });
+			fileInput().selectFile(
+				{ contents: Cypress.Buffer.from('just some text'), fileName: 'notes.txt', mimeType: 'text/plain' },
+				{ force: true },
+			);
 
 			pictureError().should('be.visible');
 			cy.document().then((doc) => {

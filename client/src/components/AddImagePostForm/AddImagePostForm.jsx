@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { ACTION_FALLBACK_MESSAGES, VALIDATION_MESSAGES } from '../../constants/errorMessages';
 import { UPLOAD_FIELDS } from '../../constants/validation';
@@ -16,6 +16,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 	const [pictureError, setPictureError] = useState('');
 	const [formError, setFormError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const isSubmittingRef = useRef(false);
 
 	const pictureChangeHandler = (image) => {
 		setUploadedImage(image);
@@ -31,7 +32,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 	const onSubmit = async (e) => {
 		e.preventDefault();
 
-		if (isSubmitting) {
+		if (isSubmittingRef.current) {
 			return;
 		}
 
@@ -43,6 +44,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 
 		setPictureError('');
 		setFormError('');
+		isSubmittingRef.current = true;
 		setIsSubmitting(true);
 
 		try {
@@ -61,6 +63,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 			setPictureError(fieldErrors[UPLOAD_FIELDS.POST_IMAGE]?.[0] ?? '');
 			setFormError(submitFormError);
 		} finally {
+			isSubmittingRef.current = false;
 			setIsSubmitting(false);
 		}
 	};

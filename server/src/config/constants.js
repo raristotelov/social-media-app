@@ -8,4 +8,5 @@ module.exports = {
 	MAX_IMAGE_BYTES: 10 * 1024 * 1024,
 	POST_IMAGE_FIELD: 'image',
 	PROFILE_PICTURE_FIELD: 'profilePicture',
+	ALLOWED_PROFILE_UPDATE_FIELDS: ['email', 'username', 'bio', 'theme', 'profilePicture'],
 };

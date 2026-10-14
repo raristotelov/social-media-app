@@ -56,7 +56,10 @@ describe('profile picture upload errors', () => {
 		});
 
 		it('rejects a file that is not JPEG, PNG or WebP with the type message under the picture and sends no request', () => {
-			fileInput().selectFile({ contents: 'just some text', fileName: 'notes.txt', mimeType: 'text/plain' }, { force: true });
+			fileInput().selectFile(
+				{ contents: Cypress.Buffer.from('just some text'), fileName: 'notes.txt', mimeType: 'text/plain' },
+				{ force: true },
+			);
 
 			pictureError().should('be.visible').and('have.text', TYPE_MESSAGE);
 			cy.get('#edit-user-profile-form .preview-wrapper').should('not.be.visible');
@@ -74,7 +77,10 @@ describe('profile picture upload errors', () => {
 		});
 
 		it('clears the message when a valid picture is chosen afterwards', () => {
-			fileInput().selectFile({ contents: 'just some text', fileName: 'notes.txt', mimeType: 'text/plain' }, { force: true });
+			fileInput().selectFile(
+				{ contents: Cypress.Buffer.from('just some text'), fileName: 'notes.txt', mimeType: 'text/plain' },
+				{ force: true },
+			);
 			pictureError().should('be.visible');
 
 			fileInput().selectFile(FIXTURE_IMAGE, { force: true });
@@ -164,7 +170,10 @@ describe('profile picture upload errors', () => {
 				visitAsUser(profilePath, jwtToken);
 				openEditProfile();
 
-				fileInput().selectFile({ contents: 'just some text', fileName: 'notes.txt', mimeType: 'text/plain' }, { force: true });
+				fileInput().selectFile(
+					{ contents: Cypress.Buffer.from('just some text'), fileName: 'notes.txt', mimeType: 'text/plain' },
+					{ force: true },
+				);
 
 				pictureError().should('be.visible');
 				cy.document().then((doc) => {

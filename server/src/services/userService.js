@@ -63,6 +63,25 @@ const asFieldError = (error) => {
 	return null;
 };
 
+const createUserNotFoundError = () => new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
+
+const assertValidUserIds = (userIds) => {
+	if (!userIds.every((userId) => mongoose.isObjectIdOrHexString(userId))) {
+		throw createUserNotFoundError();
+	}
+};
+
+const assertUsersExist = async (userIds) => {
+	assertValidUserIds(userIds);
+
+	const uniqueUserIds = [...new Set(userIds)];
+	const existingUsersCount = await UserModel.countDocuments({ _id: { $in: uniqueUserIds } });
+
+	if (existingUsersCount !== uniqueUserIds.length) {
+		throw createUserNotFoundError();
+	}
+};
+
 const signUp = async ({ email, username, password }) => {
 	try {
 		if (typeof password !== 'string' || !password) {
@@ -252,6 +271,12 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_NOT_EDITABLE }, 400);
 		}
 
+		const hasDisallowedField = Object.keys(updatedProfileData).some((field) => !constants.ALLOWED_PROFILE_UPDATE_FIELDS.includes(field));
+
+		if (hasDisallowedField) {
+			throw new AppError('Only profile fields can be updated', 400, { code: ERROR_CODES.BAD_REQUEST });
+		}
+
 		const profileUpdate = { ...updatedProfileData };
 		const isRemovingProfilePicture = profileUpdate.profilePicture === null;
 
@@ -260,10 +285,16 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 			throw new AppError('profilePicture can only be set by uploading a file', 400, { code: ERROR_CODES.BAD_REQUEST });
 		}
 
+		assertValidUserIds([userId]);
+
 		let replacedProfilePicture = null;
 
 		if (profilePictureFile || isRemovingProfilePicture) {
 			const userWithProfilePicture = await UserModel.findOne({ _id: userId }).populate({ path: 'profilePicture' });
+
+			if (!userWithProfilePicture) {
+				throw createUserNotFoundError();
+			}
 
 			replacedProfilePicture = userWithProfilePicture.profilePicture;
 		}
@@ -295,6 +326,10 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 				runValidators: true,
 				context: 'query',
 			}).populate('profilePicture');
+
+			if (!user) {
+				throw createUserNotFoundError();
+			}
 		} catch (error) {
 			if (uploadedImage) {
 				await rollbackProfilePicture({ profilePicture, uploadedImage });
@@ -330,25 +365,37 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 };
 
 const followUser = async (userId, userIdToFollow) => {
+	if (userId === userIdToFollow) {
+		throw new AppError('Users cannot follow themselves', 400, { code: ERROR_CODES.BAD_REQUEST });
+	}
+
 	try {
+		await assertUsersExist([userId, userIdToFollow]);
+
 		const currentlyLoggedUser = await UserModel.findOneAndUpdate(
 			{ _id: userId },
-			{ $push: { following: userIdToFollow } },
+			{ $addToSet: { following: userIdToFollow } },
 			{ new: true },
 		).populate('profilePicture');
 
-		await UserModel.updateOne({ _id: userIdToFollow }, { $push: { followers: userId } }, { new: true });
+		await UserModel.updateOne({ _id: userIdToFollow }, { $addToSet: { followers: userId } }, { new: true });
 
 		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser);
 
 		return updatedUserData;
 	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
 		throw new AppError('Could not follow user', 500, { cause: error });
 	}
 };
 
 const unfollowUser = async (userId, userIdToUnfollow) => {
 	try {
+		await assertUsersExist([userId, userIdToUnfollow]);
+
 		const currentlyLoggedUser = await UserModel.findOneAndUpdate(
 			{ _id: userId },
 			{ $pull: { following: userIdToUnfollow } },
@@ -361,6 +408,10 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 
 		return updatedUserData;
 	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
 		throw new AppError('Could not unfollow user', 500, { cause: error });
 	}
 };

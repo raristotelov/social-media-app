@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import EditProfileForm from './EditProfileForm';
@@ -258,6 +258,33 @@ describe('EditProfileForm', () => {
 			expect(editProfileData).toHaveBeenCalledTimes(1);
 
 			request.resolve();
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+		});
+
+		it('sends one request when the form is submitted twice synchronously before React re-renders, and allows a new submit once it settles', async () => {
+			const request = buildDeferred();
+			const editProfileData = jest.fn().mockReturnValue(request.promise);
+
+			const { container } = renderEditProfileForm(editProfileData, jest.fn());
+			const form = container.querySelector('form');
+
+			changeUsername();
+			act(() => {
+				form.requestSubmit();
+				form.requestSubmit();
+			});
+
+			expect(editProfileData).toHaveBeenCalledTimes(1);
+
+			request.resolve();
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+
+			act(() => {
+				form.requestSubmit();
+			});
+
+			expect(editProfileData).toHaveBeenCalledTimes(2);
+
 			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
 		});
 

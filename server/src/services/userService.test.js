@@ -14,7 +14,7 @@ const imageStorageService = require('./imageStorageService');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
-const { login, signUp, updateUserProfileData, getUsersProfileDataByUserIds } = require('./userService');
+const { login, signUp, updateUserProfileData, followUser, unfollowUser, getUsersProfileDataByUserIds } = require('./userService');
 
 describe('userService', () => {
 	beforeEach(() => {
@@ -315,7 +315,7 @@ describe('userService', () => {
 	});
 
 	describe('updateUserProfileData', () => {
-		const USER_ID = 'user1';
+		const USER_ID = '64b7f0a1c2d3e4f5a6b7c8a1';
 		const existingPicture = { _id: 'picture1', imageIdentifier: 'old-picture-id', imageUrl: 'https://example.com/old.jpg' };
 
 		const givenUserWithPicture = (profilePicture) => {
@@ -762,7 +762,7 @@ describe('userService', () => {
 		});
 
 		describe('updates that do not touch the profile picture', () => {
-			it('does not look up or destroy the picture when profilePicture is absent', async () => {
+			it('makes no lookup and does not destroy or upload any picture when profilePicture is absent', async () => {
 				UserModel.findOne = jest.fn();
 				givenUpdateResolves();
 
@@ -770,6 +770,8 @@ describe('userService', () => {
 
 				expect(UserModel.findOne).not.toHaveBeenCalled();
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+				expect(imageStorageService.uploadImage).not.toHaveBeenCalled();
 				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { bio: 'New bio' }, expect.any(Object));
 			});
 
@@ -785,6 +787,277 @@ describe('userService', () => {
 				expect(UserModel.findOne).not.toHaveBeenCalled();
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
 			});
+		});
+
+		describe('the allowed profile fields', () => {
+			const profilePictureFile = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), originalname: 'me.jpg' };
+			const disallowedFields = [
+				['followers', ['64b7f0a1c2d3e4f5a6b7c8b2']],
+				['following', ['64b7f0a1c2d3e4f5a6b7c8b2']],
+				['posts', ['64b7f0a1c2d3e4f5a6b7c8b3']],
+				['_id', '64b7f0a1c2d3e4f5a6b7c8b4'],
+				['an arbitrary key', 'anything'],
+			];
+			const allowedFields = [
+				['email', 'new@example.com'],
+				['username', 'newname'],
+				['bio', 'New bio'],
+				['theme', 'dark'],
+			];
+
+			it.each(disallowedFields)('rejects %s with a 400 BAD_REQUEST and neither reads, writes nor uploads', async (name, value) => {
+				const field = name === 'an arbitrary key' ? 'isAdmin' : name;
+
+				UserModel.findOne = jest.fn();
+				UserModel.findOneAndUpdate = jest.fn();
+
+				await expect(updateUserProfileData(USER_ID, { bio: 'New bio', [field]: value }, profilePictureFile)).rejects.toMatchObject({
+					statusCode: 400,
+					code: ERROR_CODES.BAD_REQUEST,
+				});
+
+				expect(UserModel.findOne).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
+				expect(imageStorageService.uploadImage).not.toHaveBeenCalled();
+				expect(UserPostModel).not.toHaveBeenCalled();
+			});
+
+			it.each(allowedFields)('still accepts %s and passes it to the update without a lookup', async (field, value) => {
+				UserModel.findOne = jest.fn();
+				givenUpdateResolves();
+
+				await expect(updateUserProfileData(USER_ID, { [field]: value })).resolves.toMatchObject({ jwt: 'signed.jwt.token' });
+
+				expect(UserModel.findOne).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { [field]: value }, expect.any(Object));
+			});
+
+			it('still accepts profilePicture: null, looking the user up first, and passes it to the update', async () => {
+				givenUserWithPicture(null);
+				givenUpdateResolves();
+
+				await expect(updateUserProfileData(USER_ID, { profilePicture: null })).resolves.toMatchObject({ jwt: 'signed.jwt.token' });
+
+				expect(UserModel.findOne).toHaveBeenCalledTimes(1);
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { profilePicture: null }, expect.any(Object));
+			});
+
+			it('still rejects password with PASSWORD_NOT_EDITABLE, ahead of the disallowed-field check', async () => {
+				UserModel.findOne = jest.fn();
+
+				await expect(updateUserProfileData(USER_ID, { password: 'x', followers: [] })).rejects.toMatchObject({
+					statusCode: 400,
+					code: ERROR_CODES.PASSWORD_NOT_EDITABLE,
+					fields: { password: ERROR_CODES.PASSWORD_NOT_EDITABLE },
+				});
+
+				expect(UserModel.findOne).not.toHaveBeenCalled();
+			});
+
+			it('rejects a disallowed field ahead of the non-null profilePicture check', async () => {
+				await expect(updateUserProfileData(USER_ID, { followers: [], profilePicture: 'x' })).rejects.toMatchObject({
+					statusCode: 400,
+					message: 'Only profile fields can be updated',
+				});
+			});
+		});
+
+		describe('a user that cannot be found', () => {
+			const profilePictureFile = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), originalname: 'me.jpg' };
+
+			const expectNothingWritten = () => {
+				expect(imageStorageService.uploadImage).not.toHaveBeenCalled();
+				expect(UserPostModel).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
+			};
+
+			beforeEach(() => {
+				UserModel.findOneAndUpdate = jest.fn();
+			});
+
+			it.each([
+				['a malformed id', 'user1'],
+				['an empty id', ''],
+				['an undefined id', undefined],
+			])('rejects %s with a 404 USER_NOT_FOUND before any lookup or upload', async (_name, userId) => {
+				UserModel.findOne = jest.fn();
+
+				await expect(updateUserProfileData(userId, { bio: 'x' }, profilePictureFile)).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.USER_NOT_FOUND,
+				});
+
+				expect(UserModel.findOne).not.toHaveBeenCalled();
+				expectNothingWritten();
+			});
+
+			it('rejects a well-formed id with no matching user with a 404 USER_NOT_FOUND, without uploading', async () => {
+				UserModel.findOne = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
+
+				await expect(updateUserProfileData(USER_ID, { bio: 'x' }, profilePictureFile)).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.USER_NOT_FOUND,
+				});
+
+				expectNothingWritten();
+			});
+
+			it('rejects a picture removal for a missing user with a 404 without destroying anything', async () => {
+				UserModel.findOne = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
+
+				await expect(updateUserProfileData(USER_ID, { profilePicture: null })).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.USER_NOT_FOUND,
+				});
+
+				expectNothingWritten();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+			});
+
+			it('answers 404 and discards the uploaded image and record when the user vanishes between the lookup and the update', async () => {
+				const save = jest.fn().mockResolvedValue(undefined);
+
+				UserPostModel.mockImplementation(function UserPostModelMock(data) {
+					Object.assign(this, data);
+					this._id = 'newPicture1';
+					this.save = save;
+				});
+				imageStorageService.uploadImage.mockResolvedValue({ imageIdentifier: 'new-picture-id', imageUrl: 'https://example.com/new.jpg' });
+				imageStorageService.discardUploadedImage.mockResolvedValue(undefined);
+				givenUserWithPicture(existingPicture);
+				givenUpdateResolves(null);
+
+				await expect(updateUserProfileData(USER_ID, { bio: 'x' }, profilePictureFile)).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.USER_NOT_FOUND,
+				});
+
+				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
+				expect(imageStorageService.deleteImage).not.toHaveBeenCalledWith('old-picture-id');
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalledWith({ _id: 'picture1' });
+			});
+
+			it('answers 404 for a plain update of a nonexistent user (update returns null), without a lookup or any rollback', async () => {
+				UserModel.findOne = jest.fn();
+				givenUpdateResolves(null);
+
+				await expect(updateUserProfileData(USER_ID, { bio: 'x' })).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.USER_NOT_FOUND,
+				});
+
+				expect(UserModel.findOne).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledTimes(1);
+				expect(imageStorageService.uploadImage).not.toHaveBeenCalled();
+				expect(imageStorageService.discardUploadedImage).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+			});
+		});
+	});
+
+	describe.each([
+		['followUser', followUser, '$addToSet', 'following', 'followers'],
+		['unfollowUser', unfollowUser, '$pull', 'following', 'followers'],
+	])('%s', (_name, action, operator, ownList, otherList) => {
+		const USER_ID = '64b7f0a1c2d3e4f5a6b7c8a1';
+		const TARGET_ID = '64b7f0a1c2d3e4f5a6b7c8a2';
+
+		const givenCount = (count) => {
+			UserModel.countDocuments = jest.fn().mockResolvedValue(count);
+		};
+
+		const givenUpdatesResolve = (user = { _id: USER_ID, username: 'realuser' }) => {
+			UserModel.findOneAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(user) });
+			UserModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+		};
+
+		const expectNothingModified = () => {
+			expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
+			expect(UserModel.updateOne).not.toHaveBeenCalled();
+		};
+
+		beforeEach(() => {
+			JWT.sign.mockReturnValue('signed.jwt.token');
+			UserModel.findOneAndUpdate = jest.fn();
+			UserModel.updateOne = jest.fn();
+		});
+
+		it('updates both users and returns the logged-in user data when both exist', async () => {
+			givenCount(2);
+			givenUpdatesResolve();
+
+			const result = await action(USER_ID, TARGET_ID);
+
+			expect(UserModel.countDocuments).toHaveBeenCalledWith({ _id: { $in: [USER_ID, TARGET_ID] } });
+			expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { [operator]: { [ownList]: TARGET_ID } }, { new: true });
+			expect(UserModel.updateOne).toHaveBeenCalledWith({ _id: TARGET_ID }, { [operator]: { [otherList]: USER_ID } }, { new: true });
+			expect(result).toEqual({ user: { _id: USER_ID, username: 'realuser' }, jwt: 'signed.jwt.token' });
+		});
+
+		it.each([
+			['the acting user or the target is missing', 1],
+			['neither user exists', 0],
+		])('rejects with a 404 USER_NOT_FOUND and modifies nothing when %s', async (_case, existingCount) => {
+			givenCount(existingCount);
+
+			await expect(action(USER_ID, TARGET_ID)).rejects.toMatchObject({ statusCode: 404, code: ERROR_CODES.USER_NOT_FOUND });
+
+			expectNothingModified();
+		});
+
+		it.each([
+			['the acting user id is malformed', 'user1', TARGET_ID],
+			['the target id is malformed', USER_ID, 'not-an-id'],
+		])('rejects with a 404 USER_NOT_FOUND without querying when %s', async (_case, userId, targetId) => {
+			UserModel.countDocuments = jest.fn();
+
+			await expect(action(userId, targetId)).rejects.toMatchObject({ statusCode: 404, code: ERROR_CODES.USER_NOT_FOUND });
+
+			expect(UserModel.countDocuments).not.toHaveBeenCalled();
+			expectNothingModified();
+		});
+
+		it('rethrows the 404 as is instead of wrapping it into a 500', async () => {
+			givenCount(0);
+
+			await expect(action(USER_ID, TARGET_ID)).rejects.toMatchObject({ statusCode: 404 });
+		});
+
+		it('wraps an unexpected database failure into a 500', async () => {
+			const dbError = new Error('connection lost');
+
+			UserModel.countDocuments = jest.fn().mockRejectedValue(dbError);
+
+			await expect(action(USER_ID, TARGET_ID)).rejects.toMatchObject({ statusCode: 500, cause: dbError });
+
+			expectNothingModified();
+		});
+	});
+
+	describe('following and unfollowing oneself', () => {
+		const USER_ID = '64b7f0a1c2d3e4f5a6b7c8a1';
+
+		beforeEach(() => {
+			JWT.sign.mockReturnValue('signed.jwt.token');
+			UserModel.countDocuments = jest.fn().mockResolvedValue(1);
+			UserModel.findOneAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: USER_ID, username: 'realuser' }) });
+			UserModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 0 });
+		});
+
+		it('rejects following oneself with a 400 BAD_REQUEST without touching the database', async () => {
+			await expect(followUser(USER_ID, USER_ID)).rejects.toMatchObject({ statusCode: 400, code: ERROR_CODES.BAD_REQUEST });
+
+			expect(UserModel.countDocuments).not.toHaveBeenCalled();
+			expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
+			expect(UserModel.updateOne).not.toHaveBeenCalled();
+		});
+
+		it('lets unfollowing oneself through, requiring only one existing user', async () => {
+			await expect(unfollowUser(USER_ID, USER_ID)).resolves.toMatchObject({ jwt: 'signed.jwt.token' });
+
+			expect(UserModel.countDocuments).toHaveBeenCalledWith({ _id: { $in: [USER_ID] } });
 		});
 	});
 

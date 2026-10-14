@@ -33,7 +33,7 @@ describe('user search', () => {
 
 		cy.get('.search-input').type(searchedUser.username);
 
-		cy.contains('.search-option', searchedUser.username).should('be.visible').click();
+		cy.contains('.search-results-dropdown .search-result', searchedUser.username).should('be.visible').click();
 
 		cy.location('pathname').should('eq', searchedProfilePath);
 		cy.contains('.profile-header .username', searchedUser.username).should('be.visible');
@@ -45,12 +45,12 @@ describe('user search', () => {
 
 		cy.get('.search-input').type(searchedUser.username);
 
-		cy.contains('.search-option', searchedUser.username).should('be.visible');
+		cy.contains('.search-results-dropdown .search-result', searchedUser.username).should('be.visible');
 	});
 
 	it('expands the field from the magnifier on mobile and opens a result', () => {
 		cy.viewport(390, 844);
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser('/user-feed', jwtToken);
 
 		cy.get('.mobile-search-field').should('not.exist');
 
@@ -65,7 +65,7 @@ describe('user search', () => {
 
 	it('closes the mobile search when Cancel is clicked', () => {
 		cy.viewport(390, 844);
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser('/user-feed', jwtToken);
 
 		cy.get('.mobile-top-bar-action[aria-label="Search"]').click();
 		cy.get('.mobile-search-field').should('be.visible');

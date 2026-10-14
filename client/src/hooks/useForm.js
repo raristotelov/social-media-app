@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { getFormErrors, isUnauthenticatedError } from '../utils/errors';
 
@@ -7,6 +7,7 @@ export const useForm = (initialValues, onSubmitHandler, { submitAllValues = fals
 	const [errors, setErrors] = useState({});
 	const [formError, setFormError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const isSubmittingRef = useRef(false);
 
 	const clearFieldError = (name) => {
 		setErrors((state) => (state[name]?.length ? { ...state, [name]: [] } : state));
@@ -42,7 +43,7 @@ export const useForm = (initialValues, onSubmitHandler, { submitAllValues = fals
 	const onSubmit = async (e) => {
 		e.preventDefault();
 
-		if (isSubmitting) {
+		if (isSubmittingRef.current) {
 			return;
 		}
 
@@ -59,6 +60,7 @@ export const useForm = (initialValues, onSubmitHandler, { submitAllValues = fals
 			}
 		}
 
+		isSubmittingRef.current = true;
 		setIsSubmitting(true);
 
 		try {
@@ -77,6 +79,7 @@ export const useForm = (initialValues, onSubmitHandler, { submitAllValues = fals
 			setErrors(fieldErrors);
 			setFormError(submitFormError);
 		} finally {
+			isSubmittingRef.current = false;
 			setIsSubmitting(false);
 		}
 	};
