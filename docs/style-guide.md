@@ -1,6 +1,6 @@
 # Style Guide
 
-Canonical reference for design tokens — colors, typography, radii, borders, spacing, elevation. Values mirror the client CSS / Figma. Where the two differ, see **Task 6** in [TODO.md](./TODO.md).
+Canonical reference for design tokens — colors, typography, radii, borders, spacing, elevation. Values mirror the client CSS / Figma.
 
 ## Colors
 
