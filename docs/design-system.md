@@ -1,6 +1,6 @@
 # Social Media App Design System
 
-How the Figma file is organised and the layout rules behind it. Tokens live in **[style-guide.md](./style-guide.md)**. Deliberate differences between design and code are tracked as **Task 6** in [TODO.md](./TODO.md).
+How the Figma file is organised and the layout rules behind it. Tokens live in **[style-guide.md](./style-guide.md)**.
 
 ## Figma file
 
