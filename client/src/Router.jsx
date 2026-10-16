@@ -17,7 +17,7 @@ const Router = () => {
 	return (
 		<div className='routes-wrapper'>
 			<Routes>
-				<Route path='/' element={jwtToken ? <Navigate to='/user-feed' /> : <Navigate to='/log-in' />} />
+				<Route path='/' element={jwtToken ? <Navigate to='/user-feed' replace /> : <Navigate to='/popular-posts' replace />} />
 
 				<Route path='/sign-up' element={<SignUpView />} />
 
