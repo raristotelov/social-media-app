@@ -3,6 +3,8 @@ const router = Router();
 
 const { userService } = require('../services');
 const verifyJwtToken = require('../middlewares/verifyJwtToken');
+const readOptionalJwtToken = require('../middlewares/readOptionalJwtToken');
+const verifyProfileOwner = require('../middlewares/verifyProfileOwner');
 const uploadImage = require('../middlewares/uploadImage');
 const constants = require('../config/constants');
 
@@ -18,7 +20,7 @@ router.post('/login', async (req, res) => {
 	return res.json(userData);
 });
 
-router.get('/', async (req, res) => {
+router.get('/', readOptionalJwtToken, async (req, res) => {
 	const userIdsString = req.query.userIds;
 	const searchWord = req.query.searchWord;
 
@@ -27,7 +29,7 @@ router.get('/', async (req, res) => {
 	let usersAccountData = [];
 
 	if (userIds) {
-		usersAccountData = await userService.getUsersProfileDataByUserIds({ userIds });
+		usersAccountData = await userService.getUsersProfileDataByUserIds({ userIds, requesterId: res.userId });
 	} else if (searchWord) {
 		usersAccountData = await userService.getUsersProfileDataBySearchWord({ searchWord });
 	}
@@ -35,7 +37,19 @@ router.get('/', async (req, res) => {
 	return res.json(usersAccountData);
 });
 
-router.patch('/update/:userId', verifyJwtToken, uploadImage(constants.PROFILE_PICTURE_FIELD), async (req, res) => {
+router.get('/:userId/followers', readOptionalJwtToken, async (req, res) => {
+	const followers = await userService.getFollowers({ userId: req.params.userId, requesterId: res.userId });
+
+	return res.json(followers);
+});
+
+router.get('/:userId/following', readOptionalJwtToken, async (req, res) => {
+	const following = await userService.getFollowing({ userId: req.params.userId, requesterId: res.userId });
+
+	return res.json(following);
+});
+
+router.patch('/update/:userId', verifyJwtToken, verifyProfileOwner, uploadImage(constants.PROFILE_PICTURE_FIELD), async (req, res) => {
 	const userId = req.params.userId;
 
 	const userAccountData = await userService.updateUserProfileData(userId, req.body, req.file);
@@ -43,7 +57,7 @@ router.patch('/update/:userId', verifyJwtToken, uploadImage(constants.PROFILE_PI
 	return res.json(userAccountData);
 });
 
-router.post('/:userId/follow/:userIdToFollow', verifyJwtToken, async (req, res) => {
+router.post('/:userId/follow/:userIdToFollow', verifyJwtToken, verifyProfileOwner, async (req, res) => {
 	const userId = req.params.userId;
 	const userIdToFollow = req.params.userIdToFollow;
 
@@ -52,7 +66,7 @@ router.post('/:userId/follow/:userIdToFollow', verifyJwtToken, async (req, res) 
 	return res.json(userAccountData);
 });
 
-router.post('/:userId/unfollow/:userIdToUnfollow', verifyJwtToken, async (req, res) => {
+router.post('/:userId/unfollow/:userIdToUnfollow', verifyJwtToken, verifyProfileOwner, async (req, res) => {
 	const userId = req.params.userId;
 	const userIdToUnfollow = req.params.userIdToUnfollow;
 

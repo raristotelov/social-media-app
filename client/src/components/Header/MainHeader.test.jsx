@@ -54,8 +54,8 @@ describe('MainHeader', () => {
 
 	describe('search dropdown', () => {
 		const searchResults = [
-			{ _id: 'user2', username: 'janedoe', followers: ['user3', 'user4'] },
-			{ _id: 'user5', username: 'janet', followers: [] },
+			{ _id: 'user2', username: 'janedoe', followersCount: 2 },
+			{ _id: 'user5', username: 'janet', followersCount: 0 },
 		];
 
 		it('renders the designed result rows with username and follower count', async () => {
@@ -72,7 +72,7 @@ describe('MainHeader', () => {
 
 		it('uses the singular for a user with exactly one follower', async () => {
 			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, jest.fn(), [
-				{ _id: 'user2', username: 'janedoe', followers: ['user3'] },
+				{ _id: 'user2', username: 'janedoe', followersCount: 1 },
 			]);
 
 			userEvent.type(screen.getByPlaceholderText('Search'), 'jan');

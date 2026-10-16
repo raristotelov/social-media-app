@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { getUsersProfileData, followUser, unfollowUser, updateUserProfileData } from '../../services/userService';
+import { getUsersProfileData, getFollowers, getFollowing, followUser, unfollowUser, updateUserProfileData } from '../../services/userService';
 import { addUserPost, updateUserPostCaption, deleteUserPost } from '../../services/userPostService';
 import { resizeImage } from '../../utils/images';
 
@@ -684,7 +684,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 		const chooseProfilePictureAndSubmit = () => {
 			userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
 			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 		};
 
 		it('resizes the chosen file and sends the resized file to the server', async () => {
@@ -746,7 +746,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
 			userEvent.clear(screen.getByPlaceholderText('Bio'));
 			userEvent.type(screen.getByPlaceholderText('Bio'), 'New bio');
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() =>
 				expect(updateUserProfileData).toHaveBeenCalledWith(expect.objectContaining({ updatedProfileData: { bio: 'New bio' } })),
@@ -789,7 +789,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 		const openEditProfile = () => userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
 
-		it('sends profilePicture: null without uploading anything and refreshes the logged-in user on Submit', async () => {
+		it('sends profilePicture: null without uploading anything and refreshes the logged-in user on Save', async () => {
 			const updatedUser = { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] };
 
 			updateUserProfileData.mockResolvedValue({ user: updatedUser, jwt: 'new.jwt' });
@@ -797,7 +797,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 			openEditProfile();
 			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() =>
 				expect(updateUserProfileData).toHaveBeenCalledWith({
@@ -963,7 +963,7 @@ describe('ProfileView errors', () => {
 
 			userEvent.click(await screen.findByRole('button', { name: 'Edit Profile' }));
 			userEvent.type(screen.getByPlaceholderText('Bio'), 'New bio');
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			return rendered;
 		};
@@ -1042,5 +1042,379 @@ describe('ProfileView errors', () => {
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 		});
+	});
+});
+
+describe('ProfileView optimistic follow and unfollow', () => {
+	const viewer = { _id: 'user1', username: 'johndoe', following: [] };
+	const viewerFollowingProfile = { ...viewer, following: ['user2'] };
+	const profile = { _id: 'user2', username: 'janedoe', posts: [], followers: [], following: [] };
+	const followedProfile = { ...profile, followers: ['user1'] };
+
+	const buildDeferred = () => {
+		const deferred = {};
+
+		deferred.promise = new Promise((resolve, reject) => {
+			deferred.resolve = resolve;
+			deferred.reject = reject;
+		});
+
+		return deferred;
+	};
+
+	const renderProfile = async ({ loggedInUser = viewer, profileData = profile } = {}) => {
+		const updateLoggedInUser = jest.fn();
+		const endSession = jest.fn();
+
+		getUsersProfileData.mockResolvedValue([profileData]);
+
+		render(
+			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser, endSession }}>
+				<ToastProvider>
+					<MemoryRouter initialEntries={['/user/user2']}>
+						<Routes>
+							<Route path='/user/:userId' element={<ProfileView />} />
+						</Routes>
+					</MemoryRouter>
+				</ToastProvider>
+			</LoggedInUserContext.Provider>,
+		);
+
+		await screen.findByText('janedoe');
+
+		return { updateLoggedInUser, endSession };
+	};
+
+	const getFollowersCountText = () => document.querySelectorAll('.profile-stat')[1].textContent;
+
+	beforeEach(() => {
+		jest.resetAllMocks();
+	});
+
+	describe('Follow', () => {
+		it('switches the button to Unfollow and raises the follower count before the request returns', async () => {
+			followUser.mockReturnValue(buildDeferred().promise);
+			await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+
+			expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument();
+			expect(getFollowersCountText()).toBe('1follower');
+		});
+
+		it('sends the request in the background with the logged-in user, the token and the profile id', async () => {
+			followUser.mockReturnValue(buildDeferred().promise);
+			await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+
+			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToFollow: 'user2' });
+			expect(followUser).toHaveBeenCalledTimes(1);
+		});
+
+		it('refreshes the logged-in user with the server response once the request succeeds', async () => {
+			const serverResponse = { user: { ...viewer, following: ['user2'] }, jwt: 'new.jwt' };
+
+			followUser.mockResolvedValue(serverResponse);
+			const { updateLoggedInUser } = await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+
+			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith(serverResponse));
+			expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument();
+			expect(getFollowersCountText()).toBe('1follower');
+		});
+
+		it('does not refetch the profile after clicking Follow', async () => {
+			followUser.mockResolvedValue({ user: viewerFollowingProfile, jwt: 'new.jwt' });
+			const { updateLoggedInUser } = await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+
+			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalled());
+			expect(getUsersProfileData).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows no error and does not end the session when the request fails', async () => {
+			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			const { updateLoggedInUser, endSession } = await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+
+			await waitFor(() => expect(followUser).toHaveBeenCalledTimes(1));
+			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+			expect(document.querySelector('.form-error')).not.toBeInTheDocument();
+			expect(updateLoggedInUser).not.toHaveBeenCalled();
+			expect(endSession).not.toHaveBeenCalled();
+		});
+
+		it('ends the session when the request fails with UNAUTHENTICATED', async () => {
+			followUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			const { endSession } = await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+
+			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
+			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+		});
+
+		it('sends a guest to /log-in with the current path, and changes neither the button nor the count', async () => {
+			await renderProfile({ loggedInUser: null });
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+
+			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2' } });
+			expect(followUser).not.toHaveBeenCalled();
+			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
+			expect(getFollowersCountText()).toBe('0followers');
+		});
+	});
+
+	describe('Unfollow', () => {
+		it('switches the button to Follow and lowers the follower count before the request returns', async () => {
+			unfollowUser.mockReturnValue(buildDeferred().promise);
+			await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
+
+			expect(getFollowersCountText()).toBe('1follower');
+
+			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+
+			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
+			expect(getFollowersCountText()).toBe('0followers');
+		});
+
+		it('sends the request in the background with the logged-in user, the token and the profile id', async () => {
+			unfollowUser.mockReturnValue(buildDeferred().promise);
+			await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
+
+			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+
+			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToUnfollow: 'user2' });
+		});
+
+		it('shows no error and does not end the session when the request fails', async () => {
+			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			const { endSession } = await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
+
+			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+
+			await waitFor(() => expect(unfollowUser).toHaveBeenCalledTimes(1));
+			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+			expect(endSession).not.toHaveBeenCalled();
+		});
+
+		it('ends the session when the request fails with UNAUTHENTICATED', async () => {
+			unfollowUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			const { endSession } = await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
+
+			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+
+			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
+		});
+	});
+
+	describe('clicking quickly', () => {
+		it('lets the latest click decide the button and the count', async () => {
+			followUser.mockReturnValue(buildDeferred().promise);
+			unfollowUser.mockReturnValue(buildDeferred().promise);
+			await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+
+			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
+			expect(getFollowersCountText()).toBe('0followers');
+		});
+
+		it('ignores the response of an earlier click that returns after a later one', async () => {
+			const followRequest = buildDeferred();
+			const unfollowRequest = buildDeferred();
+			const followResponse = { user: { ...viewer, following: ['user2'] }, jwt: 'follow.jwt' };
+			const unfollowResponse = { user: { ...viewer, following: [] }, jwt: 'unfollow.jwt' };
+
+			followUser.mockReturnValue(followRequest.promise);
+			unfollowUser.mockReturnValue(unfollowRequest.promise);
+			const { updateLoggedInUser } = await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+
+			unfollowRequest.resolve(unfollowResponse);
+			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith(unfollowResponse));
+
+			followRequest.resolve(followResponse);
+			await followRequest.promise;
+
+			expect(updateLoggedInUser).toHaveBeenCalledTimes(1);
+			expect(updateLoggedInUser).not.toHaveBeenCalledWith(followResponse);
+			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
+		});
+
+		it('ignores a stale response that returns before the latest one', async () => {
+			const followRequest = buildDeferred();
+			const unfollowRequest = buildDeferred();
+			const unfollowResponse = { user: { ...viewer, following: [] }, jwt: 'unfollow.jwt' };
+
+			followUser.mockReturnValue(followRequest.promise);
+			unfollowUser.mockReturnValue(unfollowRequest.promise);
+			const { updateLoggedInUser } = await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+
+			followRequest.resolve({ user: { ...viewer, following: ['user2'] }, jwt: 'follow.jwt' });
+			await followRequest.promise;
+
+			expect(updateLoggedInUser).not.toHaveBeenCalled();
+
+			unfollowRequest.resolve(unfollowResponse);
+			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith(unfollowResponse));
+			expect(updateLoggedInUser).toHaveBeenCalledTimes(1);
+		});
+	});
+});
+
+describe('ProfileView followers and following popup', () => {
+	const viewer = { _id: 'user1', username: 'johndoe', following: [] };
+	const profile = {
+		_id: 'user2',
+		username: 'janedoe',
+		posts: [],
+		followers: ['follower1', 'follower2'],
+		following: ['followed1'],
+	};
+	const followerRows = [
+		{ _id: 'follower1', username: 'firstfollower', followersCount: 0 },
+		{ _id: 'follower2', username: 'secondfollower', followersCount: 0 },
+	];
+	const followingRows = [{ _id: 'followed1', username: 'followedone', followersCount: 1 }];
+
+	const renderProfile = async ({ loggedInUser = viewer, profileData = profile } = {}) => {
+		getUsersProfileData.mockImplementation(async ({ userIds }) => {
+			if (userIds[0] === 'follower2') {
+				return [{ _id: 'follower2', username: 'secondfollower', posts: [], followers: [], following: [] }];
+			}
+
+			return [profileData];
+		});
+		getFollowers.mockResolvedValue(followerRows);
+		getFollowing.mockResolvedValue(followingRows);
+
+		render(
+			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+				<ToastProvider>
+					<MemoryRouter initialEntries={['/user/user2']}>
+						<Routes>
+							<Route path='/user/:userId' element={<ProfileView />} />
+						</Routes>
+					</MemoryRouter>
+				</ToastProvider>
+			</LoggedInUserContext.Provider>,
+		);
+
+		await screen.findByText('janedoe');
+	};
+
+	beforeEach(() => {
+		jest.resetAllMocks();
+	});
+
+	it('shows no popup until a count is clicked', async () => {
+		await renderProfile();
+
+		expect(screen.queryByRole('heading', { name: 'Followers' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('heading', { name: 'Following' })).not.toBeInTheDocument();
+	});
+
+	it('opens the Followers popup listing the profile followers when the followers count is clicked', async () => {
+		await renderProfile();
+
+		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+
+		expect(screen.getByRole('heading', { name: 'Followers' })).toBeInTheDocument();
+		expect(await screen.findByText('firstfollower')).toBeInTheDocument();
+		expect(screen.getByText('secondfollower')).toBeInTheDocument();
+		expect(getFollowers).toHaveBeenCalledWith({ userId: 'user2', jwtToken: 'token123' });
+		expect(getFollowing).not.toHaveBeenCalled();
+	});
+
+	it('opens the Following popup listing the users the profile follows when the following count is clicked', async () => {
+		await renderProfile();
+
+		userEvent.click(screen.getByRole('button', { name: '1 following' }));
+
+		expect(screen.getByRole('heading', { name: 'Following' })).toBeInTheDocument();
+		expect(await screen.findByText('followedone')).toBeInTheDocument();
+		expect(getFollowing).toHaveBeenCalledWith({ userId: 'user2', jwtToken: 'token123' });
+		expect(getFollowers).not.toHaveBeenCalled();
+	});
+
+	it('lets a guest open the popup', async () => {
+		await renderProfile({ loggedInUser: null });
+
+		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+
+		expect(await screen.findByText('firstfollower')).toBeInTheDocument();
+	});
+
+	it('does not open a popup for a zero count', async () => {
+		await renderProfile({ profileData: { ...profile, followers: [], following: [] } });
+
+		expect(screen.queryByRole('button', { name: '0 followers' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: '0 following' })).not.toBeInTheDocument();
+	});
+
+	it('closes the popup with the close button', async () => {
+		await renderProfile();
+
+		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+		await screen.findByText('firstfollower');
+		userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+		expect(screen.queryByRole('heading', { name: 'Followers' })).not.toBeInTheDocument();
+	});
+
+	it('closes the popup and opens that profile when a row is clicked', async () => {
+		await renderProfile();
+
+		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+		userEvent.click(await screen.findByRole('link', { name: /secondfollower/ }));
+
+		expect(screen.queryByRole('heading', { name: 'Followers' })).not.toBeInTheDocument();
+		await waitFor(() => expect(document.querySelector('.username')).toHaveTextContent('secondfollower'));
+		expect(getUsersProfileData).toHaveBeenCalledWith({ userIds: ['follower2'], jwtToken: 'token123' });
+	});
+
+	it('shows the rows in the order the server returned, with the logged-in user first', async () => {
+		await renderProfile({ loggedInUser: { _id: 'follower2', username: 'secondfollower', following: ['user2'] } });
+		getFollowers.mockResolvedValue([followerRows[1], followerRows[0]]);
+
+		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+		await screen.findByText('firstfollower');
+
+		const usernames = Array.from(document.querySelectorAll('.follow-list-results .search-result-username')).map((row) => row.textContent);
+
+		expect(usernames).toEqual(['secondfollower', 'firstfollower']);
+	});
+
+	it('loads the Followers list from the server right after following, so it includes the new follower', async () => {
+		followUser.mockReturnValue(new Promise(() => {}));
+		await renderProfile();
+
+		userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+		userEvent.click(screen.getByRole('button', { name: '3 followers' }));
+
+		await screen.findByText('firstfollower');
+		expect(getFollowers).toHaveBeenCalledWith({ userId: 'user2', jwtToken: 'token123' });
+	});
+
+	it('shows the retry state in the popup when the list fails to load, keeping the profile visible', async () => {
+		await renderProfile();
+		getFollowers.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+
+		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+
+		expect(await screen.findByText("Couldn't load this list")).toBeInTheDocument();
+		expect(screen.getByText('janedoe')).toBeInTheDocument();
 	});
 });

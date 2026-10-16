@@ -23,7 +23,7 @@ describe('profile picture removal', () => {
 
 	const removeButton = () => cy.get('#edit-user-profile-form .image-remove-button');
 
-	const submitForm = () => cy.get('#edit-user-profile-form').contains('button', 'Submit').click();
+	const submitForm = () => cy.get('#edit-user-profile-form').contains('button', 'Save').click();
 
 	beforeEach(() => {
 		user = buildTestUser();

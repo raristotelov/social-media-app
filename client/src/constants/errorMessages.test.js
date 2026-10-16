@@ -19,6 +19,7 @@ describe('ERROR_MESSAGES', () => {
 		['IMAGE_TOO_LARGE', 'This image is over 10 MB'],
 		['POST_NOT_FOUND', 'This post no longer exists'],
 		['POST_FORBIDDEN', 'You can only change your own posts'],
+		['PROFILE_FORBIDDEN', 'You can only change your own profile'],
 	])('has the documented copy for %s', (code, copy) => {
 		expect(ERROR_MESSAGES[code]).toBe(copy);
 	});
@@ -28,7 +29,7 @@ describe('ERROR_MESSAGES', () => {
 	});
 
 	it('has copy for exactly the codes the spec documents, and no other', () => {
-		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(16);
+		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(17);
 	});
 });
 
@@ -51,6 +52,13 @@ describe('LOAD_ERROR_MESSAGES', () => {
 			HEADING: "Couldn't load this profile",
 			DESCRIPTION: 'Check your connection and try again.',
 			RETRY_LABEL: 'Retry',
+		});
+	});
+
+	it('has the documented followers / following list load error copy', () => {
+		expect(LOAD_ERROR_MESSAGES.FOLLOW_LIST).toEqual({
+			MESSAGE: "Couldn't load this list",
+			RETRY_LABEL: 'Try again',
 		});
 	});
 });

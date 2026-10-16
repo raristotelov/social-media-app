@@ -56,17 +56,41 @@ export const uploadProfilePictureViaApi = (jwtToken) =>
 		imageField: 'profilePicture',
 	}).then((response) => response.user.profilePicture);
 
-export const getProfileViaApi = (userId) => cy.request(`${serverUrl}/users?userIds=${userId}`).then((response) => response.body[0]);
+export const getProfileViaApi = (userId, jwtToken) =>
+	cy
+		.request({ method: 'GET', url: `${serverUrl}/users?userIds=${userId}`, headers: jwtToken ? authHeaders(jwtToken) : {} })
+		.then((response) => response.body[0]);
+
+const getFollowListViaApi = (listPath, userId, jwtToken) =>
+	cy
+		.request({ method: 'GET', url: `${serverUrl}/users/${userId}/${listPath}`, headers: jwtToken ? authHeaders(jwtToken) : {} })
+		.then((response) => response.body);
+
+export const getFollowersViaApi = (userId, jwtToken) => getFollowListViaApi('followers', userId, jwtToken);
+
+export const getFollowingViaApi = (userId, jwtToken) => getFollowListViaApi('following', userId, jwtToken);
 
 export const searchUsersViaApi = (searchWord) =>
 	cy.request({ method: 'GET', url: `${serverUrl}/users`, qs: { searchWord } }).then((response) => response.body);
 
-export const followUserViaApi = (jwtToken, userIdToFollow) =>
+export const followUserViaApi = (jwtToken, userIdToFollow, { actingUserId = userIdFromToken(jwtToken), failOnStatusCode = true } = {}) =>
 	cy.request({
 		method: 'POST',
-		url: `${serverUrl}/users/${userIdFromToken(jwtToken)}/follow/${userIdToFollow}`,
+		url: `${serverUrl}/users/${actingUserId}/follow/${userIdToFollow}`,
 		headers: authHeaders(jwtToken),
+		failOnStatusCode,
 	});
+
+export const unfollowUserViaApi = (jwtToken, userIdToUnfollow, { actingUserId = userIdFromToken(jwtToken), failOnStatusCode = true } = {}) =>
+	cy.request({
+		method: 'POST',
+		url: `${serverUrl}/users/${actingUserId}/unfollow/${userIdToUnfollow}`,
+		headers: authHeaders(jwtToken),
+		failOnStatusCode,
+	});
+
+export const updateProfileViaApi = (jwtToken, userId, body, failOnStatusCode = true) =>
+	cy.request({ method: 'PATCH', url: `${serverUrl}/users/update/${userId}`, headers: authHeaders(jwtToken), body, failOnStatusCode });
 
 export const deletePostViaApi = (jwtToken, userPostId, failOnStatusCode = true) =>
 	cy.request({ method: 'DELETE', url: `${serverUrl}/user-posts/${userPostId}`, headers: authHeaders(jwtToken), failOnStatusCode });

@@ -92,14 +92,19 @@ const removeUsersById = async (testUserIds) => {
 		return { users: 0, posts: 0, comments: 0 };
 	}
 
-	// Profile pictures are stored as posts owned by their user, so this one query finds
-	// every image the test users uploaded.
+	// Profile pictures live on the user and post images on their posts, so images are
+	// collected from both.
 	const testUserPosts = await UserPostModel.find({ userId: { $in: testUserIds } }).select({ _id: 1, imageIdentifier: 1 });
 	const testUserPostIds = testUserPosts.map((post) => post._id);
+	const testUsersWithPictures = await UserModel.find({ _id: { $in: testUserIds } }).select({ _id: 1, profilePicture: 1 });
+	const testUserImageIdentifiers = [
+		...testUserPosts.map((post) => post.imageIdentifier),
+		...testUsersWithPictures.map((user) => user.profilePicture?.imageIdentifier),
+	];
 
 	// Images go first: if this throws, the database still points at them and a later
 	// cleanup can find and retry them.
-	await destroyImagesById([...new Set(testUserPosts.map((post) => post.imageIdentifier).filter(Boolean))]);
+	await destroyImagesById([...new Set(testUserImageIdentifiers.filter(Boolean))]);
 
 	// Comments written by a test user, plus anyone else's comments on their posts,
 	// which would otherwise be orphaned.

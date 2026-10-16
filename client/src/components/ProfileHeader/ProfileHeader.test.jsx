@@ -73,6 +73,70 @@ describe('ProfileHeader', () => {
 		});
 	});
 
+	describe('followers and following counts', () => {
+		const buildItems = (count) => Array.from({ length: count }, (_, index) => ({ _id: `item${index}` }));
+
+		it('opens the followers list when the followers count is clicked', () => {
+			const onFollowersClick = jest.fn();
+			renderProfileHeader({ onFollowersClick });
+
+			userEvent.click(screen.getByRole('button', { name: '1 follower' }));
+
+			expect(onFollowersClick).toHaveBeenCalledTimes(1);
+		});
+
+		it('opens the following list when the following count is clicked', () => {
+			const onFollowingClick = jest.fn();
+			renderProfileHeader({ onFollowingClick });
+
+			userEvent.click(screen.getByRole('button', { name: '2 following' }));
+
+			expect(onFollowingClick).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not call the following handler when the followers count is clicked', () => {
+			const onFollowingClick = jest.fn();
+			renderProfileHeader({ onFollowersClick: jest.fn(), onFollowingClick });
+
+			userEvent.click(screen.getByRole('button', { name: '1 follower' }));
+
+			expect(onFollowingClick).not.toHaveBeenCalled();
+		});
+
+		it('renders a zero followers count as plain text, not a button', () => {
+			renderProfileHeader({ userData: buildUserData({ followers: [] }), onFollowersClick: jest.fn() });
+
+			expect(screen.queryByRole('button', { name: '0 followers' })).not.toBeInTheDocument();
+			expect(screen.getByText('followers')).toBeInTheDocument();
+		});
+
+		it('renders a zero following count as plain text, not a button', () => {
+			renderProfileHeader({ userData: buildUserData({ following: [] }), onFollowingClick: jest.fn() });
+
+			expect(screen.queryByRole('button', { name: '0 following' })).not.toBeInTheDocument();
+			expect(screen.getByText('following')).toBeInTheDocument();
+		});
+
+		it('renders a missing followers list as a zero count that is not clickable', () => {
+			renderProfileHeader({ userData: buildUserData({ followers: undefined }), onFollowersClick: jest.fn() });
+
+			expect(screen.queryByRole('button', { name: '0 followers' })).not.toBeInTheDocument();
+		});
+
+		it('renders the counts as plain text when no handler is given', () => {
+			renderProfileHeader({ userData: buildUserData({ followers: buildItems(3), following: buildItems(3) }) });
+
+			expect(screen.queryByRole('button', { name: '3 followers' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: '3 following' })).not.toBeInTheDocument();
+		});
+
+		it('never makes the posts count a button', () => {
+			renderProfileHeader({ onFollowersClick: jest.fn(), onFollowingClick: jest.fn() });
+
+			expect(screen.queryByRole('button', { name: '3 posts' })).not.toBeInTheDocument();
+		});
+	});
+
 	it('renders the bio when present', () => {
 		renderProfileHeader({ userData: buildUserData({ bio: 'Just a bio' }) });
 

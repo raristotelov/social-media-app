@@ -38,13 +38,15 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - Square tiles, centre-cropped.
 - Desktop: 900 column, 292 tiles, 12 gap. Tablet: 720 column, 232 tiles, 12 gap. Mobile: full-bleed, 3 columns, 2px gaps.
 - Tiles are not clickable yet; opening a post from a profile is covered by #11.
-- **Open decision (#28 item 5):** whether tiles show like/comment counts on hover. A hovered tile with counts appears only in the Post Actions frames.
+- Hover shows the tile's like and comment counts, as on the Popular page (`Explore Tile`, `State=Hover`; Post Actions frames). Pointer devices only — no hover on touch. — To build (#28 item 5)
 
-## Followers / following popup — Design pending (#28 item 6)
+## Followers / following popup — To build (#28 item 6)
 
-- Clicking the "followers" or "following" count opens one shared popup listing those users.
-- Row: profile photo + username; row links to that user's profile.
+- Clicking the "followers" or "following" count opens one shared popup listing those users, titled "Followers" / "Following". A count of 0 is not clickable.
+- Guests can open it too.
+- Row (`User Row`): profile photo (placeholder when none), username, follower count ("1 follower" / "N followers"); hover fills `border/inset`. Clicking a row opens that profile and closes the popup.
 - If the logged-in user is in the list, they appear at the top.
+- Desktop/tablet: 400px popup with title and close icon; the popup hugs its rows up to a 372px list, then the list scrolls. Mobile: full-screen view with close icon + title, like Edit Profile.
 
 ## Upload Picture popup (own profile)
 
@@ -156,11 +158,10 @@ Base: `https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Desi
 | Error Toast | [556:4062](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=556-4062) / [556:4092](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=556-4092) | [560:6493](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=560-6493) / [560:6530](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=560-6530) | [560:6639](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=560-6639) / [560:6693](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=560-6693) |
 | Load Error | [564:4266](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=564-4266) / [564:4320](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=564-4320) | [568:4272](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-4272) / [568:4326](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-4326) | [568:7407](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-7407) / [568:7475](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-7475) |
 | Edit Picture | [496:1913](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=496-1913) / [504:2141](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=504-2141) | [498:4290](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=498-4290) / [505:4442](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-4442) | [499:3503](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=499-3503) / [505:6297](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=505-6297) |
-
-Followers / following popup: no frames yet (Design pending).
-
+| Followers (#28, in design) | [577:4957](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=577-4957) / [580:7823](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=580-7823) | [580:7913](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=580-7913) / [580:7946](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=580-7946) | [580:8101](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=580-8101) / [580:8183](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=580-8183) |
 Shared components:
 
 - [Remove Picture Button](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=526-2412) (526:2412)
 - [Post Actions Button](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=491-2052) (491:2052)
 - [Profile Picture](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=169-441) (169:441, Type=Photo/Placeholder)
+- [User Row](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=580-2307) (580:2307, State=Default/Hover)

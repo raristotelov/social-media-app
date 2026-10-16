@@ -15,6 +15,48 @@ describe('UserProfilePost', () => {
 		expect(screen.getByAltText('user-post')).toHaveAttribute('src', post.imageUrl);
 	});
 
+	describe('hover stats', () => {
+		const getStatTexts = (container) => Array.from(container.querySelectorAll('.profile-post-stat')).map((stat) => stat.textContent);
+
+		it('renders the like count, then the comment count', () => {
+			const { container } = renderPost({ post: { ...post, likes: ['user1', 'user2', 'user3'], commentsCount: 5 } });
+
+			expect(getStatTexts(container)).toEqual(['3', '5']);
+		});
+
+		it('renders 0 when the post has no likes and no comment count', () => {
+			const { container } = renderPost();
+
+			expect(getStatTexts(container)).toEqual(['0', '0']);
+		});
+
+		it('renders 0 likes for an empty likes list', () => {
+			const { container } = renderPost({ post: { ...post, likes: [], commentsCount: 2 } });
+
+			expect(getStatTexts(container)).toEqual(['0', '2']);
+		});
+
+		it('hides the stats overlay from assistive technology', () => {
+			const { container } = renderPost({ post: { ...post, likes: ['user1'], commentsCount: 1 } });
+
+			expect(container.querySelector('.profile-post-stats')).toHaveAttribute('aria-hidden', 'true');
+		});
+
+		it('draws a heart and a comment icon next to the counts', () => {
+			const { container } = renderPost();
+
+			container.querySelectorAll('.profile-post-stat').forEach((stat) => {
+				expect(stat.querySelector('svg')).toBeInTheDocument();
+			});
+		});
+
+		it('keeps the actions button reachable alongside the stats on your own profile', () => {
+			renderPost({ showActions: true, post: { ...post, likes: ['user1'], commentsCount: 1 } });
+
+			expect(screen.getByRole('button', { name: 'Post actions' })).toBeInTheDocument();
+		});
+	});
+
 	it('shows no actions button by default', () => {
 		renderPost();
 

@@ -215,6 +215,18 @@ describe('upload routes', () => {
 			expect(userService.updateUserProfileData).not.toHaveBeenCalled();
 		});
 
+		it("checks ownership before parsing the upload, so another user's oversized file gets 403, not 413", async () => {
+			const response = await fetch(`${baseUrl}/users/update/64b7f0a1c2d3e4f5a6b7c8d2`, {
+				method: 'PATCH',
+				headers: authHeaders(),
+				body: buildFormData({ fieldName: constants.PROFILE_PICTURE_FIELD, byteLength: constants.MAX_IMAGE_BYTES + 1 }),
+			});
+
+			expect(response.status).toBe(403);
+			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.PROFILE_FORBIDDEN });
+			expect(userService.updateUserProfileData).not.toHaveBeenCalled();
+		});
+
 		it('checks the token before parsing the upload, so an unauthenticated oversized file gets 401, not 413', async () => {
 			const response = await fetch(url(), {
 				method: 'PATCH',

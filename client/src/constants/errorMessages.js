@@ -17,6 +17,7 @@ export const ERROR_MESSAGES = Object.freeze({
 	[ERROR_CODES.IMAGE_TOO_LARGE]: 'This image is over 10 MB',
 	[ERROR_CODES.POST_NOT_FOUND]: 'This post no longer exists',
 	[ERROR_CODES.POST_FORBIDDEN]: 'You can only change your own posts',
+	[ERROR_CODES.PROFILE_FORBIDDEN]: 'You can only change your own profile',
 });
 
 export const VALIDATION_MESSAGES = Object.freeze({
@@ -39,5 +40,9 @@ export const LOAD_ERROR_MESSAGES = Object.freeze({
 		HEADING: "Couldn't load this profile",
 		DESCRIPTION: 'Check your connection and try again.',
 		RETRY_LABEL: 'Retry',
+	}),
+	FOLLOW_LIST: Object.freeze({
+		MESSAGE: "Couldn't load this list",
+		RETRY_LABEL: 'Try again',
 	}),
 });

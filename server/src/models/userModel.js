@@ -30,8 +30,14 @@ const UserSchema = new mongoose.Schema({
 		default: 'light',
 	},
 	profilePicture: {
-		type: 'ObjectId',
-		ref: 'UserImage',
+		type: new mongoose.Schema(
+			{
+				imageUrl: { type: String, required: true },
+				imageIdentifier: { type: String, required: true },
+			},
+			{ _id: false },
+		),
+		default: undefined,
 	},
 	posts: [
 		{

@@ -22,12 +22,19 @@ describe('EditProfileForm', () => {
 		expect(screen.getByPlaceholderText('Bio')).toHaveValue(userData.bio);
 	});
 
+	it('labels the submit button "Save", not "Submit"', () => {
+		renderEditProfileForm(jest.fn(), jest.fn());
+
+		expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('type', 'submit');
+		expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
+	});
+
 	it('shows "Email is required" and does not call editProfileData when the email is cleared', async () => {
 		const editProfileData = jest.fn();
 		renderEditProfileForm(editProfileData, jest.fn());
 
 		userEvent.clear(screen.getByPlaceholderText('Email'));
-		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 		expect(await screen.findByText('Email is required')).toBeInTheDocument();
 		expect(editProfileData).not.toHaveBeenCalled();
@@ -38,7 +45,7 @@ describe('EditProfileForm', () => {
 		renderEditProfileForm(editProfileData, jest.fn());
 
 		userEvent.clear(screen.getByPlaceholderText('Username'));
-		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 		expect(await screen.findByText('Username is required')).toBeInTheDocument();
 		expect(editProfileData).not.toHaveBeenCalled();
@@ -49,7 +56,7 @@ describe('EditProfileForm', () => {
 		const onCancelClick = jest.fn();
 		renderEditProfileForm(editProfileData, onCancelClick);
 
-		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 		await waitFor(() => expect(onCancelClick).toHaveBeenCalledTimes(1));
 		expect(editProfileData).not.toHaveBeenCalled();
@@ -61,7 +68,7 @@ describe('EditProfileForm', () => {
 
 		userEvent.clear(screen.getByPlaceholderText('Username'));
 		userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
-		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 		await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
 		expect(editProfileData).toHaveBeenCalledWith({ username: 'newname' });
@@ -92,18 +99,18 @@ describe('EditProfileForm', () => {
 			expect(screen.getByRole('button', { name: 'Remove picture' })).toBeInTheDocument();
 		});
 
-		it('sends profilePicture: null and nothing else when the existing picture is removed and Submit is clicked', async () => {
+		it('sends profilePicture: null and nothing else when the existing picture is removed and Save is clicked', async () => {
 			const editProfileData = jest.fn();
 			renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
 
 			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
 			expect(editProfileData).toHaveBeenCalledWith({ profilePicture: null });
 		});
 
-		it('does not call editProfileData or close the form on removal alone, until Submit is clicked', () => {
+		it('does not call editProfileData or close the form on removal alone, until Save is clicked', () => {
 			const editProfileData = jest.fn();
 			const onCancelClick = jest.fn();
 			renderEditProfileForm(editProfileData, onCancelClick, userDataWithPicture);
@@ -121,7 +128,7 @@ describe('EditProfileForm', () => {
 			userEvent.clear(screen.getByPlaceholderText('Bio'));
 			userEvent.type(screen.getByPlaceholderText('Bio'), 'New bio');
 			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ bio: 'New bio', profilePicture: null }));
 		});
@@ -133,7 +140,7 @@ describe('EditProfileForm', () => {
 
 			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
 			userEvent.upload(getFileInput(container), file);
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
 			expect(editProfileData).toHaveBeenCalledWith({ profilePicture: file });
@@ -145,7 +152,7 @@ describe('EditProfileForm', () => {
 			const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
 
 			userEvent.upload(getFileInput(container), file);
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ profilePicture: file }));
 		});
@@ -157,7 +164,7 @@ describe('EditProfileForm', () => {
 
 			userEvent.upload(getFileInput(container), buildFile());
 			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(onCancelClick).toHaveBeenCalledTimes(1));
 			expect(editProfileData).not.toHaveBeenCalled();
@@ -169,7 +176,7 @@ describe('EditProfileForm', () => {
 
 			userEvent.upload(getFileInput(container), buildFile());
 			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ profilePicture: null }));
 		});
@@ -180,7 +187,7 @@ describe('EditProfileForm', () => {
 
 			userEvent.clear(screen.getByPlaceholderText('Username'));
 			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ username: 'newname' }));
 		});
@@ -215,23 +222,23 @@ describe('EditProfileForm', () => {
 			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
 		};
 
-		it('enables Submit before anything is sent', () => {
+		it('enables Save before anything is sent', () => {
 			renderEditProfileForm(jest.fn(), jest.fn());
 
-			expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+			expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
 		});
 
-		it('disables Submit while the request is in flight', async () => {
+		it('disables Save while the request is in flight', async () => {
 			const request = buildDeferred();
 
 			renderEditProfileForm(jest.fn().mockReturnValue(request.promise), jest.fn());
 			changeUsername();
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-			expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
+			expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 		});
 
 		it('keeps Cancel enabled while the request is in flight', async () => {
@@ -239,26 +246,26 @@ describe('EditProfileForm', () => {
 
 			renderEditProfileForm(jest.fn().mockReturnValue(request.promise), jest.fn());
 			changeUsername();
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 		});
 
-		it('sends one request when Submit is double-clicked', async () => {
+		it('sends one request when Save is double-clicked', async () => {
 			const request = buildDeferred();
 			const editProfileData = jest.fn().mockReturnValue(request.promise);
 
 			renderEditProfileForm(editProfileData, jest.fn());
 			changeUsername();
-			userEvent.dblClick(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.dblClick(screen.getByRole('button', { name: 'Save' }));
 
 			expect(editProfileData).toHaveBeenCalledTimes(1);
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 		});
 
 		it('sends one request when the form is submitted twice synchronously before React re-renders, and allows a new submit once it settles', async () => {
@@ -277,7 +284,7 @@ describe('EditProfileForm', () => {
 			expect(editProfileData).toHaveBeenCalledTimes(1);
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 
 			act(() => {
 				form.requestSubmit();
@@ -285,17 +292,17 @@ describe('EditProfileForm', () => {
 
 			expect(editProfileData).toHaveBeenCalledTimes(2);
 
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 		});
 
-		it('enables Submit again after a failed request', async () => {
+		it('enables Save again after a failed request', async () => {
 			renderEditProfileForm(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }), jest.fn());
 			changeUsername();
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			await screen.findByRole('alert');
 
-			expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+			expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
 		});
 	});
 
@@ -354,7 +361,7 @@ describe('EditProfileForm', () => {
 				const { container } = renderEditProfileForm(editProfileData, onCancelClick);
 
 				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
-				userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+				userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 				await waitFor(() => expect(onCancelClick).toHaveBeenCalledTimes(1));
 				expect(editProfileData).not.toHaveBeenCalled();
@@ -386,7 +393,7 @@ describe('EditProfileForm', () => {
 				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
 				userEvent.clear(screen.getByPlaceholderText('Username'));
 				userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
-				userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+				userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 				await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ username: 'newname' }));
 				expect(screen.queryByText(TYPE_MESSAGE)).not.toBeInTheDocument();
@@ -399,9 +406,9 @@ describe('EditProfileForm', () => {
 				const view = renderEditProfileForm(editProfileData, jest.fn());
 
 				userEvent.upload(getFileInput(view.container), buildFile());
-				userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+				userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-				await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+				await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 
 				return view;
 			};
@@ -455,7 +462,7 @@ describe('EditProfileForm', () => {
 				const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
 
 				userEvent.upload(getFileInput(container), buildFile());
-				userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+				userEvent.click(screen.getByRole('button', { name: 'Save' }));
 				await screen.findByText(SIZE_MESSAGE);
 
 				userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
@@ -471,7 +478,7 @@ describe('EditProfileForm', () => {
 
 			userEvent.clear(screen.getByPlaceholderText('Username'));
 			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
 			return rendered;
 		};
@@ -526,7 +533,7 @@ describe('EditProfileForm', () => {
 			const { container } = submitChangedUsername(editProfileData);
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
-			await screen.findByRole('button', { name: 'Submit' });
+			await screen.findByRole('button', { name: 'Save' });
 			expect(container.querySelector('.form-error')).not.toBeInTheDocument();
 			expect(container.querySelector('.field-error')).not.toBeInTheDocument();
 		});

@@ -33,7 +33,6 @@
 
 	border: 0.5px solid var(--text-muted);
 	border-radius: 50%;
-	background-color: var(--avatar-placeholder-disc);
 }
 
 .search-result-text {
@@ -70,11 +69,13 @@
 	color: var(--text-secondary);
 }
 
-.search-results-dropdown .search-result {
+.search-results-dropdown .search-result,
+.follow-list-results .search-result {
 	padding: 8px 16px;
 }
 
-.search-results-dropdown .search-result-avatar {
+.search-results-dropdown .search-result-avatar,
+.follow-list-results .search-result-avatar {
 	width: 40px;
 	height: 40px;
 }

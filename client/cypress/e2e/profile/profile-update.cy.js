@@ -34,7 +34,7 @@ describe('profile update', () => {
 		cy.get('.popup-body').should('be.visible');
 	});
 
-	const submitForm = () => cy.get('#edit-user-profile-form').contains('button', 'Submit').click();
+	const submitForm = () => cy.get('#edit-user-profile-form').contains('button', 'Save').click();
 
 	it('opens with every field, prefilled from the account', () => {
 		cy.contains('.popup-title', 'Edit Profile').should('be.visible');
@@ -45,8 +45,13 @@ describe('profile update', () => {
 		cy.get('input#username').should('have.value', user.username);
 		cy.get('textarea#bio').should('exist');
 
-		cy.get('#edit-user-profile-form').contains('button', 'Submit').should('be.visible');
+		cy.get('#edit-user-profile-form').contains('button', 'Save').should('be.visible');
 		cy.get('#edit-user-profile-form').contains('button', 'Cancel').should('be.visible');
+	});
+
+	it('labels the submit button "Save", not "Submit"', () => {
+		cy.get('#edit-user-profile-form button[type="submit"]').should('have.text', 'Save');
+		cy.get('#edit-user-profile-form').contains('button', 'Submit').should('not.exist');
 	});
 
 	it('requires an email and never reaches the server', () => {
