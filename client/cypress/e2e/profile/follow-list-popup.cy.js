@@ -146,16 +146,15 @@ describe('followers and following popup', () => {
 		cy.visit(ownerPath);
 		cy.contains('.profile-header .username', owner.username).should('be.visible');
 
-		let hasFailedOnce = false;
+		let shouldFail = true;
 
 		cy.intercept({ method: 'GET', pathname: '/users/*/followers' }, (req) => {
-			if (hasFailedOnce) {
+			if (!shouldFail) {
 				req.continue();
 
 				return;
 			}
 
-			hasFailedOnce = true;
 			req.reply({ statusCode: 500, body: { code: 'INTERNAL_ERROR' } });
 		}).as('followListRequest');
 		statButton('followers').click();
@@ -164,6 +163,9 @@ describe('followers and following popup', () => {
 		cy.contains('.follow-list-error', "Couldn't load this list").should('be.visible');
 		rows().should('not.exist');
 
+		cy.then(() => {
+			shouldFail = false;
+		});
 		cy.contains('.follow-list-error button', 'Try again').click();
 
 		cy.wait('@followListRequest');
