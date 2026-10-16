@@ -38,9 +38,9 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - Square tiles, centre-cropped.
 - Desktop: 900 column, 292 tiles, 12 gap. Tablet: 720 column, 232 tiles, 12 gap. Mobile: full-bleed, 3 columns, 2px gaps.
 - Tiles are not clickable yet; opening a post from a profile is covered by #11.
-- Hover shows the tile's like and comment counts, as on the Popular page (`Explore Tile`, `State=Hover`; Post Actions frames). Pointer devices only — no hover on touch. — To build (#28 item 5)
+- Hover shows the tile's like and comment counts, as on the Popular page (`Explore Tile`, `State=Hover`; Post Actions frames). Pointer devices only — no hover on touch. — Built (#28)
 
-## Followers / following popup — To build (#28 item 6)
+## Followers / following popup — Built (#28)
 
 - Clicking the "followers" or "following" count opens one shared popup listing those users, titled "Followers" / "Following". A count of 0 is not clickable.
 - Guests can open it too.
@@ -65,7 +65,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - Opened from Edit Profile. Fields: email, username, bio (textarea, max 150), profile picture. — Built
 - Email and username required. Untouched submit just closes; only changed values are sent. — Built
 - Password cannot be changed here (server rejects it); change password is #24.
-- Submit button label is "Save" (code says "Submit"). — To build (#28 item 3)
+- Submit button label is "Save". — Built (#28)
 - Mobile: full-screen view with close icon + title. — Built
 
 ### Profile picture input
@@ -86,8 +86,8 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 
 ## Authorization
 
-- A user can only edit/delete their own posts and edit their own profile and follows. Server ownership checks — To build (#28 item 1).
-- Emails are not exposed to anyone but the owner — To build (#28 item 2).
+- A user can only edit/delete their own posts and edit their own profile and follows. Server ownership checks — Built (#28).
+- Emails are not exposed to anyone but the owner — Built (#28).
 
 ## Errors — Built
 
