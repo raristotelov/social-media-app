@@ -295,4 +295,34 @@ describe('ImageInput', () => {
 			expect(screen.getByAltText('preview')).toHaveAttribute('src', 'blob:preview');
 		});
 	});
+
+	describe('placeholder sizing', () => {
+		it('draws the placeholder icon at the width and height given in props', () => {
+			const { container } = renderImageInput({ iconWidthProp: 120, iconHeightProp: 80 });
+			const icon = container.querySelector('label svg');
+
+			expect(icon).toHaveAttribute('width', '120px');
+			expect(icon).toHaveAttribute('height', '80px');
+		});
+
+		it('falls back to a 90px icon when no icon size is given', () => {
+			const { container } = renderImageInput();
+			const icon = container.querySelector('label svg');
+
+			expect(icon).toHaveAttribute('width', '90px');
+			expect(icon).toHaveAttribute('height', '90px');
+		});
+
+		it('sets the placeholder text to the font size given in props', () => {
+			renderImageInput({ placeholderText: 'Choose a Picture', fontSizeProp: 20 });
+
+			expect(screen.getByText('Choose a Picture')).toHaveStyle({ fontSize: '20px' });
+		});
+
+		it('falls back to a 22px placeholder text when no font size is given', () => {
+			renderImageInput({ placeholderText: 'Choose a Picture' });
+
+			expect(screen.getByText('Choose a Picture')).toHaveStyle({ fontSize: '22px' });
+		});
+	});
 });

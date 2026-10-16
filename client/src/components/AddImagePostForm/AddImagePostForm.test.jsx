@@ -46,6 +46,15 @@ describe('AddImagePostForm', () => {
 		expect(addImagePostHandler).not.toHaveBeenCalled();
 	});
 
+	it('renders the image input with the 90px icon and 20px label the form asks for', () => {
+		const { container } = renderAddImagePostForm(jest.fn(), jest.fn());
+		const icon = container.querySelector('label svg');
+
+		expect(icon).toHaveAttribute('width', '90px');
+		expect(icon).toHaveAttribute('height', '90px');
+		expect(screen.getByText('Choose a Picture')).toHaveStyle({ fontSize: '20px' });
+	});
+
 	it('calls onCancelClick when the Cancel button is clicked', () => {
 		const onCancelClick = jest.fn();
 		renderAddImagePostForm(jest.fn(), onCancelClick);
