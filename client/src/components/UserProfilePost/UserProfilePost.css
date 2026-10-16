@@ -11,6 +11,54 @@
 	object-fit: cover;
 }
 
+.profile-post-stats {
+	display: none;
+}
+
+@media (hover: hover) {
+	.profile-post-stats {
+		position: absolute;
+		inset: 0;
+		container-type: inline-size;
+
+		display: flex;
+		justify-content: center;
+		align-items: center;
+
+		background-color: rgba(0, 0, 0, 0.5);
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.profile-post:hover .profile-post-stats {
+		opacity: 1;
+	}
+}
+
+.profile-post-stats-content {
+	display: flex;
+	align-items: center;
+	gap: 24px;
+}
+
+@container (max-width: 200px) {
+	.profile-post-stats-content {
+		flex-direction: column;
+		gap: 8px;
+	}
+}
+
+.profile-post-stat {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+
+	font-family: 'Mada';
+	font-size: 16px;
+	font-weight: bold;
+	color: var(--static-white);
+}
+
 .post-actions-button {
 	position: absolute;
 	top: 8px;

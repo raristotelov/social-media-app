@@ -12,6 +12,15 @@ const imageStorageService = require('./imageStorageService');
 
 const necessaryUserFields = ['_id', 'email', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following', 'followedUsersPosts'];
 
+const USER_ROW_PROJECTION = {
+	_id: 1,
+	username: 1,
+	'profilePicture.imageUrl': 1,
+	followersCount: { $size: { $ifNull: ['$followers', []] } },
+};
+
+const escapeRegExp = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const signAuthToken = ({ _id, username }) =>
 	JWT.sign({ userId: _id, username }, process.env.JWT_SECRET, {
 		expiresIn: constants.JWT_EXPIRY,
@@ -154,15 +163,18 @@ const getFollowedUsersPostsByUserIds = async ({ userIds }) => {
 		const usersToFollowedUsersMap = {};
 
 		// Create a mapping of user ids to their followed users
-		for (let i = 0; i < userIds.length; i += 1) {
-			usersToFollowedUsersMap[userIds[i]] = users[i].following;
-		}
+		users.forEach((user) => {
+			usersToFollowedUsersMap[String(user._id)] = user.following;
+		});
 
 		// Get all followed users
 		const allFollowedUsers = users.map((user) => user.following).flat();
 
 		// Get all user posts of the followed users
-		const followedUsersPostDocs = await UserPostModel.find({ userId: { $in: allFollowedUsers } }).populate({ path: 'userId' });
+		const followedUsersPostDocs = await UserPostModel.find({ userId: { $in: allFollowedUsers } }).populate({
+			path: 'userId',
+			select: 'username profilePicture',
+		});
 
 		// Attach a comment count to each post for the feed cards
 		const postIds = followedUsersPostDocs.map((post) => post._id);
@@ -174,20 +186,19 @@ const getFollowedUsersPostsByUserIds = async ({ userIds }) => {
 
 		const userToUserPostsMap = {};
 
-		// Create a mapping for user ids to their posts
-		for (let i = 0; i < followedUsersPosts.length; i += 1) {
-			userToUserPostsMap[followedUsersPosts[i].userId._id] = followedUsersPosts[i];
-		}
+		// Create a mapping for user ids to all of their posts
+		followedUsersPosts.forEach((post) => {
+			const authorId = String(post.userId._id);
+
+			userToUserPostsMap[authorId] = [...(userToUserPostsMap[authorId] || []), post];
+		});
 
 		const usersWithFollowedUsersPosts = {};
 
 		for (let i = 0; i < userIds.length; i += 1) {
-			const followedUsersPosts = usersToFollowedUsersMap[userIds[i]]
-				.filter((userId) => userToUserPostsMap[userId])
-				.map((userId) => userToUserPostsMap[userId])
-				.flat();
+			const followedUserIds = usersToFollowedUsersMap[String(userIds[i])] || [];
 
-			usersWithFollowedUsersPosts[userIds[i]] = followedUsersPosts;
+			usersWithFollowedUsersPosts[userIds[i]] = followedUserIds.flatMap((userId) => userToUserPostsMap[String(userId)] || []);
 		}
 
 		return usersWithFollowedUsersPosts;
@@ -200,7 +211,21 @@ const getFollowedUsersPostsByUserIds = async ({ userIds }) => {
 	}
 };
 
-const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds }) => {
+const toProfileData = ({ user, requesterId, commentCounts, followedUsersPosts }) => {
+	const profileData = user.toObject();
+
+	if (String(user._id) !== String(requesterId)) {
+		delete profileData.email;
+	}
+
+	return {
+		...profileData,
+		posts: profileData.posts.map((post) => ({ ...post, commentsCount: commentCounts[post._id.toString()] || 0 })),
+		followedUsersPosts,
+	};
+};
+
+const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds, requesterId }) => {
 	try {
 		const userIds = [...new Set(requestedUserIds)];
 
@@ -210,8 +235,7 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds }) => {
 
 		const usersResult = await UserModel.find({ _id: { $in: userIds } })
 			.select({ _id: 1, username: 1, email: 1, posts: 1, bio: 1, theme: 1, profilePicture: 1, following: 1, followers: 1 })
-			.populate({ path: 'posts' })
-			.populate({ path: 'profilePicture' });
+			.populate({ path: 'posts' });
 
 		if (usersResult.length !== userIds.length) {
 			throw new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
@@ -219,10 +243,17 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds }) => {
 
 		const usersWithFollowedUsersPostsResult = await getFollowedUsersPostsByUserIds({ userIds });
 
-		const mappedUsers = usersResult.map((user) => ({
-			...user.toObject(),
-			followedUsersPosts: usersWithFollowedUsersPostsResult[user._id],
-		}));
+		const profilePostIds = usersResult.flatMap((user) => user.posts.map((post) => post._id));
+		const commentCounts = await commentService.getCommentCountsForPosts(profilePostIds);
+
+		const mappedUsers = usersResult.map((user) =>
+			toProfileData({
+				user,
+				requesterId,
+				commentCounts,
+				followedUsersPosts: usersWithFollowedUsersPostsResult[user._id],
+			}),
+		);
 
 		return mappedUsers;
 	} catch (error) {
@@ -236,10 +267,10 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds }) => {
 
 const getUsersProfileDataBySearchWord = async ({ searchWord }) => {
 	try {
-		const users = await UserModel.find({ username: { $regex: `^${searchWord}`, $options: 'i' } })
-			.select({ _id: 1, username: 1, posts: 1, bio: 1, profilePicture: 1, followers: 1 })
-			.populate({ path: 'posts' })
-			.populate({ path: 'profilePicture' });
+		const users = await UserModel.aggregate([
+			{ $match: { username: { $regex: `^${escapeRegExp(searchWord)}`, $options: 'i' } } },
+			{ $project: USER_ROW_PROJECTION },
+		]);
 
 		return users;
 	} catch (error) {
@@ -247,23 +278,36 @@ const getUsersProfileDataBySearchWord = async ({ searchWord }) => {
 	}
 };
 
-const destroyProfilePicture = async (profilePicture) => {
-	await imageStorageService.deleteImage(profilePicture.imageIdentifier);
+const getFollowListByUserId = async ({ userId, listField, requesterId }) => {
+	try {
+		assertValidUserIds([userId]);
 
-	await UserPostModel.deleteOne({ _id: profilePicture._id });
-};
+		const user = await UserModel.findById(userId).select({ [listField]: 1 });
 
-const rollbackProfilePicture = async ({ profilePicture, uploadedImage }) => {
-	if (profilePicture) {
-		try {
-			await UserPostModel.deleteOne({ _id: profilePicture._id });
-		} catch (error) {
-			console.error(`Could not remove profile picture record ${profilePicture._id} after a failed update`, error);
+		if (!user) {
+			throw createUserNotFoundError();
 		}
-	}
 
-	await imageStorageService.discardUploadedImage(uploadedImage.imageIdentifier);
+		const listedUserIds = user[listField];
+
+		const rows = await UserModel.aggregate([{ $match: { _id: { $in: listedUserIds } } }, { $project: USER_ROW_PROJECTION }]);
+
+		const rowsById = new Map(rows.map((row) => [String(row._id), row]));
+		const orderedRows = listedUserIds.map((listedUserId) => rowsById.get(String(listedUserId))).filter(Boolean);
+
+		return [...orderedRows].sort((a, b) => Number(String(b._id) === String(requesterId)) - Number(String(a._id) === String(requesterId)));
+	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
+		throw new AppError('Could not load the users list', 500, { cause: error });
+	}
 };
+
+const getFollowers = ({ userId, requesterId }) => getFollowListByUserId({ userId, listField: 'followers', requesterId });
+
+const getFollowing = ({ userId, requesterId }) => getFollowListByUserId({ userId, listField: 'following', requesterId });
 
 const updateUserProfileData = async (userId, updatedProfileData, profilePictureFile) => {
 	try {
@@ -290,7 +334,7 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 		let replacedProfilePicture = null;
 
 		if (profilePictureFile || isRemovingProfilePicture) {
-			const userWithProfilePicture = await UserModel.findOne({ _id: userId }).populate({ path: 'profilePicture' });
+			const userWithProfilePicture = await UserModel.findOne({ _id: userId });
 
 			if (!userWithProfilePicture) {
 				throw createUserNotFoundError();
@@ -305,34 +349,32 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 			uploadedImage = await imageStorageService.uploadImage({ file: profilePictureFile, fieldName: constants.PROFILE_PICTURE_FIELD });
 		}
 
-		let profilePicture = null;
 		let user;
 
 		try {
 			if (uploadedImage) {
-				profilePicture = new UserPostModel({
-					imageIdentifier: uploadedImage.imageIdentifier,
-					imageUrl: uploadedImage.imageUrl,
-					userId,
-				});
-
-				await profilePicture.save();
-
-				profileUpdate.profilePicture = profilePicture._id;
+				profileUpdate.profilePicture = { imageUrl: uploadedImage.imageUrl, imageIdentifier: uploadedImage.imageIdentifier };
 			}
 
-			user = await UserModel.findOneAndUpdate({ _id: userId }, profileUpdate, {
+			const userUpdate = { ...profileUpdate };
+
+			if (isRemovingProfilePicture) {
+				delete userUpdate.profilePicture;
+				userUpdate.$unset = { profilePicture: 1 };
+			}
+
+			user = await UserModel.findOneAndUpdate({ _id: userId }, userUpdate, {
 				new: true,
 				runValidators: true,
 				context: 'query',
-			}).populate('profilePicture');
+			});
 
 			if (!user) {
 				throw createUserNotFoundError();
 			}
 		} catch (error) {
 			if (uploadedImage) {
-				await rollbackProfilePicture({ profilePicture, uploadedImage });
+				await imageStorageService.discardUploadedImage(uploadedImage.imageIdentifier);
 			}
 
 			throw error;
@@ -340,7 +382,7 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 
 		if (replacedProfilePicture) {
 			try {
-				await destroyProfilePicture(replacedProfilePicture);
+				await imageStorageService.deleteImage(replacedProfilePicture.imageIdentifier);
 			} catch (error) {
 				console.error(`Could not delete replaced profile picture ${replacedProfilePicture.imageIdentifier}`, error);
 			}
@@ -372,11 +414,7 @@ const followUser = async (userId, userIdToFollow) => {
 	try {
 		await assertUsersExist([userId, userIdToFollow]);
 
-		const currentlyLoggedUser = await UserModel.findOneAndUpdate(
-			{ _id: userId },
-			{ $addToSet: { following: userIdToFollow } },
-			{ new: true },
-		).populate('profilePicture');
+		const currentlyLoggedUser = await UserModel.findOneAndUpdate({ _id: userId }, { $addToSet: { following: userIdToFollow } }, { new: true });
 
 		await UserModel.updateOne({ _id: userIdToFollow }, { $addToSet: { followers: userId } }, { new: true });
 
@@ -396,11 +434,7 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 	try {
 		await assertUsersExist([userId, userIdToUnfollow]);
 
-		const currentlyLoggedUser = await UserModel.findOneAndUpdate(
-			{ _id: userId },
-			{ $pull: { following: userIdToUnfollow } },
-			{ new: true },
-		).populate('profilePicture');
+		const currentlyLoggedUser = await UserModel.findOneAndUpdate({ _id: userId }, { $pull: { following: userIdToUnfollow } }, { new: true });
 
 		await UserModel.updateOne({ _id: userIdToUnfollow }, { $pull: { followers: userId } }, { new: true });
 
@@ -421,6 +455,8 @@ module.exports = {
 	login,
 	getUsersProfileDataByUserIds,
 	getUsersProfileDataBySearchWord,
+	getFollowers,
+	getFollowing,
 	updateUserProfileData,
 	followUser,
 	unfollowUser,

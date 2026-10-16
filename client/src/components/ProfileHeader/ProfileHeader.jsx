@@ -3,8 +3,37 @@ import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
 import './ProfileHeader.css';
 
+const ProfileStat = ({ count, label, onClick }) => {
+	const content = (
+		<>
+			<strong>{count}</strong>
+
+			<span>{label}</span>
+		</>
+	);
+
+	if (!onClick || count === 0) {
+		return <span className='profile-stat'>{content}</span>;
+	}
+
+	return (
+		<button type='button' className='profile-stat profile-stat-button' onClick={onClick}>
+			{content}
+		</button>
+	);
+};
+
 const ProfileHeader = (props) => {
-	const { userData, loggedInUserData, onEditProfileClick, onFollowUserClick, onUnfollowUserClick, isLoggedInUserProfile } = props;
+	const {
+		userData,
+		loggedInUserData,
+		onEditProfileClick,
+		onFollowUserClick,
+		onUnfollowUserClick,
+		onFollowersClick,
+		onFollowingClick,
+		isLoggedInUserProfile,
+	} = props;
 
 	const totalPostsCount = userData?.posts?.length ? userData.posts.length : 0;
 	const followersCount = userData?.followers?.length ? userData.followers.length : 0;
@@ -24,23 +53,11 @@ const ProfileHeader = (props) => {
 			<span className='username'>{userData.username}</span>
 
 			<div className='followers-data-wrapper'>
-				<span className='profile-stat'>
-					<strong>{totalPostsCount}</strong>
+				<ProfileStat count={totalPostsCount} label={totalPostsCount === 1 ? 'post' : 'posts'} />
 
-					<span>{totalPostsCount === 1 ? 'post' : 'posts'}</span>
-				</span>
+				<ProfileStat count={followersCount} label={followersCount === 1 ? 'follower' : 'followers'} onClick={onFollowersClick} />
 
-				<span className='profile-stat'>
-					<strong>{followersCount}</strong>
-
-					<span>{followersCount === 1 ? 'follower' : 'followers'}</span>
-				</span>
-
-				<span className='profile-stat'>
-					<strong>{followingCount}</strong>
-
-					<span>following</span>
-				</span>
+				<ProfileStat count={followingCount} label='following' onClick={onFollowingClick} />
 			</div>
 
 			{bio ? <p className='bio'>{bio}</p> : null}

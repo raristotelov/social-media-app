@@ -26,6 +26,7 @@ Every error code the server sends and the copy the client shows for it. The clie
 | `USER_NOT_FOUND` | 404 | Profile load, profile update, follow / unfollow, unknown or malformed user id | — (blank page until #29) |
 | `POST_NOT_FOUND` | 404 | Post edit / delete | This post no longer exists |
 | `POST_FORBIDDEN` | 403 | Post edit / delete on someone else's post | You can only change your own posts |
+| `PROFILE_FORBIDDEN` | 403 | Profile update, follow / unfollow for someone else's account | You can only change your own profile |
 | `BAD_REQUEST` | 400 | Malformed request body; 4xx errors not yet given their own code | The action's fallback (below) |
 | `INTERNAL_ERROR` | 500 | Anywhere | The action's fallback (below) |
 
@@ -60,3 +61,4 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | --- | --- |
 | Profile (full page) | Couldn't load this profile / Check your connection and try again. / Retry |
 | Comments (inline) | Couldn't load comments · Try again |
+| Followers / following popup (inline) | Couldn't load this list · Try again |

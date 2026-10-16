@@ -4,7 +4,6 @@ const AppError = require('../utils/AppError');
 const AUTHOR_POPULATE = {
 	path: 'userId',
 	select: 'username profilePicture',
-	populate: { path: 'profilePicture' },
 };
 
 const addComment = async ({ userPostId, userId, text, parentCommentId }) => {

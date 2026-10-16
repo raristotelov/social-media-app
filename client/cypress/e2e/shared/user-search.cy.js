@@ -1,5 +1,13 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, followUserViaApi, searchUsersViaApi } from '../../support/api';
+import {
+	createUserViaApi,
+	loginViaApi,
+	visitAsUser,
+	userIdFromToken,
+	followUserViaApi,
+	searchUsersViaApi,
+	uploadProfilePictureViaApi,
+} from '../../support/api';
 
 describe('user search', () => {
 	const user = buildTestUser();
@@ -9,6 +17,7 @@ describe('user search', () => {
 	let ownProfilePath;
 	let searchedUserId;
 	let searchedProfilePath;
+	let searchedPictureUrl;
 
 	before(() => {
 		createUserViaApi(user);
@@ -17,6 +26,12 @@ describe('user search', () => {
 			searchedUserId = userIdFromToken(response.body);
 			searchedProfilePath = `/user/${searchedUserId}`;
 		});
+
+		loginViaApi(searchedUser)
+			.then((token) => uploadProfilePictureViaApi(token))
+			.then((picture) => {
+				searchedPictureUrl = picture.imageUrl;
+			});
 
 		loginViaApi(user).then((token) => {
 			jwtToken = token;
@@ -76,12 +91,47 @@ describe('user search', () => {
 		cy.contains('.search-result', searchedUser.username).find('.search-result-followers').should('have.text', '1 follower');
 	});
 
-	it('returns follower data but no email from the search endpoint', () => {
+	it("shows the user's profile picture as the avatar in the desktop dropdown row", () => {
+		cy.viewport(1440, 900);
+		visitAsUser(ownProfilePath, jwtToken);
+
+		cy.get('.search-input').type(searchedUser.username);
+
+		cy.contains('.search-results-dropdown .search-result', searchedUser.username)
+			.find('img.search-result-avatar')
+			.should('be.visible')
+			.and('have.attr', 'src', searchedPictureUrl);
+	});
+
+	it('shows the placeholder avatar for a user without a profile picture', () => {
+		cy.viewport(1440, 900);
+		visitAsUser(searchedProfilePath, jwtToken);
+
+		cy.get('.search-input').type(user.username);
+
+		cy.contains('.search-results-dropdown .search-result', user.username).within(() => {
+			cy.get('svg.search-result-avatar').should('be.visible');
+			cy.get('img.search-result-avatar').should('not.exist');
+		});
+	});
+
+	it("shows the user's profile picture as the avatar in the mobile result row", () => {
+		cy.viewport(390, 844);
+		visitAsUser('/user-feed', jwtToken);
+
+		cy.get('.mobile-top-bar-action[aria-label="Search"]').click();
+		cy.get('.mobile-search-field').type(searchedUser.username);
+
+		cy.contains('.search-result', searchedUser.username).find('img.search-result-avatar').should('have.attr', 'src', searchedPictureUrl);
+	});
+
+	it('returns slim rows with a follower count and no email from the search endpoint', () => {
 		searchUsersViaApi(searchedUser.username).then((users) => {
 			expect(users).to.have.length(1);
 			expect(users[0]).to.have.property('username', searchedUser.username);
-			expect(users[0].followers).to.have.length(1);
-			expect(users[0]).not.to.have.property('email');
+			expect(users[0]).to.have.property('followersCount', 1);
+			expect(users[0].profilePicture).to.have.property('imageUrl', searchedPictureUrl);
+			['email', 'followers', 'posts', 'bio'].forEach((field) => expect(users[0]).not.to.have.property(field));
 		});
 	});
 

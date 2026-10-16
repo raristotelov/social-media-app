@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
+import { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
@@ -7,6 +7,7 @@ import { addUserPost, updateUserPostCaption, deleteUserPost } from '../../servic
 import { getUsersProfileData, updateUserProfileData, followUser, unfollowUser } from '../../services/userService';
 import { ERROR_CODES } from '../../constants/errorCodes';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
+import { FOLLOW_LIST_TYPES } from '../../constants/followLists';
 import { getErrorCode, getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
 import { resizeImage } from '../../utils/images';
 
@@ -18,11 +19,18 @@ import AddImagePostForm from '../AddImagePostForm/AddImagePostForm';
 import EditProfileForm from '../EditProfileForm/EditProfileForm';
 import EditPostForm from '../EditPostForm/EditPostForm';
 import DeletePostConfirm from '../DeletePostConfirm/DeletePostConfirm';
+import FollowListPopup from '../FollowListPopup/FollowListPopup';
 import PlusIcon from '../icons/Plus';
 
 import './ProfileView.css';
 
 const isSamePost = (post, postId) => (post._id ?? post) === postId;
+
+const withId = (ids = [], id, shouldInclude) => {
+	const otherIds = ids.filter((existingId) => existingId !== id);
+
+	return shouldInclude ? [...otherIds, id] : otherIds;
+};
 
 const ProfileView = (props) => {
 	const [userPosts, setUserPosts] = useState([]);
@@ -35,6 +43,9 @@ const ProfileView = (props) => {
 	const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 	const [loadFailedUserId, setLoadFailedUserId] = useState(null);
 	const [reloadCount, setReloadCount] = useState(0);
+	const [openFollowList, setOpenFollowList] = useState(null);
+	const [optimisticIsFollowed, setOptimisticIsFollowed] = useState(null);
+	const latestFollowRequestId = useRef(0);
 
 	const { jwtToken, loggedInUser, updateLoggedInUser, endSession } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
@@ -71,6 +82,7 @@ const ProfileView = (props) => {
 		let isCurrentRequest = true;
 
 		setIsLoadingProfile(true);
+		setOptimisticIsFollowed(null);
 
 		getUsersProfileData({ userIds: [userId], jwtToken })
 			.then((result) => {
@@ -219,6 +231,29 @@ const ProfileView = (props) => {
 		}
 	};
 
+	const showFollowStateOptimistically = (isFollowed) => {
+		setOptimisticIsFollowed(isFollowed);
+		setUserData((state) => ({ ...state, followers: withId(state.followers, loggedInUser._id, isFollowed) }));
+	};
+
+	const sendFollowRequest = async (isFollowed, sendRequest) => {
+		latestFollowRequestId.current += 1;
+
+		const requestId = latestFollowRequestId.current;
+
+		showFollowStateOptimistically(isFollowed);
+
+		try {
+			const updatedUserData = await sendRequest();
+
+			if (requestId === latestFollowRequestId.current) {
+				updateLoggedInUser(updatedUserData);
+			}
+		} catch (error) {
+			endSessionIfUnauthenticated(error);
+		}
+	};
+
 	const followUserHandler = async (userIdToFollow) => {
 		if (!loggedInUser) {
 			navigate('/log-in', { state: { from: location.pathname } });
@@ -226,32 +261,31 @@ const ProfileView = (props) => {
 			return;
 		}
 
-		try {
-			const updatedUserData = await followUser({
+		await sendFollowRequest(true, () =>
+			followUser({
 				userId: loggedInUser?._id,
 				jwtToken,
 				userIdToFollow,
-			});
-
-			updateLoggedInUser(updatedUserData);
-		} catch (error) {
-			endSessionIfUnauthenticated(error);
-		}
+			}),
+		);
 	};
 
 	const onUnfollowUserHandler = async (userIdToUnfollow) => {
-		try {
-			const updatedUserData = await unfollowUser({
+		await sendFollowRequest(false, () =>
+			unfollowUser({
 				userId: loggedInUser?._id,
 				jwtToken,
 				userIdToUnfollow,
-			});
-
-			updateLoggedInUser(updatedUserData);
-		} catch (error) {
-			endSessionIfUnauthenticated(error);
-		}
+			}),
+		);
 	};
+
+	const closeFollowList = () => {
+		setOpenFollowList(null);
+	};
+
+	const headerLoggedInUser =
+		optimisticIsFollowed === null ? loggedInUser : { ...loggedInUser, following: withId(loggedInUser?.following, userId, optimisticIsFollowed) };
 
 	if (loadFailedUserId === userId && userData?._id !== userId) {
 		return <ProfileLoadError onRetryClick={retryProfileLoad} isRetrying={isLoadingProfile} />;
@@ -265,11 +299,13 @@ const ProfileView = (props) => {
 		<div className='profile-view-wrapper'>
 			<ProfileHeader
 				userData={userData}
-				loggedInUserData={loggedInUser}
+				loggedInUserData={headerLoggedInUser}
 				isLoggedInUserProfile={isLoggedInUserProfile}
 				onEditProfileClick={openEditProfileForm}
 				onFollowUserClick={followUserHandler}
 				onUnfollowUserClick={onUnfollowUserHandler}
+				onFollowersClick={() => setOpenFollowList(FOLLOW_LIST_TYPES.FOLLOWERS)}
+				onFollowingClick={() => setOpenFollowList(FOLLOW_LIST_TYPES.FOLLOWING)}
 			/>
 
 			<section className='profile-posts-wrapper'>
@@ -291,6 +327,8 @@ const ProfileView = (props) => {
 					/>
 				))}
 			</section>
+
+			{openFollowList ? <FollowListPopup userId={userId} listType={openFollowList} onClose={closeFollowList} /> : null}
 
 			{isAddPicturePopupOpen ? (
 				<Popup title='Upload Picture' onClosePopupClick={closeAddPictureForm}>

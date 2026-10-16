@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 
 import PostActionsMenu from '../PostActionsMenu/PostActionsMenu';
 import PostActionsIcon from '../icons/PostActions';
+import HeartIcon from '../icons/Heart';
+import CommentOutlineIcon from '../icons/CommentOutline';
 
 import './UserProfilePost.css';
 
@@ -49,6 +51,22 @@ const UserProfilePost = ({ post, showActions = false, onEditClick, onDeleteClick
 	return (
 		<div className='profile-post' ref={postRef}>
 			<img src={post.imageUrl} alt='user-post' />
+
+			<div className='profile-post-stats' aria-hidden='true'>
+				<div className='profile-post-stats-content'>
+					<span className='profile-post-stat'>
+						<HeartIcon iconColorProp='var(--static-white)' />
+
+						{post.likes?.length ?? 0}
+					</span>
+
+					<span className='profile-post-stat'>
+						<CommentOutlineIcon iconColorProp='var(--static-white)' />
+
+						{post.commentsCount ?? 0}
+					</span>
+				</div>
+			</div>
 
 			{showActions ? (
 				<button

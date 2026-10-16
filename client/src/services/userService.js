@@ -25,10 +25,22 @@ export const getUsersProfileData = ({ userIds, searchWord, jwtToken }) => {
 	}
 
 	if (searchWord) {
-		requestUrl = requestUrl.concat('searchWord=', searchWord);
+		requestUrl = requestUrl.concat('searchWord=', encodeURIComponent(searchWord));
 	}
 
 	return request.get(requestUrl);
+};
+
+export const getFollowers = ({ userId, jwtToken }) => {
+	const request = requestFactory(jwtToken);
+
+	return request.get(`${serverUrl}/users/${userId}/followers`);
+};
+
+export const getFollowing = ({ userId, jwtToken }) => {
+	const request = requestFactory(jwtToken);
+
+	return request.get(`${serverUrl}/users/${userId}/following`);
 };
 
 export const updateUserProfileData = ({ userId, jwtToken, updatedProfileData }) => {

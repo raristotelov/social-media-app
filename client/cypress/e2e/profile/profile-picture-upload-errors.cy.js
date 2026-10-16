@@ -20,7 +20,7 @@ describe('profile picture upload errors', () => {
 
 	const fileInput = () => cy.get('#edit-user-profile-form input[type="file"]');
 
-	const submitButton = () => cy.get('#edit-user-profile-form').contains('button', 'Submit');
+	const submitButton = () => cy.get('#edit-user-profile-form').contains('button', 'Save');
 
 	const pictureError = () => cy.get('#edit-user-profile-form .profile-form-profile-picture-wrapper .field-error');
 
@@ -144,7 +144,7 @@ describe('profile picture upload errors', () => {
 			fileInput().selectFile(FIXTURE_IMAGE, { force: true });
 		});
 
-		it('disables Submit until the response arrives, then enables it again', () => {
+		it('disables Save until the response arrives, then enables it again', () => {
 			submitButton().should('not.be.disabled').click();
 
 			submitButton().should('be.disabled');
@@ -154,7 +154,7 @@ describe('profile picture upload errors', () => {
 			submitButton().should('not.be.disabled');
 		});
 
-		it('sends one request when Submit is double-clicked', () => {
+		it('sends one request when Save is double-clicked', () => {
 			submitButton().dblclick();
 
 			cy.wait('@updateRequest');

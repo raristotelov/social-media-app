@@ -1,9 +1,69 @@
 import { requestFactory } from './requester';
-import { updateUserProfileData } from './userService';
+import { getUsersProfileData, getFollowers, getFollowing, updateUserProfileData } from './userService';
 
 jest.mock('./requester');
 
 describe('userService', () => {
+	describe('getUsersProfileData', () => {
+		let get;
+
+		beforeEach(() => {
+			get = jest.fn().mockResolvedValue([]);
+			requestFactory.mockReturnValue({ get });
+		});
+
+		it('encodes the search word so characters like & and # reach the server', async () => {
+			await getUsersProfileData({ searchWord: 'a&b#c' });
+
+			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/users\?searchWord=a%26b%23c$/));
+		});
+	});
+
+	describe.each([
+		['getFollowers', getFollowers, 'followers'],
+		['getFollowing', getFollowing, 'following'],
+	])('%s', (_name, getList, path) => {
+		let get;
+
+		beforeEach(() => {
+			get = jest.fn().mockResolvedValue([]);
+			requestFactory.mockReturnValue({ get });
+		});
+
+		it(`requests the ${path} endpoint of the user`, async () => {
+			await getList({ userId: 'user1', jwtToken: 'token123' });
+
+			expect(get).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`/users/user1/${path}$`)));
+		});
+
+		it('sends the token so the server can put the logged-in user first', async () => {
+			await getList({ userId: 'user1', jwtToken: 'token123' });
+
+			expect(requestFactory).toHaveBeenCalledWith('token123');
+		});
+
+		it('works without a token for a guest', async () => {
+			await getList({ userId: 'user1' });
+
+			expect(requestFactory).toHaveBeenCalledWith(undefined);
+			expect(get).toHaveBeenCalledTimes(1);
+		});
+
+		it('resolves with the rows from the server', async () => {
+			const rows = [{ _id: 'user2', username: 'janedoe', followersCount: 1 }];
+
+			get.mockResolvedValue(rows);
+
+			await expect(getList({ userId: 'user1', jwtToken: 'token123' })).resolves.toBe(rows);
+		});
+
+		it('rejects when the request fails', async () => {
+			get.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+
+			await expect(getList({ userId: 'user1' })).rejects.toMatchObject({ status: 500 });
+		});
+	});
+
 	describe('updateUserProfileData', () => {
 		const picture = new File(['(image)'], 'me.jpg', { type: 'image/jpeg' });
 		let patch;

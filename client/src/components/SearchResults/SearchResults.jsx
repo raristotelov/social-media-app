@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
+import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
 import './SearchResults.css';
 
@@ -26,11 +27,11 @@ const SearchResults = ({ results, isLoading, onResultClick, className = '' }) =>
 	return (
 		<div className={classNames}>
 			{results.map((user) => {
-				const followersCount = user.followers?.length || 0;
+				const followersCount = user.followersCount || 0;
 
 				return (
 					<Link to={`/user/${user._id}`} key={user._id} className='search-result' onClick={onResultClick}>
-						<span className='search-result-avatar' />
+						<ProfilePicture imageUrl={user.profilePicture?.imageUrl} className='search-result-avatar' />
 
 						<span className='search-result-text'>
 							<span className='search-result-username'>{user.username}</span>

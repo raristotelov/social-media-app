@@ -11,6 +11,7 @@ const JWT = require('jsonwebtoken');
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const imageStorageService = require('./imageStorageService');
+const commentService = require('./commentService');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
@@ -22,6 +23,8 @@ const {
 	unfollowUser,
 	getUsersProfileDataByUserIds,
 	getUsersProfileDataBySearchWord,
+	getFollowers,
+	getFollowing,
 } = require('./userService');
 
 describe('userService', () => {
@@ -324,20 +327,18 @@ describe('userService', () => {
 
 	describe('updateUserProfileData', () => {
 		const USER_ID = '64b7f0a1c2d3e4f5a6b7c8a1';
-		const existingPicture = { _id: 'picture1', imageIdentifier: 'old-picture-id', imageUrl: 'https://example.com/old.jpg' };
+		const existingPicture = { imageIdentifier: 'old-picture-id', imageUrl: 'https://example.com/old.jpg' };
 
 		const givenUserWithPicture = (profilePicture) => {
-			UserModel.findOne = jest.fn().mockReturnValue({
-				populate: jest.fn().mockResolvedValue({ _id: USER_ID, profilePicture }),
-			});
+			UserModel.findOne = jest.fn().mockResolvedValue({ _id: USER_ID, profilePicture });
 		};
 
 		const givenUpdateResolves = (user = { _id: USER_ID, username: 'realuser' }) => {
-			UserModel.findOneAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(user) });
+			UserModel.findOneAndUpdate = jest.fn().mockResolvedValue(user);
 		};
 
 		const givenUpdateRejects = (error) => {
-			UserModel.findOneAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockRejectedValue(error) });
+			UserModel.findOneAndUpdate = jest.fn().mockRejectedValue(error);
 		};
 
 		const buildDuplicateUsernameError = () => {
@@ -354,7 +355,6 @@ describe('userService', () => {
 		beforeEach(() => {
 			JWT.sign.mockReturnValue('signed.jwt.token');
 			imageStorageService.deleteImage.mockResolvedValue({ result: 'ok' });
-			UserPostModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
 			consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		});
 
@@ -363,32 +363,30 @@ describe('userService', () => {
 		});
 
 		describe('removing the profile picture (profilePicture: null)', () => {
-			it('destroys the Cloudinary asset, deletes the UserImage document and unsets the reference', async () => {
+			it('unsets the profile picture on the user and destroys the Cloudinary asset', async () => {
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves();
 
 				await updateUserProfileData(USER_ID, { profilePicture: null });
 
 				expect(imageStorageService.deleteImage).toHaveBeenCalledWith('old-picture-id');
-				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'picture1' });
-				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { profilePicture: null }, expect.any(Object));
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { $unset: { profilePicture: 1 } }, expect.any(Object));
 			});
 
-			it('updates the user first, then destroys the Cloudinary asset, then deletes the document', async () => {
+			it('updates the user first, then destroys the Cloudinary asset', async () => {
 				const callOrder = [];
 
 				givenUserWithPicture(existingPicture);
 				imageStorageService.deleteImage.mockImplementation(async () => callOrder.push('cloudinary'));
-				UserPostModel.deleteOne.mockImplementation(async () => callOrder.push('document'));
-				UserModel.findOneAndUpdate = jest.fn().mockImplementation(() => {
+				UserModel.findOneAndUpdate = jest.fn().mockImplementation(async () => {
 					callOrder.push('user');
 
-					return { populate: jest.fn().mockResolvedValue({ _id: USER_ID }) };
+					return { _id: USER_ID };
 				});
 
 				await updateUserProfileData(USER_ID, { profilePicture: null });
 
-				expect(callOrder).toEqual(['user', 'cloudinary', 'document']);
+				expect(callOrder).toEqual(['user', 'cloudinary']);
 			});
 
 			it('leaves the picture untouched and does not call deleteImage when the update fails (duplicate username)', async () => {
@@ -480,17 +478,7 @@ describe('userService', () => {
 			const profilePictureFile = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), originalname: 'me.jpg' };
 			const uploadedImage = { imageIdentifier: 'new-picture-id', imageUrl: 'https://example.com/new.jpg' };
 
-			const buildUserPostModelMock = () => {
-				const save = jest.fn().mockResolvedValue(undefined);
-
-				UserPostModel.mockImplementation(function UserPostModelMock(data) {
-					Object.assign(this, data);
-					this._id = 'newPicture1';
-					this.save = save;
-				});
-
-				return save;
-			};
+			const embeddedPicture = { imageUrl: uploadedImage.imageUrl, imageIdentifier: uploadedImage.imageIdentifier };
 
 			beforeEach(() => {
 				imageStorageService.uploadImage.mockResolvedValue(uploadedImage);
@@ -498,7 +486,6 @@ describe('userService', () => {
 			});
 
 			it('uploads the received file under the profile picture field', async () => {
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves();
 
@@ -507,23 +494,19 @@ describe('userService', () => {
 				expect(imageStorageService.uploadImage).toHaveBeenCalledWith({ file: profilePictureFile, fieldName: 'profilePicture' });
 			});
 
-			it('destroys the previous asset and document, saves the new image and points the user at it', async () => {
-				const save = buildUserPostModelMock();
-
+			it('points the user at the new image and destroys the previous asset, creating no post record', async () => {
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves();
 
 				await updateUserProfileData(USER_ID, {}, profilePictureFile);
 
 				expect(imageStorageService.deleteImage).toHaveBeenCalledWith('old-picture-id');
-				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'picture1' });
-				expect(UserPostModel).toHaveBeenCalledWith({ ...uploadedImage, userId: USER_ID });
-				expect(save).toHaveBeenCalledTimes(1);
-				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { profilePicture: 'newPicture1' }, expect.any(Object));
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { profilePicture: embeddedPicture }, expect.any(Object));
+				expect(UserPostModel).not.toHaveBeenCalled();
+				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
 			});
 
 			it('applies other profile fields sent together with the new picture', async () => {
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves();
 
@@ -531,13 +514,12 @@ describe('userService', () => {
 
 				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith(
 					{ _id: USER_ID },
-					{ bio: 'New bio', profilePicture: 'newPicture1' },
+					{ bio: 'New bio', profilePicture: embeddedPicture },
 					expect.any(Object),
 				);
 			});
 
 			it('returns the updated user data with a fresh token', async () => {
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves({ _id: USER_ID, username: 'realuser' });
 
@@ -546,31 +528,28 @@ describe('userService', () => {
 				expect(result).toEqual({ user: { _id: USER_ID, username: 'realuser' }, jwt: 'signed.jwt.token' });
 			});
 
-			it('saves the new image and updates the user first, then destroys the previous asset and document', async () => {
+			it('uploads the new image and updates the user first, then destroys the previous asset', async () => {
 				const callOrder = [];
-				const save = jest.fn().mockImplementation(async () => callOrder.push('save new'));
 
-				UserPostModel.mockImplementation(function UserPostModelMock(data) {
-					Object.assign(this, data);
-					this._id = 'newPicture1';
-					this.save = save;
+				imageStorageService.uploadImage.mockImplementation(async () => {
+					callOrder.push('upload');
+
+					return uploadedImage;
 				});
 				givenUserWithPicture(existingPicture);
 				imageStorageService.deleteImage.mockImplementation(async () => callOrder.push('cloudinary'));
-				UserPostModel.deleteOne.mockImplementation(async (filter) => callOrder.push(`delete ${filter._id}`));
-				UserModel.findOneAndUpdate = jest.fn().mockImplementation(() => {
+				UserModel.findOneAndUpdate = jest.fn().mockImplementation(async () => {
 					callOrder.push('user');
 
-					return { populate: jest.fn().mockResolvedValue({ _id: USER_ID }) };
+					return { _id: USER_ID };
 				});
 
 				await updateUserProfileData(USER_ID, {}, profilePictureFile);
 
-				expect(callOrder).toEqual(['save new', 'user', 'cloudinary', 'delete picture1']);
+				expect(callOrder).toEqual(['upload', 'user', 'cloudinary']);
 			});
 
 			it('does not discard the new image when everything succeeds', async () => {
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves();
 
@@ -585,7 +564,6 @@ describe('userService', () => {
 					fields: { profilePicture: ERROR_CODES.IMAGE_TYPE_INVALID },
 				});
 
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves();
 				imageStorageService.uploadImage.mockRejectedValue(typeError);
@@ -603,18 +581,17 @@ describe('userService', () => {
 			});
 
 			it('propagates a Cloudinary upload failure as a 502 and leaves the old picture untouched', async () => {
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
+				givenUpdateResolves();
 				imageStorageService.uploadImage.mockRejectedValue(new AppError('Could not upload image', 502));
 
 				await expect(updateUserProfileData(USER_ID, {}, profilePictureFile)).rejects.toMatchObject({ statusCode: 502 });
 
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
-				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+				expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
 			});
 
-			it('deletes the new document, destroys the new image and leaves the old picture untouched when the update fails (duplicate username)', async () => {
-				buildUserPostModelMock();
+			it('destroys the new image and leaves the old picture untouched when the update fails (duplicate username)', async () => {
 				givenUserWithPicture(existingPicture);
 				givenUpdateRejects(buildDuplicateUsernameError());
 
@@ -624,19 +601,17 @@ describe('userService', () => {
 					fields: { username: ERROR_CODES.USERNAME_TAKEN },
 				});
 
-				expect(UserPostModel.deleteOne).toHaveBeenCalledTimes(1);
-				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
+				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledTimes(1);
 				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
 			});
 
-			it('maps a validation failure to a 400 with fields, deleting the new document and leaving the old picture untouched', async () => {
+			it('maps a validation failure to a 400 with fields, destroying the new image and leaving the old picture untouched', async () => {
 				const validationError = new Error('User validation failed');
 
 				validationError.name = 'ValidationError';
 				validationError.errors = { bio: { kind: 'maxlength', message: 'Bio is too long' } };
 
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateRejects(validationError);
 
@@ -646,16 +621,13 @@ describe('userService', () => {
 					fields: { bio: ERROR_CODES.BIO_TOO_LONG },
 				});
 
-				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
-				expect(UserPostModel.deleteOne).not.toHaveBeenCalledWith({ _id: 'picture1' });
 				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
 			});
 
-			it('wraps an unexpected update failure in a 500, deleting the new document and leaving the old picture untouched', async () => {
+			it('wraps an unexpected update failure in a 500, destroying the new image and leaving the old picture untouched', async () => {
 				const dbError = new Error('connection lost');
 
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateRejects(dbError);
 
@@ -664,51 +636,13 @@ describe('userService', () => {
 					cause: dbError,
 				});
 
-				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
 				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
-			});
-
-			it('deletes nothing from the database but still destroys the new image when saving the new picture record fails', async () => {
-				const saveError = new Error('connection lost');
-
-				UserPostModel.mockImplementation(function UserPostModelMock(data) {
-					Object.assign(this, data);
-					this._id = 'newPicture1';
-					this.save = jest.fn().mockRejectedValue(saveError);
-				});
-				givenUserWithPicture(existingPicture);
-				givenUpdateResolves();
-
-				await expect(updateUserProfileData(USER_ID, {}, profilePictureFile)).rejects.toMatchObject({
-					statusCode: 500,
-					cause: saveError,
-				});
-
-				expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
-				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
-				expect(imageStorageService.deleteImage).not.toHaveBeenCalled();
-			});
-
-			it('still destroys the new image, logs, and answers with the update error when removing the new record fails', async () => {
-				const dbError = new Error('connection lost');
-				const deleteError = new Error('delete failed');
-
-				buildUserPostModelMock();
-				givenUserWithPicture(existingPicture);
-				givenUpdateRejects(dbError);
-				UserPostModel.deleteOne.mockRejectedValue(deleteError);
-
-				await expect(updateUserProfileData(USER_ID, {}, profilePictureFile)).rejects.toMatchObject({ statusCode: 500, cause: dbError });
-
-				expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('newPicture1'), deleteError);
-				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 			});
 
 			it('still resolves with the updated user and logs the error when the post-save destroy of the old picture fails', async () => {
 				const destroyError = new AppError('Could not delete image old-picture-id', 502);
 
-				buildUserPostModelMock();
 				givenUserWithPicture(existingPicture);
 				givenUpdateResolves({ _id: USER_ID, username: 'realuser' });
 				imageStorageService.deleteImage.mockRejectedValue(destroyError);
@@ -722,7 +656,6 @@ describe('userService', () => {
 			});
 
 			it('destroys nothing when the user had no previous picture', async () => {
-				buildUserPostModelMock();
 				givenUserWithPicture(null);
 				givenUpdateResolves();
 
@@ -847,7 +780,7 @@ describe('userService', () => {
 				await expect(updateUserProfileData(USER_ID, { profilePicture: null })).resolves.toMatchObject({ jwt: 'signed.jwt.token' });
 
 				expect(UserModel.findOne).toHaveBeenCalledTimes(1);
-				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { profilePicture: null }, expect.any(Object));
+				expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { $unset: { profilePicture: 1 } }, expect.any(Object));
 			});
 
 			it('still rejects password with PASSWORD_NOT_EDITABLE, ahead of the disallowed-field check', async () => {
@@ -901,7 +834,7 @@ describe('userService', () => {
 			});
 
 			it('rejects a well-formed id with no matching user with a 404 USER_NOT_FOUND, without uploading', async () => {
-				UserModel.findOne = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
+				UserModel.findOne = jest.fn().mockResolvedValue(null);
 
 				await expect(updateUserProfileData(USER_ID, { bio: 'x' }, profilePictureFile)).rejects.toMatchObject({
 					statusCode: 404,
@@ -912,7 +845,7 @@ describe('userService', () => {
 			});
 
 			it('rejects a picture removal for a missing user with a 404 without destroying anything', async () => {
-				UserModel.findOne = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
+				UserModel.findOne = jest.fn().mockResolvedValue(null);
 
 				await expect(updateUserProfileData(USER_ID, { profilePicture: null })).rejects.toMatchObject({
 					statusCode: 404,
@@ -920,17 +853,9 @@ describe('userService', () => {
 				});
 
 				expectNothingWritten();
-				expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
 			});
 
-			it('answers 404 and discards the uploaded image and record when the user vanishes between the lookup and the update', async () => {
-				const save = jest.fn().mockResolvedValue(undefined);
-
-				UserPostModel.mockImplementation(function UserPostModelMock(data) {
-					Object.assign(this, data);
-					this._id = 'newPicture1';
-					this.save = save;
-				});
+			it('answers 404 and discards the uploaded image when the user vanishes between the lookup and the update', async () => {
 				imageStorageService.uploadImage.mockResolvedValue({ imageIdentifier: 'new-picture-id', imageUrl: 'https://example.com/new.jpg' });
 				imageStorageService.discardUploadedImage.mockResolvedValue(undefined);
 				givenUserWithPicture(existingPicture);
@@ -941,10 +866,8 @@ describe('userService', () => {
 					code: ERROR_CODES.USER_NOT_FOUND,
 				});
 
-				expect(UserPostModel.deleteOne).toHaveBeenCalledWith({ _id: 'newPicture1' });
 				expect(imageStorageService.discardUploadedImage).toHaveBeenCalledWith('new-picture-id');
 				expect(imageStorageService.deleteImage).not.toHaveBeenCalledWith('old-picture-id');
-				expect(UserPostModel.deleteOne).not.toHaveBeenCalledWith({ _id: 'picture1' });
 			});
 
 			it('answers 404 for a plain update of a nonexistent user (update returns null), without a lookup or any rollback', async () => {
@@ -977,7 +900,7 @@ describe('userService', () => {
 		};
 
 		const givenUpdatesResolve = (user = { _id: USER_ID, username: 'realuser' }) => {
-			UserModel.findOneAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(user) });
+			UserModel.findOneAndUpdate = jest.fn().mockResolvedValue(user);
 			UserModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
 		};
 
@@ -1050,7 +973,7 @@ describe('userService', () => {
 		beforeEach(() => {
 			JWT.sign.mockReturnValue('signed.jwt.token');
 			UserModel.countDocuments = jest.fn().mockResolvedValue(1);
-			UserModel.findOneAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: USER_ID, username: 'realuser' }) });
+			UserModel.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: USER_ID, username: 'realuser' });
 			UserModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 0 });
 		});
 
@@ -1073,9 +996,8 @@ describe('userService', () => {
 		const VALID_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 
 		const givenFindResolves = (users) => {
-			const populate = jest.fn();
+			const populate = jest.fn().mockResolvedValue(users);
 
-			populate.mockReturnValueOnce({ populate }).mockResolvedValueOnce(users);
 			UserModel.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ populate }) });
 		};
 
@@ -1111,45 +1033,277 @@ describe('userService', () => {
 				cause: dbError,
 			});
 		});
+
+		describe('resolving profiles', () => {
+			const OWNER_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
+			const OTHER_ID = '64b7f0a1c2d3e4f5a6b7c8e2';
+			const AUTHOR_ONE_ID = '64b7f0a1c2d3e4f5a6b7c8f1';
+			const AUTHOR_TWO_ID = '64b7f0a1c2d3e4f5a6b7c8f2';
+
+			const buildUser = ({ _id, email = `${_id}@example.com`, posts = [], following = [] }) => {
+				const data = { _id, username: `user-${_id}`, email, posts, following, followers: [] };
+
+				return { _id, posts, toObject: () => ({ ...data }) };
+			};
+
+			const buildPostDoc = ({ _id, author }) => {
+				const data = { _id, userId: { _id: author, username: `user-${author}` }, imageUrl: `https://example.com/${_id}.jpg` };
+
+				return { _id, toObject: () => ({ ...data }) };
+			};
+
+			const givenLookup = ({ users, followedUserDocs = [], followedPostDocs = [], commentCounts = {} }) => {
+				const populateFollowedPostAuthor = jest.fn();
+
+				UserModel.find = jest
+					.fn()
+					.mockReturnValueOnce({
+						select: jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(users) }),
+					})
+					.mockReturnValueOnce({ select: jest.fn().mockResolvedValue(followedUserDocs) });
+				UserPostModel.find = jest.fn().mockImplementation((filter) => {
+					const requestedAuthorIds = filter.userId.$in.map(String);
+
+					populateFollowedPostAuthor.mockResolvedValue(
+						followedPostDocs.filter((postDoc) => requestedAuthorIds.includes(String(postDoc.toObject().userId._id))),
+					);
+
+					return { populate: populateFollowedPostAuthor };
+				});
+				commentService.getCommentCountsForPosts.mockResolvedValue(commentCounts);
+
+				return populateFollowedPostAuthor;
+			};
+
+			describe('email visibility', () => {
+				it('strips the email from the profile when the requester is a guest', async () => {
+					givenLookup({ users: [buildUser({ _id: OWNER_ID })] });
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(profile).not.toHaveProperty('email');
+				});
+
+				it('strips the email from the profile when the requester is another user', async () => {
+					givenLookup({ users: [buildUser({ _id: OWNER_ID })] });
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID], requesterId: OTHER_ID });
+
+					expect(profile).not.toHaveProperty('email');
+				});
+
+				it('keeps the email when the requester is the profile owner', async () => {
+					givenLookup({ users: [buildUser({ _id: OWNER_ID, email: 'owner@example.com' })] });
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID], requesterId: OWNER_ID });
+
+					expect(profile.email).toBe('owner@example.com');
+				});
+
+				it('keeps the email when the requester id is an object that stringifies to the owner id', async () => {
+					givenLookup({ users: [buildUser({ _id: OWNER_ID, email: 'owner@example.com' })] });
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID], requesterId: { toString: () => OWNER_ID } });
+
+					expect(profile.email).toBe('owner@example.com');
+				});
+
+				it("keeps the email only on the requester's own profile when several profiles are requested", async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID, email: 'owner@example.com' }), buildUser({ _id: OTHER_ID, email: 'other@example.com' })],
+					});
+
+					const profiles = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID], requesterId: OWNER_ID });
+
+					expect(profiles.map((profile) => profile.email)).toEqual(['owner@example.com', undefined]);
+				});
+			});
+
+			describe('profile post comment counts', () => {
+				it('adds a commentsCount to each profile post, defaulting to 0', async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID, posts: [{ _id: 'post1' }, { _id: 'post2' }] })],
+						commentCounts: { post1: 3 },
+					});
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(profile.posts).toEqual([
+						{ _id: 'post1', commentsCount: 3 },
+						{ _id: 'post2', commentsCount: 0 },
+					]);
+				});
+
+				it('asks for the comment counts of all profile posts in one call', async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID, posts: [{ _id: 'post1' }] }), buildUser({ _id: OTHER_ID, posts: [{ _id: 'post2' }] })],
+					});
+
+					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
+
+					expect(commentService.getCommentCountsForPosts).toHaveBeenCalledWith(['post1', 'post2']);
+				});
+			});
+
+			describe('followed users posts', () => {
+				it('populates each post author with only the username and profile picture, never the email or password hash', async () => {
+					const populateAuthor = givenLookup({
+						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID] })],
+						followedUserDocs: [{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] }],
+					});
+
+					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(populateAuthor).toHaveBeenCalledWith({ path: 'userId', select: 'username profilePicture' });
+				});
+
+				it('keeps every post of a followed author, not just the last one', async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID] })],
+						followedUserDocs: [{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] }],
+						followedPostDocs: [
+							buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }),
+							buildPostDoc({ _id: 'p2', author: AUTHOR_ONE_ID }),
+							buildPostDoc({ _id: 'p3', author: AUTHOR_ONE_ID }),
+						],
+					});
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(profile.followedUsersPosts.map((post) => post._id)).toEqual(['p1', 'p2', 'p3']);
+				});
+
+				it('gives each user only the posts of the authors they follow', async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID] }), buildUser({ _id: OTHER_ID, following: [AUTHOR_TWO_ID] })],
+						followedUserDocs: [
+							{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] },
+							{ _id: OTHER_ID, following: [AUTHOR_TWO_ID] },
+						],
+						followedPostDocs: [buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }), buildPostDoc({ _id: 'p2', author: AUTHOR_TWO_ID })],
+					});
+
+					const profiles = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
+
+					expect(profiles.map((profile) => profile.followedUsersPosts.map((post) => post._id))).toEqual([['p1'], ['p2']]);
+				});
+
+				it('maps users by their _id, so a lookup that returns them in a different order than requested attaches the right posts', async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID }), buildUser({ _id: OTHER_ID })],
+						followedUserDocs: [
+							{ _id: OTHER_ID, following: [AUTHOR_TWO_ID] },
+							{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] },
+						],
+						followedPostDocs: [buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }), buildPostDoc({ _id: 'p2', author: AUTHOR_TWO_ID })],
+					});
+
+					const profiles = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
+
+					expect(profiles.map((profile) => profile.followedUsersPosts.map((post) => post._id))).toEqual([['p1'], ['p2']]);
+				});
+
+				it('attaches a commentsCount to each followed post', async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID] })],
+						followedUserDocs: [{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] }],
+						followedPostDocs: [buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }), buildPostDoc({ _id: 'p2', author: AUTHOR_ONE_ID })],
+						commentCounts: { p1: 4 },
+					});
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(profile.followedUsersPosts.map((post) => post.commentsCount)).toEqual([4, 0]);
+				});
+
+				it('loads the posts of all followed users with a single userId query', async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID, AUTHOR_TWO_ID] })],
+						followedUserDocs: [{ _id: OWNER_ID, following: [AUTHOR_ONE_ID, AUTHOR_TWO_ID] }],
+						followedPostDocs: [buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }), buildPostDoc({ _id: 'p2', author: AUTHOR_TWO_ID })],
+					});
+
+					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(UserPostModel.find).toHaveBeenCalledTimes(1);
+					expect(UserPostModel.find).toHaveBeenCalledWith({ userId: { $in: [AUTHOR_ONE_ID, AUTHOR_TWO_ID] } });
+					expect(UserModel.find).toHaveBeenCalledTimes(2);
+				});
+
+				it('returns an empty list for a user who follows nobody', async () => {
+					givenLookup({
+						users: [buildUser({ _id: OWNER_ID })],
+						followedUserDocs: [{ _id: OWNER_ID, following: [] }],
+					});
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(profile.followedUsersPosts).toEqual([]);
+				});
+			});
+		});
 	});
 
 	describe('getUsersProfileDataBySearchWord', () => {
 		const givenSearchResolves = (users) => {
-			const populate = jest.fn();
-			const select = jest.fn().mockReturnValue({ populate });
-
-			populate.mockReturnValueOnce({ populate }).mockResolvedValueOnce(users);
-			UserModel.find = jest.fn().mockReturnValue({ select });
-
-			return select;
+			UserModel.aggregate = jest.fn().mockResolvedValue(users);
 		};
+
+		const getMatchStage = () => UserModel.aggregate.mock.calls[0][0].find((stage) => stage.$match).$match;
+
+		const getProjectStage = () => UserModel.aggregate.mock.calls[0][0].find((stage) => stage.$project).$project;
 
 		it('matches usernames starting with the search word, case-insensitively', async () => {
 			givenSearchResolves([]);
 
 			await getUsersProfileDataBySearchWord({ searchWord: 'jan' });
 
-			expect(UserModel.find).toHaveBeenCalledWith({ username: { $regex: '^jan', $options: 'i' } });
+			expect(getMatchStage()).toEqual({ username: { $regex: '^jan', $options: 'i' } });
 		});
 
-		it('selects followers so the follower count can be shown', async () => {
-			const select = givenSearchResolves([]);
+		it.each([
+			['a dot', 'j.n', '^j\\.n'],
+			['a star', 'j*', '^j\\*'],
+			['a plus and a question mark', 'a+b?', '^a\\+b\\?'],
+			['parentheses and brackets', '(a)[b]', '^\\(a\\)\\[b\\]'],
+			['a caret and a dollar sign', '^a$', '^\\^a\\$'],
+			['braces and a pipe', 'a{2}|b', '^a\\{2\\}\\|b'],
+			['a backslash', 'a\\b', '^a\\\\b'],
+		])('escapes %s so the search word is matched literally', async (_name, searchWord, expectedPattern) => {
+			givenSearchResolves([]);
+
+			await getUsersProfileDataBySearchWord({ searchWord });
+
+			expect(getMatchStage()).toEqual({ username: { $regex: expectedPattern, $options: 'i' } });
+		});
+
+		it('counts followers with $size so the follower count can be shown without the followers array', async () => {
+			givenSearchResolves([]);
 
 			await getUsersProfileDataBySearchWord({ searchWord: 'jan' });
 
-			expect(select).toHaveBeenCalledWith(expect.objectContaining({ followers: 1 }));
+			expect(getProjectStage().followersCount).toEqual({ $size: { $ifNull: ['$followers', []] } });
+			expect(getProjectStage()).not.toHaveProperty('followers');
 		});
 
-		it('does not select email', async () => {
-			const select = givenSearchResolves([]);
+		it('projects only the id, username, profile picture url and follower count', async () => {
+			givenSearchResolves([]);
 
 			await getUsersProfileDataBySearchWord({ searchWord: 'jan' });
 
-			expect(select.mock.calls[0][0]).not.toHaveProperty('email');
+			expect(Object.keys(getProjectStage()).sort()).toEqual(['_id', 'followersCount', 'profilePicture.imageUrl', 'username']);
 		});
 
-		it('returns the users found', async () => {
-			const users = [{ _id: 'user1', username: 'janedoe', followers: ['user2', 'user3'] }];
+		it('does not project email, password, posts or bio', async () => {
+			givenSearchResolves([]);
+
+			await getUsersProfileDataBySearchWord({ searchWord: 'jan' });
+
+			['email', 'password', 'posts', 'bio'].forEach((field) => expect(getProjectStage()).not.toHaveProperty(field));
+		});
+
+		it('returns the rows found', async () => {
+			const users = [{ _id: 'user1', username: 'janedoe', followersCount: 2 }];
 
 			givenSearchResolves(users);
 
@@ -1159,7 +1313,7 @@ describe('userService', () => {
 		it('wraps an unexpected database failure in a 500 AppError', async () => {
 			const dbError = new Error('connection lost');
 
-			UserModel.find = jest.fn().mockImplementation(() => {
+			UserModel.aggregate = jest.fn().mockImplementation(() => {
 				throw dbError;
 			});
 
@@ -1167,6 +1321,142 @@ describe('userService', () => {
 				statusCode: 500,
 				cause: dbError,
 			});
+		});
+	});
+
+	describe.each([
+		['getFollowers', getFollowers, 'followers'],
+		['getFollowing', getFollowing, 'following'],
+	])('%s', (_name, getList, listField) => {
+		const PROFILE_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
+		const FIRST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
+		const SECOND_ID = '64b7f0a1c2d3e4f5a6b7c8e2';
+		const THIRD_ID = '64b7f0a1c2d3e4f5a6b7c8e3';
+
+		const buildRow = (_id, overrides = {}) => ({ _id, username: `user-${_id}`, followersCount: 0, ...overrides });
+
+		const givenProfileWithList = (listedUserIds, rows) => {
+			const select = jest.fn().mockResolvedValue({ _id: PROFILE_ID, [listField]: listedUserIds });
+
+			UserModel.findById = jest.fn().mockReturnValue({ select });
+			UserModel.aggregate = jest.fn().mockResolvedValue(rows);
+
+			return select;
+		};
+
+		it('reads only the requested list field of the profile', async () => {
+			const select = givenProfileWithList([], []);
+
+			await getList({ userId: PROFILE_ID });
+
+			expect(UserModel.findById).toHaveBeenCalledWith(PROFILE_ID);
+			expect(select).toHaveBeenCalledWith({ [listField]: 1 });
+		});
+
+		it('matches the listed users and projects slim rows with a $size follower count', async () => {
+			givenProfileWithList([FIRST_ID, SECOND_ID], []);
+
+			await getList({ userId: PROFILE_ID });
+
+			const [pipeline] = UserModel.aggregate.mock.calls[0];
+			const project = pipeline.find((stage) => stage.$project).$project;
+
+			expect(pipeline.find((stage) => stage.$match).$match).toEqual({ _id: { $in: [FIRST_ID, SECOND_ID] } });
+			expect(Object.keys(project).sort()).toEqual(['_id', 'followersCount', 'profilePicture.imageUrl', 'username']);
+			expect(project.followersCount).toEqual({ $size: { $ifNull: ['$followers', []] } });
+		});
+
+		it('returns the rows as given by the projection, without email', async () => {
+			const rows = [buildRow(FIRST_ID, { followersCount: 3, profilePicture: { imageUrl: 'https://example.com/one.jpg' } })];
+
+			givenProfileWithList([FIRST_ID], rows);
+
+			const result = await getList({ userId: PROFILE_ID });
+
+			expect(result).toEqual(rows);
+			expect(result[0]).not.toHaveProperty('email');
+		});
+
+		it('keeps the stored list order even when the database returns the rows in another order', async () => {
+			givenProfileWithList([THIRD_ID, FIRST_ID, SECOND_ID], [buildRow(FIRST_ID), buildRow(SECOND_ID), buildRow(THIRD_ID)]);
+
+			const result = await getList({ userId: PROFILE_ID });
+
+			expect(result.map((row) => row._id)).toEqual([THIRD_ID, FIRST_ID, SECOND_ID]);
+		});
+
+		it('moves the requester to the top when they are in the list', async () => {
+			givenProfileWithList([FIRST_ID, SECOND_ID, THIRD_ID], [buildRow(FIRST_ID), buildRow(SECOND_ID), buildRow(THIRD_ID)]);
+
+			const result = await getList({ userId: PROFILE_ID, requesterId: SECOND_ID });
+
+			expect(result.map((row) => row._id)).toEqual([SECOND_ID, FIRST_ID, THIRD_ID]);
+		});
+
+		it('keeps the stored order when the requester is not in the list', async () => {
+			givenProfileWithList([FIRST_ID, SECOND_ID], [buildRow(FIRST_ID), buildRow(SECOND_ID)]);
+
+			const result = await getList({ userId: PROFILE_ID, requesterId: THIRD_ID });
+
+			expect(result.map((row) => row._id)).toEqual([FIRST_ID, SECOND_ID]);
+		});
+
+		it('treats an object requester id that stringifies to a listed id as that user', async () => {
+			givenProfileWithList([FIRST_ID, SECOND_ID], [buildRow(FIRST_ID), buildRow(SECOND_ID)]);
+
+			const result = await getList({ userId: PROFILE_ID, requesterId: { toString: () => SECOND_ID } });
+
+			expect(result[0]._id).toBe(SECOND_ID);
+		});
+
+		it('returns an empty list for a profile with nobody in the list', async () => {
+			givenProfileWithList([], []);
+
+			await expect(getList({ userId: PROFILE_ID })).resolves.toEqual([]);
+		});
+
+		it('skips listed users that no longer exist', async () => {
+			givenProfileWithList([FIRST_ID, SECOND_ID], [buildRow(SECOND_ID)]);
+
+			const result = await getList({ userId: PROFILE_ID });
+
+			expect(result.map((row) => row._id)).toEqual([SECOND_ID]);
+		});
+
+		it('rejects a malformed id with a 404 USER_NOT_FOUND without querying', async () => {
+			UserModel.findById = jest.fn();
+			UserModel.aggregate = jest.fn();
+
+			await expect(getList({ userId: 'not-an-object-id' })).rejects.toMatchObject({ statusCode: 404, code: ERROR_CODES.USER_NOT_FOUND });
+
+			expect(UserModel.findById).not.toHaveBeenCalled();
+			expect(UserModel.aggregate).not.toHaveBeenCalled();
+		});
+
+		it('rejects an unknown id with a 404 USER_NOT_FOUND, not a 500', async () => {
+			UserModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+			UserModel.aggregate = jest.fn();
+
+			await expect(getList({ userId: PROFILE_ID })).rejects.toMatchObject({ statusCode: 404, code: ERROR_CODES.USER_NOT_FOUND });
+
+			expect(UserModel.aggregate).not.toHaveBeenCalled();
+		});
+
+		it('wraps a failing profile lookup in a 500 AppError', async () => {
+			const dbError = new Error('connection lost');
+
+			UserModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockRejectedValue(dbError) });
+
+			await expect(getList({ userId: PROFILE_ID })).rejects.toMatchObject({ statusCode: 500, cause: dbError });
+		});
+
+		it('wraps a failing rows query in a 500 AppError', async () => {
+			const dbError = new Error('connection lost');
+
+			givenProfileWithList([FIRST_ID], []);
+			UserModel.aggregate = jest.fn().mockRejectedValue(dbError);
+
+			await expect(getList({ userId: PROFILE_ID })).rejects.toMatchObject({ statusCode: 500, cause: dbError });
 		});
 	});
 });

@@ -26,6 +26,34 @@ describe('Popup', () => {
 		expect(onClosePopupClick).toHaveBeenCalledTimes(1);
 	});
 
+	it('calls onClosePopupClick when Escape is pressed', () => {
+		const onClosePopupClick = jest.fn();
+		render(<Popup onClosePopupClick={onClosePopupClick} />);
+
+		userEvent.keyboard('{Escape}');
+
+		expect(onClosePopupClick).toHaveBeenCalledTimes(1);
+	});
+
+	it('ignores other keys', () => {
+		const onClosePopupClick = jest.fn();
+		render(<Popup onClosePopupClick={onClosePopupClick} />);
+
+		userEvent.keyboard('{Enter}');
+
+		expect(onClosePopupClick).not.toHaveBeenCalled();
+	});
+
+	it('stops listening for Escape once closed', () => {
+		const onClosePopupClick = jest.fn();
+		const { unmount } = render(<Popup onClosePopupClick={onClosePopupClick} />);
+
+		unmount();
+		userEvent.keyboard('{Escape}');
+
+		expect(onClosePopupClick).not.toHaveBeenCalled();
+	});
+
 	it('renders its children', () => {
 		render(
 			<Popup onClosePopupClick={jest.fn()}>

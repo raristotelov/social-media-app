@@ -59,6 +59,19 @@
 	gap: 4px;
 }
 
+.profile-stat-button {
+	padding: 0;
+	border: none;
+	background: none;
+
+	font: inherit;
+	color: inherit;
+}
+
+.profile-stat-button:hover {
+	cursor: pointer;
+}
+
 .profile-header .bio {
 	grid-area: bio;
 	margin: 0;

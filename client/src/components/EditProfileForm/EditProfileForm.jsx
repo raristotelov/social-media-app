@@ -143,7 +143,7 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 			) : null}
 
 			<div className='profile-form-button-row'>
-				<Button type='submit' label='Submit' disabled={isSubmitting} />
+				<Button type='submit' label='Save' disabled={isSubmitting} />
 
 				<Button type='button' label='Cancel' variant='secondary' onClick={onCancelClick} />
 			</div>
