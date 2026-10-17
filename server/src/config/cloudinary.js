@@ -9,7 +9,10 @@ cloudinary.config({
 
 const isConfigured = () => Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
 
+const getUploadFolder = () => process.env.CLOUDINARY_FOLDER;
+
 module.exports = {
 	cloudinary,
 	isConfigured,
+	getUploadFolder,
 };

@@ -62,6 +62,44 @@ const getImageStorageService = () => {
 	return imageStorageService;
 };
 
+let cloudinaryConfig;
+
+const getCloudinaryConfig = () => {
+	if (!cloudinaryConfig) {
+		loadServerEnv();
+
+		cloudinaryConfig = require(path.join(SERVER_ROOT, 'src/config/cloudinary'));
+	}
+
+	return cloudinaryConfig;
+};
+
+const getCloudinaryFolder = () => {
+	const folder = getCloudinaryConfig().getUploadFolder();
+
+	if (!folder) {
+		throw new Error('CLOUDINARY_FOLDER is not set. Cypress needs it — export it before running Cypress, or set it in server/.env.');
+	}
+
+	return folder;
+};
+
+const isNotFoundError = (error) => error?.http_code === 404 || error?.error?.http_code === 404;
+
+const cloudinaryAssetExists = async (publicId) => {
+	try {
+		await getCloudinaryConfig().cloudinary.api.resource(publicId);
+
+		return true;
+	} catch (error) {
+		if (isNotFoundError(error)) {
+			return false;
+		}
+
+		throw error;
+	}
+};
+
 // Destroys exactly the given Cloudinary images, never a folder or prefix, because local
 // development images live in the same folder. An image that is already gone counts as done.
 const destroyImagesById = async (imageIdentifiers) => {
@@ -160,4 +198,6 @@ const deleteTestUser = (email) => {
 module.exports = {
 	cleanTestUsers,
 	deleteTestUser,
+	getCloudinaryFolder,
+	cloudinaryAssetExists,
 };

@@ -1,15 +1,17 @@
 jest.mock('../config/cloudinary', () => ({
 	cloudinary: { uploader: { upload_stream: jest.fn(), destroy: jest.fn() } },
 	isConfigured: jest.fn(),
+	getUploadFolder: jest.fn(),
 }));
 
-const { cloudinary, isConfigured } = require('../config/cloudinary');
+const { cloudinary, isConfigured, getUploadFolder } = require('../config/cloudinary');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
 const { uploadImage, deleteImage, discardUploadedImage } = require('./imageStorageService');
 
 const FIELD_NAME = 'image';
+const UPLOAD_FOLDER = 'social-media-app/staging';
 const JPEG_BUFFER = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
 const PNG_BUFFER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 const WEBP_BUFFER = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
@@ -38,6 +40,7 @@ describe('imageStorageService', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
 		isConfigured.mockReturnValue(true);
+		getUploadFolder.mockReturnValue(UPLOAD_FOLDER);
 		consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 	});
 
@@ -68,7 +71,27 @@ describe('imageStorageService', () => {
 			await uploadImage({ file: buildFile(), fieldName: FIELD_NAME });
 
 			expect(cloudinary.uploader.upload_stream).toHaveBeenCalledWith(
-				{ resource_type: 'image', allowed_formats: ['jpg', 'png', 'webp'] },
+				expect.objectContaining({ resource_type: 'image', allowed_formats: ['jpg', 'png', 'webp'] }),
+				expect.any(Function),
+			);
+		});
+
+		it('uploads into the configured folder', async () => {
+			givenCloudinaryUploadResolves();
+
+			await uploadImage({ file: buildFile(), fieldName: FIELD_NAME });
+
+			expect(cloudinary.uploader.upload_stream).toHaveBeenCalledWith(expect.objectContaining({ folder: UPLOAD_FOLDER }), expect.any(Function));
+		});
+
+		it('uses whichever folder is currently configured', async () => {
+			getUploadFolder.mockReturnValue('social-media-app/production');
+			givenCloudinaryUploadResolves();
+
+			await uploadImage({ file: buildFile(), fieldName: FIELD_NAME });
+
+			expect(cloudinary.uploader.upload_stream).toHaveBeenCalledWith(
+				expect.objectContaining({ folder: 'social-media-app/production' }),
 				expect.any(Function),
 			);
 		});
@@ -172,6 +195,14 @@ describe('imageStorageService', () => {
 				expect(cloudinary.uploader.upload_stream).not.toHaveBeenCalled();
 			});
 
+			it.each([[undefined], [null], ['']])('rejects with a 500 when the upload folder is %p, without uploading', async (folder) => {
+				getUploadFolder.mockReturnValue(folder);
+
+				await expect(uploadImage({ file: buildFile(), fieldName: FIELD_NAME })).rejects.toMatchObject({ statusCode: 500 });
+
+				expect(cloudinary.uploader.upload_stream).not.toHaveBeenCalled();
+			});
+
 			it('wraps a Cloudinary upload error in a 502 and keeps it as the cause', async () => {
 				const cloudinaryError = new Error('Invalid API key');
 
@@ -231,6 +262,15 @@ describe('imageStorageService', () => {
 			cloudinary.uploader.destroy.mockRejectedValue(cloudinaryError);
 
 			await expect(deleteImage('abc123')).rejects.toMatchObject({ statusCode: 502, cause: cloudinaryError });
+		});
+
+		it('still deletes when the upload folder is not set, since deletes use the public id', async () => {
+			getUploadFolder.mockReturnValue(undefined);
+			cloudinary.uploader.destroy.mockResolvedValue({ result: 'ok' });
+
+			await expect(deleteImage('abc123')).resolves.toEqual({ result: 'ok' });
+
+			expect(cloudinary.uploader.destroy).toHaveBeenCalledWith('abc123', { invalidate: true });
 		});
 
 		it('rejects with a 500 when Cloudinary is not configured', async () => {

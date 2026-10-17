@@ -1,6 +1,6 @@
 const { defineConfig } = require('cypress');
 
-const { cleanTestUsers, deleteTestUser } = require('./cypress/support/testUsersDb');
+const { cleanTestUsers, deleteTestUser, getCloudinaryFolder, cloudinaryAssetExists } = require('./cypress/support/testUsersDb');
 
 module.exports = defineConfig({
 	e2e: {
@@ -14,6 +14,10 @@ module.exports = defineConfig({
 				deleteTestUser,
 				// Sweeps every cypress+…@test.local account, for specs that died mid-run.
 				cleanTestUsers,
+				// Returns the server's CLOUDINARY_FOLDER so specs never hardcode it.
+				getCloudinaryFolder,
+				// Resolves true if the public id exists in Cloudinary, false if it is gone.
+				cloudinaryAssetExists,
 			});
 		},
 	},
