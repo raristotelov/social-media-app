@@ -1,4 +1,4 @@
-const { cloudinary, isConfigured } = require('../config/cloudinary');
+const { cloudinary, isConfigured, getUploadFolder } = require('../config/cloudinary');
 const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
@@ -6,10 +6,10 @@ const { detectImageType } = require('../utils/imageType');
 
 const ALLOWED_IMAGE_FORMATS = ['jpg', 'png', 'webp'];
 
-const uploadBuffer = (buffer) =>
+const uploadBuffer = (buffer, folder) =>
 	new Promise((resolve, reject) => {
 		const uploadStream = cloudinary.uploader.upload_stream(
-			{ resource_type: 'image', allowed_formats: ALLOWED_IMAGE_FORMATS },
+			{ resource_type: 'image', allowed_formats: ALLOWED_IMAGE_FORMATS, folder },
 			(error, result) => {
 				if (error || !result) {
 					reject(error || new Error('Cloudinary returned no upload result'));
@@ -41,12 +41,14 @@ const validateImageFile = (file, fieldName) => {
 const uploadImage = async ({ file, fieldName }) => {
 	validateImageFile(file, fieldName);
 
-	if (!isConfigured()) {
+	const folder = getUploadFolder();
+
+	if (!isConfigured() || !folder) {
 		throw new AppError('Cloudinary is not configured; cannot upload image', 500);
 	}
 
 	try {
-		const result = await uploadBuffer(file.buffer);
+		const result = await uploadBuffer(file.buffer, folder);
 
 		return {
 			imageIdentifier: result.public_id,
