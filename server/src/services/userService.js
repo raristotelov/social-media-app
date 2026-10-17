@@ -3,14 +3,14 @@ const bcrypt = require('bcrypt');
 const mongoose = require('mongoose');
 
 const UserModel = require('../models/userModel');
-const UserPostModel = require('../models/userPostModel');
 const constants = require('../config/constants');
-const { ERROR_CODES, VALIDATION_ERROR_CODES, DUPLICATE_KEY_ERROR_CODES } = require('../config/errorCodes');
+const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
+const { asFieldError } = require('../utils/fieldErrors');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 
-const necessaryUserFields = ['_id', 'email', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following', 'followedUsersPosts'];
+const necessaryUserFields = ['_id', 'email', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following'];
 
 const USER_ROW_PROJECTION = {
 	_id: 1,
@@ -39,37 +39,6 @@ const getNeccessaryUserData = (user) => {
 		user: userObject,
 		jwt: signAuthToken(user),
 	};
-};
-
-const asFieldError = (error) => {
-	if (error.name === 'ValidationError') {
-		const fields = {};
-
-		for (const [path, pathError] of Object.entries(error.errors)) {
-			const code = VALIDATION_ERROR_CODES[path]?.[pathError.kind];
-
-			if (!code) {
-				return null;
-			}
-
-			fields[path] = code;
-		}
-
-		return AppError.fromFields(fields, 400, { cause: error });
-	}
-
-	if (error.code === 11000) {
-		const duplicatedField = Object.keys(error.keyPattern || {})[0];
-		const code = DUPLICATE_KEY_ERROR_CODES[duplicatedField];
-
-		if (!code) {
-			return null;
-		}
-
-		return AppError.fromFields({ [duplicatedField]: code }, 409, { cause: error });
-	}
-
-	return null;
 };
 
 const createUserNotFoundError = () => new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
@@ -155,63 +124,9 @@ const login = async ({ email, password }) => {
 	}
 };
 
-const getFollowedUsersPostsByUserIds = async ({ userIds }) => {
-	try {
-		// Fetch all user with the users they follow
-		const users = await UserModel.find({ _id: { $in: userIds } }).select({ _id: 1, following: 1 });
+const compareNewestFirst = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
 
-		const usersToFollowedUsersMap = {};
-
-		// Create a mapping of user ids to their followed users
-		users.forEach((user) => {
-			usersToFollowedUsersMap[String(user._id)] = user.following;
-		});
-
-		// Get all followed users
-		const allFollowedUsers = users.map((user) => user.following).flat();
-
-		// Get all user posts of the followed users
-		const followedUsersPostDocs = await UserPostModel.find({ userId: { $in: allFollowedUsers } }).populate({
-			path: 'userId',
-			select: 'username profilePicture',
-		});
-
-		// Attach a comment count to each post for the feed cards
-		const postIds = followedUsersPostDocs.map((post) => post._id);
-		const commentCounts = await commentService.getCommentCountsForPosts(postIds);
-		const followedUsersPosts = followedUsersPostDocs.map((post) => ({
-			...post.toObject(),
-			commentsCount: commentCounts[post._id.toString()] || 0,
-		}));
-
-		const userToUserPostsMap = {};
-
-		// Create a mapping for user ids to all of their posts
-		followedUsersPosts.forEach((post) => {
-			const authorId = String(post.userId._id);
-
-			userToUserPostsMap[authorId] = [...(userToUserPostsMap[authorId] || []), post];
-		});
-
-		const usersWithFollowedUsersPosts = {};
-
-		for (let i = 0; i < userIds.length; i += 1) {
-			const followedUserIds = usersToFollowedUsersMap[String(userIds[i])] || [];
-
-			usersWithFollowedUsersPosts[userIds[i]] = followedUserIds.flatMap((userId) => userToUserPostsMap[String(userId)] || []);
-		}
-
-		return usersWithFollowedUsersPosts;
-	} catch (error) {
-		if (error instanceof AppError) {
-			throw error;
-		}
-
-		throw new AppError('Could not load followed users posts', 500, { cause: error });
-	}
-};
-
-const toProfileData = ({ user, requesterId, commentCounts, followedUsersPosts }) => {
+const toProfileData = ({ user, requesterId, commentCounts, previewComments }) => {
 	const profileData = user.toObject();
 
 	if (String(user._id) !== String(requesterId)) {
@@ -220,8 +135,13 @@ const toProfileData = ({ user, requesterId, commentCounts, followedUsersPosts })
 
 	return {
 		...profileData,
-		posts: profileData.posts.map((post) => ({ ...post, commentsCount: commentCounts[post._id.toString()] || 0 })),
-		followedUsersPosts,
+		posts: profileData.posts
+			.map((post) => ({
+				...post,
+				commentsCount: commentCounts[post._id.toString()] || 0,
+				previewComments: previewComments[post._id.toString()] || [],
+			}))
+			.sort(compareNewestFirst),
 	};
 };
 
@@ -241,19 +161,14 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds, request
 			throw new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
 		}
 
-		const usersWithFollowedUsersPostsResult = await getFollowedUsersPostsByUserIds({ userIds });
-
 		const profilePostIds = usersResult.flatMap((user) => user.posts.map((post) => post._id));
-		const commentCounts = await commentService.getCommentCountsForPosts(profilePostIds);
 
-		const mappedUsers = usersResult.map((user) =>
-			toProfileData({
-				user,
-				requesterId,
-				commentCounts,
-				followedUsersPosts: usersWithFollowedUsersPostsResult[user._id],
-			}),
-		);
+		const [commentCounts, previewComments] = await Promise.all([
+			commentService.getCommentCountsForPosts(profilePostIds),
+			commentService.getPreviewCommentsForPosts(profilePostIds),
+		]);
+
+		const mappedUsers = usersResult.map((user) => toProfileData({ user, requesterId, commentCounts, previewComments }));
 
 		return mappedUsers;
 	} catch (error) {

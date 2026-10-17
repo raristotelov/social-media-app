@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 
 import UserProfilePost from './UserProfilePost';
 
@@ -159,5 +160,46 @@ describe('UserProfilePost', () => {
 		fireEvent.keyDown(document, { key: 'Enter' });
 
 		expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+	});
+
+	describe('linking to the posts view', () => {
+		const renderLinkedPost = (props = {}) =>
+			render(
+				<MemoryRouter>
+					<UserProfilePost post={post} to='/user/user2/posts#post1' onEditClick={jest.fn()} onDeleteClick={jest.fn()} {...props} />
+				</MemoryRouter>,
+			);
+
+		it('links the tile to the posts view at that post', () => {
+			renderLinkedPost();
+
+			expect(screen.getByRole('link')).toHaveAttribute('href', '/user/user2/posts#post1');
+		});
+
+		it('keeps the image inside the link', () => {
+			renderLinkedPost();
+
+			expect(screen.getByRole('link')).toContainElement(screen.getByAltText('user-post'));
+		});
+
+		it('renders no link when it was given no destination', () => {
+			renderPost();
+
+			expect(screen.queryByRole('link')).not.toBeInTheDocument();
+		});
+
+		it('keeps the actions button outside the link, so it does not navigate', () => {
+			renderLinkedPost({ showActions: true });
+
+			expect(screen.getByRole('link')).not.toContainElement(screen.getByRole('button', { name: 'Post actions' }));
+		});
+
+		it('opens the menu from the actions button on a linked tile', () => {
+			renderLinkedPost({ showActions: true });
+
+			userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
+
+			expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+		});
 	});
 });

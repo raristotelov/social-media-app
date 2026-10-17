@@ -10,6 +10,8 @@ import { resizeImage } from '../../utils/images';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
+import ProfileLayout from '../ProfileLayout/ProfileLayout';
+
 import ProfileView from './ProfileView';
 
 jest.mock('../../services/userService');
@@ -47,7 +49,9 @@ const renderProfileView = (loggedInUser) => {
 			<ToastProvider>
 				<MemoryRouter initialEntries={['/user/user2']}>
 					<Routes>
-						<Route path='/user/:userId' element={<ProfileView />} />
+						<Route path='/user/:userId' element={<ProfileLayout />}>
+							<Route index element={<ProfileView />} />
+						</Route>
 					</Routes>
 				</MemoryRouter>
 			</ToastProvider>
@@ -100,7 +104,9 @@ describe('ProfileView post actions and profile picture removal', () => {
 				<ToastProvider>
 					<MemoryRouter initialEntries={['/user/user2']}>
 						<Routes>
-							<Route path='/user/:userId' element={<ProfileView />} />
+							<Route path='/user/:userId' element={<ProfileLayout />}>
+								<Route index element={<ProfileView />} />
+							</Route>
 						</Routes>
 					</MemoryRouter>
 				</ToastProvider>
@@ -845,7 +851,9 @@ describe('ProfileView errors', () => {
 				<ToastProvider>
 					<MemoryRouter initialEntries={['/user/user2']}>
 						<Routes>
-							<Route path='/user/:userId' element={<ProfileView />} />
+							<Route path='/user/:userId' element={<ProfileLayout />}>
+								<Route index element={<ProfileView />} />
+							</Route>
 						</Routes>
 					</MemoryRouter>
 				</ToastProvider>
@@ -1073,7 +1081,9 @@ describe('ProfileView optimistic follow and unfollow', () => {
 				<ToastProvider>
 					<MemoryRouter initialEntries={['/user/user2']}>
 						<Routes>
-							<Route path='/user/:userId' element={<ProfileView />} />
+							<Route path='/user/:userId' element={<ProfileLayout />}>
+								<Route index element={<ProfileView />} />
+							</Route>
 						</Routes>
 					</MemoryRouter>
 				</ToastProvider>
@@ -1305,7 +1315,9 @@ describe('ProfileView followers and following popup', () => {
 				<ToastProvider>
 					<MemoryRouter initialEntries={['/user/user2']}>
 						<Routes>
-							<Route path='/user/:userId' element={<ProfileView />} />
+							<Route path='/user/:userId' element={<ProfileLayout />}>
+								<Route index element={<ProfileView />} />
+							</Route>
 						</Routes>
 					</MemoryRouter>
 				</ToastProvider>

@@ -9,7 +9,9 @@ const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
-const { addUserPost, updateUserPostCaption, deleteUserPost } = require('./userPostService');
+const { addUserPost, getFollowedUsersPosts, likeUserPost, unlikeUserPost, updateUserPostCaption, deleteUserPost } = require('./userPostService');
+
+const ActualUserPostModel = jest.requireActual('../models/userPostModel');
 
 const OWNER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const OTHER_USER_ID = '64b7f0a1c2d3e4f5a6b7c8d2';
@@ -285,6 +287,274 @@ describe('userPostService', () => {
 				await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toBeInstanceOf(AppError);
 
 				expect(callOrder).toEqual(['record', 'image']);
+			});
+		});
+	});
+
+	describe('addUserPost caption length', () => {
+		const imageFile = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), originalname: 'photo.jpg' };
+
+		beforeEach(() => {
+			UserPostModel.validate.mockImplementation((...args) => ActualUserPostModel.validate(...args));
+			imageStorageService.uploadImage.mockResolvedValue({ imageIdentifier: 'new-cloudinary-id', imageUrl: 'https://example.com/new.jpg' });
+			UserPostModel.mockImplementation(function UserPostModelMock(data) {
+				Object.assign(this, data);
+				this._id = 'newPost1';
+				this.save = jest.fn().mockResolvedValue(undefined);
+			});
+			UserModel.findByIdAndUpdate.mockResolvedValue({});
+		});
+
+		it('rejects a 1001-character caption with a 400 CAPTION_TOO_LONG on the caption field', async () => {
+			await expect(addUserPost({ caption: 'a'.repeat(1001), imageFile }, OWNER_ID)).rejects.toMatchObject({
+				statusCode: 400,
+				code: ERROR_CODES.CAPTION_TOO_LONG,
+				fields: { caption: ERROR_CODES.CAPTION_TOO_LONG },
+			});
+		});
+
+		it('does not upload the image when the caption is too long', async () => {
+			await expect(addUserPost({ caption: 'a'.repeat(1001), imageFile }, OWNER_ID)).rejects.toBeInstanceOf(AppError);
+
+			expect(imageStorageService.uploadImage).not.toHaveBeenCalled();
+		});
+
+		it('saves nothing and touches nothing in the database when the caption is too long', async () => {
+			await expect(addUserPost({ caption: 'a'.repeat(1001), imageFile }, OWNER_ID)).rejects.toBeInstanceOf(AppError);
+
+			expect(UserPostModel).not.toHaveBeenCalled();
+			expect(UserModel.findByIdAndUpdate).not.toHaveBeenCalled();
+			expect(imageStorageService.discardUploadedImage).not.toHaveBeenCalled();
+		});
+
+		it('rejects a caption far over the limit the same way', async () => {
+			await expect(addUserPost({ caption: 'a'.repeat(5000), imageFile }, OWNER_ID)).rejects.toMatchObject({
+				statusCode: 400,
+				code: ERROR_CODES.CAPTION_TOO_LONG,
+			});
+		});
+
+		it('accepts a caption of exactly 1000 characters and uploads the image', async () => {
+			await expect(addUserPost({ caption: 'a'.repeat(1000), imageFile }, OWNER_ID)).resolves.toMatchObject({ _id: 'newPost1' });
+
+			expect(imageStorageService.uploadImage).toHaveBeenCalledTimes(1);
+		});
+
+		it('accepts a post without a caption', async () => {
+			await expect(addUserPost({ imageFile }, OWNER_ID)).resolves.toMatchObject({ _id: 'newPost1' });
+
+			expect(imageStorageService.uploadImage).toHaveBeenCalledTimes(1);
+		});
+
+		it('accepts an empty caption', async () => {
+			await expect(addUserPost({ caption: '', imageFile }, OWNER_ID)).resolves.toMatchObject({ _id: 'newPost1' });
+		});
+
+		it('answers with a 500, without uploading, when the check itself fails unexpectedly', async () => {
+			const checkError = new Error('connection lost');
+
+			UserPostModel.validate.mockRejectedValue(checkError);
+
+			await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not save the user post',
+				cause: checkError,
+			});
+
+			expect(imageStorageService.uploadImage).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('getFollowedUsersPosts', () => {
+		const FOLLOWED_IDS = ['64b7f0a1c2d3e4f5a6b7c8a1', '64b7f0a1c2d3e4f5a6b7c8a2'];
+
+		const buildPostDoc = (id, authorUsername = 'alice') => {
+			const data = { _id: id, imageUrl: `https://example.com/${id}.jpg`, likes: [], userId: { _id: 'author1', username: authorUsername } };
+
+			return { _id: id, toObject: () => ({ ...data }) };
+		};
+
+		const givenFeed = ({ following = FOLLOWED_IDS, posts = [], commentCounts = {}, previewComments = {} } = {}) => {
+			const populate = jest.fn().mockResolvedValue(posts);
+			const sort = jest.fn().mockReturnValue({ populate });
+			const select = jest.fn().mockResolvedValue({ following });
+
+			UserModel.findById = jest.fn().mockReturnValue({ select });
+			UserPostModel.find = jest.fn().mockReturnValue({ sort });
+			commentService.getCommentCountsForPosts.mockResolvedValue(commentCounts);
+			commentService.getPreviewCommentsForPosts.mockResolvedValue(previewComments);
+
+			return { sort, populate, select };
+		};
+
+		it('reads only the followed user ids of the requesting user', async () => {
+			const { select } = givenFeed();
+
+			await getFollowedUsersPosts(OWNER_ID);
+
+			expect(UserModel.findById).toHaveBeenCalledWith(OWNER_ID);
+			expect(select).toHaveBeenCalledWith({ following: 1 });
+		});
+
+		it('loads the posts of the followed users only', async () => {
+			givenFeed();
+
+			await getFollowedUsersPosts(OWNER_ID);
+
+			expect(UserPostModel.find).toHaveBeenCalledWith({ userId: { $in: FOLLOWED_IDS } });
+		});
+
+		it('sorts the posts newest first, ordering equal timestamps by id', async () => {
+			const { sort } = givenFeed();
+
+			await getFollowedUsersPosts(OWNER_ID);
+
+			expect(sort).toHaveBeenCalledWith({ createdAt: -1, _id: -1 });
+		});
+
+		it('populates the author with only the username and profile picture', async () => {
+			const { populate } = givenFeed();
+
+			await getFollowedUsersPosts(OWNER_ID);
+
+			expect(populate).toHaveBeenCalledWith({ path: 'userId', select: 'username profilePicture' });
+		});
+
+		it('returns the posts in the order the query gave them, with the author populated', async () => {
+			givenFeed({ posts: [buildPostDoc('p3', 'carol'), buildPostDoc('p2', 'bob'), buildPostDoc('p1', 'alice')] });
+
+			const feed = await getFollowedUsersPosts(OWNER_ID);
+
+			expect(feed.map((post) => post._id)).toEqual(['p3', 'p2', 'p1']);
+			expect(feed.map((post) => post.userId.username)).toEqual(['carol', 'bob', 'alice']);
+		});
+
+		it('adds the comment count of each post, defaulting to 0', async () => {
+			givenFeed({ posts: [buildPostDoc('p2'), buildPostDoc('p1')], commentCounts: { p2: 4 } });
+
+			const feed = await getFollowedUsersPosts(OWNER_ID);
+
+			expect(feed.map((post) => post.commentsCount)).toEqual([4, 0]);
+		});
+
+		it('adds the preview comments of each post, defaulting to an empty list', async () => {
+			const preview = [{ _id: 'c1' }, { _id: 'c2' }];
+
+			givenFeed({ posts: [buildPostDoc('p2'), buildPostDoc('p1')], previewComments: { p2: preview } });
+
+			const feed = await getFollowedUsersPosts(OWNER_ID);
+
+			expect(feed.map((post) => post.previewComments)).toEqual([preview, []]);
+		});
+
+		it('asks for the counts and previews of all the posts in one call each', async () => {
+			givenFeed({ posts: [buildPostDoc('p2'), buildPostDoc('p1')] });
+
+			await getFollowedUsersPosts(OWNER_ID);
+
+			expect(commentService.getCommentCountsForPosts).toHaveBeenCalledTimes(1);
+			expect(commentService.getCommentCountsForPosts).toHaveBeenCalledWith(['p2', 'p1']);
+			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
+			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['p2', 'p1']);
+		});
+
+		it('returns an empty list when the user follows nobody', async () => {
+			givenFeed({ following: [] });
+
+			await expect(getFollowedUsersPosts(OWNER_ID)).resolves.toEqual([]);
+		});
+
+		it('returns an empty list when the followed users have no posts', async () => {
+			givenFeed({ posts: [] });
+
+			await expect(getFollowedUsersPosts(OWNER_ID)).resolves.toEqual([]);
+		});
+
+		it('wraps an unexpected database failure in a 500 AppError that keeps the cause', async () => {
+			const dbError = new Error('connection lost');
+
+			givenFeed();
+			UserPostModel.find = jest.fn().mockImplementation(() => {
+				throw dbError;
+			});
+
+			await expect(getFollowedUsersPosts(OWNER_ID)).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not load followed users posts',
+				cause: dbError,
+			});
+		});
+
+		it('rethrows an AppError from the comment service unchanged', async () => {
+			const commentError = new AppError('Could not load comment counts', 500);
+
+			givenFeed({ posts: [buildPostDoc('p1')] });
+			commentService.getCommentCountsForPosts.mockRejectedValue(commentError);
+
+			await expect(getFollowedUsersPosts(OWNER_ID)).rejects.toBe(commentError);
+		});
+	});
+
+	describe.each([
+		['likeUserPost', likeUserPost, 'userWhoLikedId', { $addToSet: { likes: OTHER_USER_ID } }, 'Could not like the post'],
+		['unlikeUserPost', unlikeUserPost, 'userWhoUnlikedId', { $pull: { likes: OTHER_USER_ID } }, 'Could not unlike the post'],
+	])('%s', (_name, action, userKey, expectedUpdate, failureMessage) => {
+		const run = (userPostId = POST_ID) => action({ userPostId, [userKey]: OTHER_USER_ID });
+
+		it('updates the likes of the post with the right operator and resolves with the updated post', async () => {
+			const updatedPost = { _id: POST_ID, likes: [OTHER_USER_ID] };
+
+			UserPostModel.findOneAndUpdate = jest.fn().mockResolvedValue(updatedPost);
+
+			const result = await run();
+
+			expect(UserPostModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: POST_ID }, expectedUpdate, { new: true });
+			expect(result).toBe(updatedPost);
+		});
+
+		it('rejects a malformed post id with a 404 POST_NOT_FOUND, without querying the database', async () => {
+			UserPostModel.findOneAndUpdate = jest.fn();
+
+			await expect(run('not-an-object-id')).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.POST_NOT_FOUND,
+			});
+
+			expect(UserPostModel.findOneAndUpdate).not.toHaveBeenCalled();
+		});
+
+		it('rejects a post that does not exist with a 404 POST_NOT_FOUND instead of resolving with null', async () => {
+			UserPostModel.findOneAndUpdate = jest.fn().mockResolvedValue(null);
+
+			await expect(run()).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.POST_NOT_FOUND,
+			});
+		});
+
+		it('wraps an unexpected database failure in a 500 AppError that keeps the cause', async () => {
+			const dbError = new Error('connection lost');
+
+			UserPostModel.findOneAndUpdate = jest.fn().mockRejectedValue(dbError);
+
+			await expect(run()).rejects.toMatchObject({
+				statusCode: 500,
+				message: failureMessage,
+				cause: dbError,
+			});
+		});
+	});
+
+	describe('liking a post twice', () => {
+		it('adds the user with $addToSet, which keeps the likes free of duplicates, and never with $push', async () => {
+			UserPostModel.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: POST_ID, likes: [OTHER_USER_ID] });
+
+			await likeUserPost({ userPostId: POST_ID, userWhoLikedId: OTHER_USER_ID });
+			await likeUserPost({ userPostId: POST_ID, userWhoLikedId: OTHER_USER_ID });
+
+			UserPostModel.findOneAndUpdate.mock.calls.forEach(([, update]) => {
+				expect(update).toEqual({ $addToSet: { likes: OTHER_USER_ID } });
+				expect(update).not.toHaveProperty('$push');
 			});
 		});
 	});

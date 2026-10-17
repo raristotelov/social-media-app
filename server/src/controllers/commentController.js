@@ -18,7 +18,7 @@ router.post('/', verifyJwtToken, async (req, res) => {
 	return res.json(comment);
 });
 
-router.get('/post/:userPostId', verifyJwtToken, async (req, res) => {
+router.get('/post/:userPostId', async (req, res) => {
 	const comments = await commentService.getCommentsForPost({ userPostId: req.params.userPostId });
 
 	return res.json(comments);

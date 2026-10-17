@@ -1,0 +1,38 @@
+.profile-posts-view {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 500px;
+	padding: calc(var(--header-height) + 46px) 0 60px;
+
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+
+	font-family: 'Mada';
+}
+
+.profile-posts-list {
+	display: flex;
+	flex-direction: column;
+	gap: 60px;
+}
+
+.profile-posts-list > .user-post {
+	scroll-margin-top: calc(var(--header-height) + 20px);
+}
+
+@media (max-width: 599px) {
+	.profile-posts-view {
+		max-width: none;
+		padding: var(--header-height) 0 var(--tab-bar-height);
+		gap: 0;
+	}
+
+	.profile-posts-list {
+		gap: 8px;
+	}
+
+	.profile-posts-list > .user-post {
+		scroll-margin-top: var(--header-height);
+	}
+}

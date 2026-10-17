@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 
 import { ACTION_FALLBACK_MESSAGES, VALIDATION_MESSAGES } from '../../constants/errorMessages';
-import { UPLOAD_FIELDS } from '../../constants/validation';
+import { MAX_CAPTION_LENGTH, UPLOAD_FIELDS } from '../../constants/validation';
 import { getFormErrors, isUnauthenticatedError } from '../../utils/errors';
 
 import Button from '../Button/Button';
@@ -14,6 +14,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 	const [uploadedImage, setUploadedImage] = useState(null);
 	const [caption, setCaption] = useState('');
 	const [pictureError, setPictureError] = useState('');
+	const [captionError, setCaptionError] = useState('');
 	const [formError, setFormError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const isSubmittingRef = useRef(false);
@@ -26,6 +27,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 
 	const captionChangeHandler = (e) => {
 		setCaption(e.target.value);
+		setCaptionError('');
 		setFormError('');
 	};
 
@@ -43,6 +45,7 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 		}
 
 		setPictureError('');
+		setCaptionError('');
 		setFormError('');
 		isSubmittingRef.current = true;
 		setIsSubmitting(true);
@@ -56,11 +59,12 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 
 			const { fieldErrors, formError: submitFormError } = getFormErrors(
 				error,
-				[UPLOAD_FIELDS.POST_IMAGE],
+				[UPLOAD_FIELDS.POST_IMAGE, UPLOAD_FIELDS.POST_CAPTION],
 				ACTION_FALLBACK_MESSAGES.UPLOAD_PICTURE,
 			);
 
 			setPictureError(fieldErrors[UPLOAD_FIELDS.POST_IMAGE]?.[0] ?? '');
+			setCaptionError(fieldErrors[UPLOAD_FIELDS.POST_CAPTION]?.[0] ?? '');
 			setFormError(submitFormError);
 		} finally {
 			isSubmittingRef.current = false;
@@ -84,7 +88,16 @@ const AddImagePostForm = ({ addImagePostHandler, onCancelClick }) => {
 				{pictureError ? <span className='field-error'>{pictureError}</span> : null}
 			</div>
 
-			<textarea className='caption-input' placeholder='Write a caption...' value={caption} onChange={captionChangeHandler} />
+			<textarea
+				className={captionError ? 'caption-input has-error' : 'caption-input'}
+				placeholder='Write a caption...'
+				value={caption}
+				maxLength={MAX_CAPTION_LENGTH}
+				onChange={captionChangeHandler}
+				aria-invalid={Boolean(captionError)}
+			/>
+
+			{captionError ? <span className='field-error caption-error'>{captionError}</span> : null}
 
 			{formError ? (
 				<p className='form-error add-image-post-error' role='alert'>

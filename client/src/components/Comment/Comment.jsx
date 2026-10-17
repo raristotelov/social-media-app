@@ -1,29 +1,60 @@
-import { useState, useContext } from 'react';
+import { useContext, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 
-import HeartIcon from '../icons/Heart';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import ToastContext from '../../contexts/ToastContext';
+import useLoginRedirect from '../../hooks/useLoginRedirect';
 import { likeComment, unlikeComment, addComment } from '../../services/commentService';
+import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
+import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
+
+import AddCommentForm from '../AddCommentForm/AddCommentForm';
+import ProfilePicture from '../ProfilePicture/ProfilePicture';
+import HeartIcon from '../icons/Heart';
 
 import './Comment.css';
 
-const DEFAULT_AVATAR = 'https://i.pinimg.com/736x/30/df/1c/30df1cb8981338d42ed2722ab74cb51e.jpg';
+const AuthorLink = ({ authorId, className, children }) => {
+	if (!authorId) {
+		return <span className={className}>{children}</span>;
+	}
 
-const Comment = ({ comment, userPostId, onReload, isReply }) => {
+	return (
+		<Link to={`/user/${authorId}`} className={className}>
+			{children}
+		</Link>
+	);
+};
+
+const Comment = ({ comment, userPostId, onReload, isReply = false }) => {
 	const [showReplies, setShowReplies] = useState(false);
 	const [isReplying, setIsReplying] = useState(false);
-	const [replyText, setReplyText] = useState('');
+	const isUpdatingLikeRef = useRef(false);
 
-	const { jwtToken, loggedInUser } = useContext(LoggedInUserContext);
+	const { jwtToken, loggedInUser, endSession } = useContext(LoggedInUserContext);
+	const { showToast } = useContext(ToastContext);
+	const redirectToLogin = useLoginRedirect();
 
 	const author = comment.userId || {};
-	const avatarUrl = author.profilePicture?.imageUrl || DEFAULT_AVATAR;
 	const likes = comment.likes || [];
-	const loggedInUserHasLikedComment = likes.includes(loggedInUser?._id);
+	const hasLikedComment = likes.includes(loggedInUser?._id);
 	const replies = comment.replies || [];
 
 	const toggleLike = async () => {
+		if (!loggedInUser) {
+			redirectToLogin();
+
+			return;
+		}
+
+		if (isUpdatingLikeRef.current) {
+			return;
+		}
+
+		isUpdatingLikeRef.current = true;
+
 		try {
-			if (loggedInUserHasLikedComment) {
+			if (hasLikedComment) {
 				await unlikeComment({ commentId: comment._id, jwtToken });
 			} else {
 				await likeComment({ commentId: comment._id, jwtToken });
@@ -31,84 +62,98 @@ const Comment = ({ comment, userPostId, onReload, isReply }) => {
 
 			await onReload();
 		} catch (error) {
-			console.log('Something went wrong while liking a comment', error);
+			if (isUnauthenticatedError(error)) {
+				endSession();
+			} else {
+				showToast(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.UPDATE_LIKE));
+			}
+		} finally {
+			isUpdatingLikeRef.current = false;
 		}
 	};
 
-	const submitReply = async (e) => {
-		e.preventDefault();
+	const toggleReplyForm = () => {
+		if (!loggedInUser) {
+			redirectToLogin();
 
-		if (!replyText.trim()) {
 			return;
 		}
 
-		try {
-			await addComment({ userPostId, text: replyText, parentCommentId: comment._id, jwtToken });
-
-			setReplyText('');
-			setIsReplying(false);
-			setShowReplies(true);
-
-			await onReload();
-		} catch (error) {
-			console.log('Something went wrong while replying to a comment', error);
-		}
+		setIsReplying((state) => !state);
 	};
 
+	const submitReply = async (text) => {
+		const addedReply = await addComment({ userPostId, text, parentCommentId: comment._id, jwtToken });
+
+		setIsReplying(false);
+		setShowReplies(true);
+
+		await onReload(addedReply);
+	};
+
+	const classNames = isReply ? 'comment comment-reply' : 'comment';
+
 	return (
-		<div className='comment-wrapper'>
-			<div className='commenter-account-details'>
-				<img src={avatarUrl} alt='commenter-avatar' />
-			</div>
+		<div className={classNames}>
+			<div className='comment-row'>
+				<AuthorLink authorId={author._id} className='comment-avatar-link'>
+					<ProfilePicture imageUrl={author.profilePicture?.imageUrl} className='comment-avatar' />
+				</AuthorLink>
 
-			<div className='comment-content'>
-				<span className='commenter-username'>{author.username}</span>
+				<div className='comment-content'>
+					<AuthorLink authorId={author._id} className='comment-username'>
+						{author.username}
+					</AuthorLink>
 
-				<span className='comment-text'>{comment.text}</span>
+					<p className='comment-text'>{comment.text}</p>
 
-				<div className='comment-utils'>
-					<button className='comment-like-btn' onClick={toggleLike}>
-						<HeartIcon
-							fillColorProp={loggedInUserHasLikedComment ? '#F64D4D' : 'none'}
-							iconColorProp={loggedInUserHasLikedComment ? '#F64D4D' : null}
-						/>
-					</button>
-
-					<span className='comment-util-label'>{`${likes.length} ${likes.length === 1 ? 'like' : 'likes'}`}</span>
-
-					{!isReply ? (
-						<button className='comment-util-btn' onClick={() => setIsReplying((state) => !state)}>
-							Reply
+					<div className='comment-utils'>
+						<button
+							type='button'
+							className='comment-like-button'
+							aria-label={hasLikedComment ? 'Unlike comment' : 'Like comment'}
+							aria-pressed={hasLikedComment}
+							onClick={toggleLike}
+						>
+							<HeartIcon
+								fillColorProp={hasLikedComment ? 'var(--brand-red)' : 'none'}
+								iconColorProp={hasLikedComment ? 'var(--brand-red)' : 'var(--text-primary)'}
+							/>
 						</button>
-					) : null}
 
-					{!isReply && replies.length ? (
-						<button className='comment-util-btn' onClick={() => setShowReplies((state) => !state)}>
-							{showReplies ? 'Hide replies' : `View replies (${replies.length})`}
-						</button>
+						<span className='comment-util-label'>{`${likes.length} ${likes.length === 1 ? 'like' : 'likes'}`}</span>
+
+						{!isReply ? (
+							<button type='button' className='comment-util-button' onClick={toggleReplyForm}>
+								Reply
+							</button>
+						) : null}
+
+						{!isReply && replies.length && !showReplies ? (
+							<button type='button' className='comment-util-button' onClick={() => setShowReplies(true)}>
+								View replies
+							</button>
+						) : null}
+					</div>
+
+					{isReplying ? (
+						<AddCommentForm onSubmit={submitReply} placeholder='Write a reply...' fallbackMessage={ACTION_FALLBACK_MESSAGES.ADD_REPLY} />
 					) : null}
 				</div>
-
-				{isReplying ? (
-					<form className='reply-form' onSubmit={submitReply}>
-						<input
-							type='text'
-							className='add-comment-input'
-							placeholder='Write a reply...'
-							value={replyText}
-							onChange={(e) => setReplyText(e.target.value)}
-						/>
-					</form>
-				) : null}
-
-				{!isReply && showReplies ? (
-					<div className='replies-wrapper'>
-						{replies.map((reply) => (
-							<Comment key={reply._id} comment={reply} userPostId={userPostId} onReload={onReload} isReply />
-						))}
-					</div>
-				) : null}
 			</div>
+
+			{!isReply && showReplies ? (
+				<div className='comment-replies'>
+					<button type='button' className='comment-hide-replies' onClick={() => setShowReplies(false)}>
+						<span className='comment-hide-replies-line' aria-hidden='true' />
+						Hide replies
+					</button>
+
+					{replies.map((reply) => (
+						<Comment key={reply._id} comment={reply} userPostId={userPostId} onReload={onReload} isReply />
+					))}
+				</div>
+			) : null}
 		</div>
 	);
 };

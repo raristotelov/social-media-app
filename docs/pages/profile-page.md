@@ -37,7 +37,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 
 - Square tiles, centre-cropped.
 - Desktop: 900 column, 292 tiles, 12 gap. Tablet: 720 column, 232 tiles, 12 gap. Mobile: full-bleed, 3 columns, 2px gaps.
-- Tiles are not clickable yet; opening a post from a profile is covered by #11.
+- Clicking a tile opens the profile posts view — see [feed-page.md](./feed-page.md).
 - Hover shows the tile's like and comment counts, as on the Popular page (`Explore Tile`, `State=Hover`; Post Actions frames). Pointer devices only — no hover on touch. — Built (#28)
 
 ## Followers / following popup — Built (#28)

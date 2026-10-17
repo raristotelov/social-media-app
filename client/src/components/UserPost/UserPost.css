@@ -1,82 +1,138 @@
-.post-wrapper {
-	border: 2px solid var(--border-divider);
-	margin-bottom: 60px;
+.user-post {
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+
 	background-color: var(--background-surface);
-}
-
-.account-details {
-	display: flex;
-	align-items: center;
-	padding: 16px 0 16px 16px;
-}
-
-.account-details img {
-	width: 40px;
-	height: 40px;
-	border: 0.5px solid var(--border-divider);
-	border-radius: 50%;
-}
-
-.account-details span {
-	margin-left: 16px;
+	border: 1px solid var(--border-card);
+	border-radius: 12px;
 
 	font-family: 'Mada';
-	color: var(--text-primary);
-	font-size: 18px;
-	font-weight: bold;
 }
 
-.post-image-wrapper img {
-	width: 500px;
-	height: 550px;
-	/* It is object cover for testing. When done change it to object-fit: contain */
+.user-post-header {
+	padding: 16px;
+
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.user-post-author {
+	min-width: 0;
+
+	display: flex;
+	align-items: center;
+	gap: 16px;
+
+	color: inherit;
+	text-decoration: none;
+}
+
+.user-post-author:hover {
+	opacity: 0.7;
+}
+
+.user-post-avatar {
+	width: 40px;
+	height: 40px;
+	flex-shrink: 0;
+}
+
+.user-post-username {
+	min-width: 0;
+
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+
+	font-size: 15px;
+	font-weight: bold;
+	color: var(--text-primary);
+}
+
+.user-post-actions {
+	position: relative;
+	flex-shrink: 0;
+
+	display: flex;
+}
+
+.user-post-actions-button {
+	width: 32px;
+	height: 32px;
+	padding: 0;
+
+	border: none;
+	background-color: transparent;
+	color: var(--text-primary);
+	line-height: 0;
+}
+
+.user-post-actions-button:hover {
+	cursor: pointer;
+	opacity: 0.5;
+}
+
+.user-post-image {
+	width: 100%;
+	aspect-ratio: 500 / 550;
+}
+
+.user-post-image img {
+	display: block;
+	width: 100%;
+	height: 100%;
 	object-fit: cover;
 }
 
-.post-caption {
+.user-post-footer {
+	padding: 0 16px 16px;
+}
+
+.user-post-stats {
 	padding: 8px 0;
-	margin-left: 16px;
-	margin-right: 16px;
-
-	color: var(--text-primary);
-	font-family: 'Mada';
-	font-size: 16px;
-	word-wrap: break-word;
-	overflow-wrap: break-word;
-}
-
-.post-caption-username {
-	font-weight: bold;
-	margin-right: 6px;
-}
-
-.like-action-wrapper {
-	padding: 8px 0 8px 0px;
 
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
-
-	border-bottom: 1px solid var(--border-divider);
-	margin-left: 16px;
-	margin-right: 16px;
+	gap: 8px 24px;
 }
 
-.like-action-wrapper span {
-	margin-left: 16px;
+.user-post-stat {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 
-	color: var(--text-primary);
-	font-weight: bold;
-	font-family: 'Mada';
-	font-size: 18px;
+	font-size: 15px;
+	color: var(--text-secondary);
 }
 
-.like-btn {
-	border: none;
-	background-color: inherit;
+.user-post-like-button,
+.user-post-comments-button {
 	padding: 0;
+
+	border: none;
+	background-color: transparent;
+
+	font-family: 'Mada';
+	line-height: 0;
 }
 
-@keyframes heartPulse {
+.user-post-comments-button {
+	font-size: 15px;
+	line-height: normal;
+	color: var(--text-secondary);
+}
+
+.user-post-like-button:hover,
+.user-post-comments-button:hover {
+	cursor: pointer;
+	opacity: 0.7;
+}
+
+@keyframes userPostHeartPulse {
 	0% {
 		transform: scale(1);
 	}
@@ -88,104 +144,46 @@
 	}
 }
 
-.heart-pulse {
-	animation: heartPulse 0.3s ease-in-out;
+.user-post-like-button-pulse {
+	animation: userPostHeartPulse 0.3s ease-in-out;
 }
 
-.like-btn svg {
-	width: 30px;
-	height: 30px;
-}
+.user-post-previews {
+	padding: 8px 0;
 
-.like-btn svg:hover {
-	cursor: pointer;
-	opacity: 0.5;
-}
-
-.comments-section {
-	padding: 8px 0 8px 0;
-	margin-left: 16px;
-	margin-right: 16px;
-
-	border-bottom: 1px solid var(--border-divider);
-}
-
-.comments-section-toggle-wrapper {
 	display: flex;
-	justify-content: space-between;
-	align-items: center;
+	flex-direction: column;
+	gap: 3px;
+
+	border-bottom: 1px solid var(--border-inset);
 }
 
-.comments-section-toggle-wrapper:hover {
-	cursor: pointer;
+.user-post-preview {
+	margin: 0;
+
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+
+	font-size: 15px;
+	color: var(--text-secondary);
 }
 
-.toggle-comments-btn {
-	border: none;
-	background-color: inherit;
-	padding: 0;
-}
-
-.toggle-comments-btn:hover {
-	cursor: pointer;
-}
-
-.toggle-comments-btn svg {
-	width: 30px;
-	height: 30px;
-}
-
-.comments-count-section {
-	display: flex;
-	align-items: center;
-}
-
-.comments-count-section svg {
-	width: 30px;
-	height: 30px;
-}
-
-.comments-count-section span {
-	margin-left: 16px;
-
-	color: var(--text-primary);
+.user-post-preview-username {
 	font-weight: bold;
-	font-family: 'Mada';
-	font-size: 18px;
-}
-
-.add-comment-textarea-wrapper {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-
-	margin-left: 16px;
-	margin-right: 16px;
-	margin-bottom: 16px;
-}
-
-.add-comment-input {
-	padding: 18px 0 8px 0;
-	width: 100%;
-
-	border: none;
-	resize: none;
-	outline: none;
-	background-color: transparent;
-	border-bottom: 1px solid var(--border-divider);
-
 	color: var(--text-primary);
-	font-family: 'Mada';
-	font-size: 16px;
 }
 
-.comments-wrapper {
-	max-height: 600px;
-	/* width: 1000px; */
-	overflow-y: scroll;
-	margin-bottom: 30px;
+@media (min-width: 600px) {
+	.user-post-actions .account-menu.post-actions-menu {
+		top: calc(100% + 4px);
+		right: 0;
+	}
 }
 
-.comments-wrapper > *:not(:last-child) {
-	margin-bottom: 30px;
+@media (max-width: 599px) {
+	.user-post {
+		border: none;
+		border-radius: 0;
+	}
 }

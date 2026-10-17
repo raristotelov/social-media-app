@@ -5,18 +5,25 @@ const UserModel = require('../models/userModel');
 const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
+const { createPostNotFoundError } = require('../utils/notFoundErrors');
+const { asFieldError } = require('../utils/fieldErrors');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 
+const AUTHOR_POPULATE = {
+	path: 'userId',
+	select: 'username profilePicture',
+};
+
 const findOwnedUserPost = async ({ userPostId, userId }) => {
 	if (!mongoose.isValidObjectId(userPostId)) {
-		throw new AppError('Post not found', 404, { code: ERROR_CODES.POST_NOT_FOUND });
+		throw createPostNotFoundError();
 	}
 
 	const userPost = await UserPostModel.findById(userPostId);
 
 	if (!userPost) {
-		throw new AppError('Post not found', 404, { code: ERROR_CODES.POST_NOT_FOUND });
+		throw createPostNotFoundError();
 	}
 
 	if (!userPost.userId || userPost.userId.toString() !== String(userId)) {
@@ -26,7 +33,7 @@ const findOwnedUserPost = async ({ userPostId, userId }) => {
 	const isListedPost = await UserModel.exists({ _id: userId, posts: userPost._id });
 
 	if (!isListedPost) {
-		throw new AppError('Post not found', 404, { code: ERROR_CODES.POST_NOT_FOUND });
+		throw createPostNotFoundError();
 	}
 
 	return userPost;
@@ -54,7 +61,23 @@ const rollbackAddedUserPost = async ({ userPost, imageIdentifier }) => {
 	await imageStorageService.discardUploadedImage(imageIdentifier);
 };
 
+const assertValidCaption = async (caption) => {
+	try {
+		await UserPostModel.validate({ caption }, ['caption']);
+	} catch (error) {
+		const fieldError = asFieldError(error);
+
+		if (fieldError) {
+			throw fieldError;
+		}
+
+		throw new AppError('Could not save the user post', 500, { cause: error });
+	}
+};
+
 const addUserPost = async ({ caption, imageFile }, userId) => {
+	await assertValidCaption(caption);
+
 	const uploadedImage = await imageStorageService.uploadImage({ file: imageFile, fieldName: constants.POST_IMAGE_FIELD });
 
 	let userPost;
@@ -79,50 +102,83 @@ const addUserPost = async ({ caption, imageFile }, userId) => {
 	} catch (error) {
 		await rollbackAddedUserPost({ userPost, imageIdentifier: uploadedImage.imageIdentifier });
 
+		const fieldError = asFieldError(error);
+
+		if (fieldError) {
+			throw fieldError;
+		}
+
 		throw new AppError('Could not save the user post', 500, { cause: error });
 	}
 };
 
 const getFollowedUsersPosts = async (userId) => {
 	try {
-		const userResult = await UserModel.find({ _id: userId }).select({ following: 1 }).populate({ path: 'following', populate: 'posts' });
+		const currentUser = await UserModel.findById(userId).select({ following: 1 });
 
-		const currentUser = userResult[0];
-
-		const currentUserFollowedUsers = currentUser.following;
-
-		const followedUsersPosts = [];
-
-		for (let i = 0; i < currentUserFollowedUsers.length; i += 1) {
-			const followedUser = currentUserFollowedUsers[i];
-
-			if (followedUser?.posts?.length) {
-				followedUsersPosts.push(...followedUser.posts);
-			}
+		if (!currentUser) {
+			throw new AppError('Unauthorized', 401, { code: ERROR_CODES.UNAUTHENTICATED });
 		}
 
-		return followedUsersPosts;
+		const followedUsersPostDocs = await UserPostModel.find({ userId: { $in: currentUser.following } })
+			.sort({ createdAt: -1, _id: -1 })
+			.populate(AUTHOR_POPULATE);
+
+		const postIds = followedUsersPostDocs.map((post) => post._id);
+
+		const [commentCounts, previewComments] = await Promise.all([
+			commentService.getCommentCountsForPosts(postIds),
+			commentService.getPreviewCommentsForPosts(postIds),
+		]);
+
+		return followedUsersPostDocs.map((post) => ({
+			...post.toObject(),
+			commentsCount: commentCounts[post._id.toString()] || 0,
+			previewComments: previewComments[post._id.toString()] || [],
+		}));
 	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
 		throw new AppError('Could not load followed users posts', 500, { cause: error });
 	}
 };
 
+const updateUserPostLikes = async ({ userPostId, likesUpdate }) => {
+	if (!mongoose.isObjectIdOrHexString(userPostId)) {
+		throw createPostNotFoundError();
+	}
+
+	const updatedUserPost = await UserPostModel.findOneAndUpdate({ _id: userPostId }, likesUpdate, { new: true });
+
+	if (!updatedUserPost) {
+		throw createPostNotFoundError();
+	}
+
+	return updatedUserPost;
+};
+
 const likeUserPost = async ({ userPostId, userWhoLikedId }) => {
 	try {
-		const updatedUserPostData = await UserPostModel.findOneAndUpdate({ _id: userPostId }, { $push: { likes: userWhoLikedId } }, { new: true });
-
-		return updatedUserPostData;
+		return await updateUserPostLikes({ userPostId, likesUpdate: { $addToSet: { likes: userWhoLikedId } } });
 	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
 		throw new AppError('Could not like the post', 500, { cause: error });
 	}
 };
 
 const unlikeUserPost = async ({ userPostId, userWhoUnlikedId }) => {
 	try {
-		const updatedUserPostData = await UserPostModel.findOneAndUpdate({ _id: userPostId }, { $pull: { likes: userWhoUnlikedId } }, { new: true });
-
-		return updatedUserPostData;
+		return await updateUserPostLikes({ userPostId, likesUpdate: { $pull: { likes: userWhoUnlikedId } } });
 	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
 		throw new AppError('Could not unlike the post', 500, { cause: error });
 	}
 };
@@ -143,6 +199,12 @@ const updateUserPostCaption = async ({ userPostId, userId, caption }) => {
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
+		}
+
+		const fieldError = asFieldError(error);
+
+		if (fieldError) {
+			throw fieldError;
 		}
 
 		throw new AppError('Could not update the post', 500, { cause: error });

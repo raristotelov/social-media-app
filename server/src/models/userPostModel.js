@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 
+const constants = require('../config/constants');
+
 const UserPostSchema = new mongoose.Schema({
 	imageIdentifier: {
 		type: String,
@@ -13,6 +15,7 @@ const UserPostSchema = new mongoose.Schema({
 	},
 	caption: {
 		type: String,
+		maxlength: [constants.MAX_CAPTION_LENGTH, `Caption must be at most ${constants.MAX_CAPTION_LENGTH} characters`],
 	},
 	userId: {
 		type: 'ObjectId',
