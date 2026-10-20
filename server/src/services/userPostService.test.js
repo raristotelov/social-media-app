@@ -470,6 +470,40 @@ describe('userPostService', () => {
 			await expect(getFollowedUsersPosts(OWNER_ID)).resolves.toEqual([]);
 		});
 
+		describe('when the user of the token no longer exists', () => {
+			const givenMissingUser = () => {
+				const select = jest.fn().mockResolvedValue(null);
+
+				UserModel.findById = jest.fn().mockReturnValue({ select });
+				UserPostModel.find = jest.fn();
+			};
+
+			it('rejects with a 401 UNAUTHENTICATED error', async () => {
+				givenMissingUser();
+
+				await expect(getFollowedUsersPosts(OWNER_ID)).rejects.toMatchObject({
+					statusCode: 401,
+					code: ERROR_CODES.UNAUTHENTICATED,
+				});
+			});
+
+			it('rejects with an AppError, not a 500', async () => {
+				givenMissingUser();
+
+				await expect(getFollowedUsersPosts(OWNER_ID)).rejects.toBeInstanceOf(AppError);
+			});
+
+			it('loads no posts and no comment data', async () => {
+				givenMissingUser();
+
+				await getFollowedUsersPosts(OWNER_ID).catch(() => undefined);
+
+				expect(UserPostModel.find).not.toHaveBeenCalled();
+				expect(commentService.getCommentCountsForPosts).not.toHaveBeenCalled();
+				expect(commentService.getPreviewCommentsForPosts).not.toHaveBeenCalled();
+			});
+		});
+
 		it('wraps an unexpected database failure in a 500 AppError that keeps the cause', async () => {
 			const dbError = new Error('connection lost');
 

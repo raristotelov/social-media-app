@@ -175,6 +175,16 @@ describe('Comment', () => {
 			expect(unlikeComment).not.toHaveBeenCalled();
 		});
 
+		it('reloads without passing a comment after a like', async () => {
+			likeComment.mockResolvedValue({ _id: 'c1', likes: ['user1'] });
+			const { onReload } = renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+
+			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			expect(onReload.mock.calls[0]).toEqual([]);
+		});
+
 		it('unlikes a comment the user already liked', async () => {
 			unlikeComment.mockResolvedValue({});
 			const { onReload } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
@@ -343,6 +353,19 @@ describe('Comment', () => {
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			await waitFor(() => expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument());
+		});
+
+		it('passes the saved reply to the reload', async () => {
+			const savedReply = { _id: 'r9', text: 'Thanks', parentCommentId: 'c1', likes: [] };
+
+			addComment.mockResolvedValue(savedReply);
+			const { onReload } = renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+			await waitFor(() => expect(onReload).toHaveBeenCalledWith(savedReply));
 		});
 
 		it('shows the replies after a successful reply', async () => {

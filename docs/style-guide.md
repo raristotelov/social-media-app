@@ -13,6 +13,7 @@ Colours live as a Figma **variable collection (`Colours`) with Light and Dark mo
 | `text/primary` | `#4B4B4B` | `#F0F0F0` | Primary UI text, nav labels, icon strokes |
 | `text/secondary` | `#8E8E8E` | `#A8A8A8` | Counts, comment metadata, follower lines |
 | `text/muted` | `#B5B5B5` | `#6E6E6E` | Placeholder text, input borders |
+| `text/link` | `#2F5D8A` | `#8AB4E0` | @mentions in comments — 6.9:1 on light surface, 8.4:1 on dark |
 | `border/card` | `#DBDBDB` | `#2A2A2A` | 1px border on cards sitting on the page |
 | `border/divider` | `#C0C0C0` | `#333333` | Header bottom border, profile divider |
 | `border/inset` | `#E4E4E4` | `#2A2A2A` | Dividers inside cards |

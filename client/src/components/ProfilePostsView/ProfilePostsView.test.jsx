@@ -471,6 +471,76 @@ describe('ProfilePostsView', () => {
 			expect(await screen.findAllByAltText('user-post')).toHaveLength(2);
 		});
 
+		describe('deleting from the posts view', () => {
+			const deletePostAt = (index) => {
+				userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[index]);
+				userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+				userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			};
+
+			it('goes to the profile grid, replacing the entry, when the last post is deleted', async () => {
+				deleteUserPost.mockResolvedValue(undefined);
+				getUsersProfileData.mockResolvedValue([buildProfile({ posts: [buildPost('post1')] })]);
+				renderProfileRoutes({ user: ownUser, entries: ['/popular-posts', '/user/user2/posts#post1'], initialIndex: 1 });
+
+				await screen.findAllByRole('article');
+				deletePostAt(0);
+
+				await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
+				expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE');
+				expect(screen.getByTestId('hash')).toBeEmptyDOMElement();
+			});
+
+			it('shows the empty grid after the last post is deleted', async () => {
+				deleteUserPost.mockResolvedValue(undefined);
+				getUsersProfileData.mockResolvedValue([buildProfile({ posts: [buildPost('post1')] })]);
+				renderProfileRoutes({ user: ownUser, entries: ['/user/user2/posts#post1'] });
+
+				await screen.findAllByRole('article');
+				deletePostAt(0);
+
+				await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
+				expect(screen.queryByRole('article')).not.toBeInTheDocument();
+				expect(document.querySelectorAll('.profile-post')).toHaveLength(0);
+			});
+
+			it('stays on the posts view when a post other than the last is deleted', async () => {
+				deleteUserPost.mockResolvedValue(undefined);
+				renderProfileRoutes({ user: ownUser });
+
+				await screen.findAllByRole('article');
+				deletePostAt(1);
+
+				await waitFor(() => expect(getRenderedPostIds()).toEqual(['post3', 'post1']));
+				expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2\/posts$/);
+			});
+
+			it('stays on the posts view when the second to last post is deleted', async () => {
+				deleteUserPost.mockResolvedValue(undefined);
+				getUsersProfileData.mockResolvedValue([buildProfile({ posts: [buildPost('post2'), buildPost('post1')] })]);
+				renderProfileRoutes({ user: ownUser, entries: ['/user/user2/posts#post2'] });
+
+				await screen.findAllByRole('article');
+				deletePostAt(0);
+
+				await waitFor(() => expect(getRenderedPostIds()).toEqual(['post1']));
+				expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2\/posts$/);
+			});
+
+			it('stays on the posts view when deleting the last post fails', async () => {
+				deleteUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+				getUsersProfileData.mockResolvedValue([buildProfile({ posts: [buildPost('post1')] })]);
+				renderProfileRoutes({ user: ownUser, entries: ['/user/user2/posts#post1'] });
+
+				await screen.findAllByRole('article');
+				deletePostAt(0);
+
+				expect(await screen.findByText("Couldn't delete the post. Try again.")).toBeInTheDocument();
+				expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2\/posts$/);
+				expect(getRenderedPostIds()).toEqual(['post1']);
+			});
+		});
+
 		it('shows the delete failure as a toast and keeps the post', async () => {
 			deleteUserPost.mockRejectedValue({ code: 'POST_NOT_FOUND', status: 404 });
 			renderProfileRoutes({ user: ownUser });

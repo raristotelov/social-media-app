@@ -26,7 +26,7 @@ const AuthorLink = ({ authorId, className, children }) => {
 	);
 };
 
-const Comment = ({ comment, userPostId, onReload, isReply = false }) => {
+const Comment = ({ comment, userPostId, onReload, isReply = false, parentCommentId = null }) => {
 	const [showReplies, setShowReplies] = useState(false);
 	const [isReplying, setIsReplying] = useState(false);
 	const isUpdatingLikeRef = useRef(false);
@@ -39,6 +39,12 @@ const Comment = ({ comment, userPostId, onReload, isReply = false }) => {
 	const likes = comment.likes || [];
 	const hasLikedComment = likes.includes(loggedInUser?._id);
 	const replies = comment.replies || [];
+
+	const replyMention = `@${author.username}`;
+
+	const mentionedUser = comment.mentionedUserId;
+	const savedMention = mentionedUser ? `@${mentionedUser.username}` : null;
+	const hasSavedMention = Boolean(savedMention) && comment.text.startsWith(savedMention);
 
 	const toggleLike = async () => {
 		if (!loggedInUser) {
@@ -83,10 +89,19 @@ const Comment = ({ comment, userPostId, onReload, isReply = false }) => {
 	};
 
 	const submitReply = async (text) => {
-		const addedReply = await addComment({ userPostId, text, parentCommentId: comment._id, jwtToken });
+		const addedReply = await addComment({
+			userPostId,
+			text,
+			parentCommentId: isReply ? parentCommentId : comment._id,
+			mentionedUserId: author._id && text.trim().startsWith(replyMention) ? author._id : null,
+			jwtToken,
+		});
 
 		setIsReplying(false);
-		setShowReplies(true);
+
+		if (!isReply) {
+			setShowReplies(true);
+		}
 
 		await onReload(addedReply);
 	};
@@ -105,7 +120,19 @@ const Comment = ({ comment, userPostId, onReload, isReply = false }) => {
 						{author.username}
 					</AuthorLink>
 
-					<p className='comment-text'>{comment.text}</p>
+					<p className='comment-text'>
+						{hasSavedMention ? (
+							<>
+								<Link to={`/user/${mentionedUser._id}`} className='comment-mention'>
+									{savedMention}
+								</Link>
+
+								{comment.text.slice(savedMention.length)}
+							</>
+						) : (
+							comment.text
+						)}
+					</p>
 
 					<div className='comment-utils'>
 						<button
@@ -123,11 +150,9 @@ const Comment = ({ comment, userPostId, onReload, isReply = false }) => {
 
 						<span className='comment-util-label'>{`${likes.length} ${likes.length === 1 ? 'like' : 'likes'}`}</span>
 
-						{!isReply ? (
-							<button type='button' className='comment-util-button' onClick={toggleReplyForm}>
-								Reply
-							</button>
-						) : null}
+						<button type='button' className='comment-util-button' onClick={toggleReplyForm}>
+							Reply
+						</button>
 
 						{!isReply && replies.length && !showReplies ? (
 							<button type='button' className='comment-util-button' onClick={() => setShowReplies(true)}>
@@ -137,7 +162,12 @@ const Comment = ({ comment, userPostId, onReload, isReply = false }) => {
 					</div>
 
 					{isReplying ? (
-						<AddCommentForm onSubmit={submitReply} placeholder='Write a reply...' fallbackMessage={ACTION_FALLBACK_MESSAGES.ADD_REPLY} />
+						<AddCommentForm
+							onSubmit={submitReply}
+							placeholder='Write a reply...'
+							initialText={`${replyMention} `}
+							fallbackMessage={ACTION_FALLBACK_MESSAGES.ADD_REPLY}
+						/>
 					) : null}
 				</div>
 			</div>
@@ -150,7 +180,7 @@ const Comment = ({ comment, userPostId, onReload, isReply = false }) => {
 					</button>
 
 					{replies.map((reply) => (
-						<Comment key={reply._id} comment={reply} userPostId={userPostId} onReload={onReload} isReply />
+						<Comment key={reply._id} comment={reply} userPostId={userPostId} onReload={onReload} isReply parentCommentId={comment._id} />
 					))}
 				</div>
 			) : null}

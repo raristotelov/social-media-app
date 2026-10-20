@@ -1,8 +1,12 @@
+import useHideOnScrollDown from '../../hooks/useHideOnScrollDown';
+
 import ChevronLeftIcon from '../icons/ChevronLeft';
 
 import './PostsBar.css';
 
-const PostsBar = ({ username, isHidden = false, onBackClick }) => {
+const PostsBar = ({ username, onBackClick }) => {
+	const isHidden = useHideOnScrollDown();
+
 	const classNames = isHidden ? 'posts-bar posts-bar-hidden' : 'posts-bar';
 
 	return (

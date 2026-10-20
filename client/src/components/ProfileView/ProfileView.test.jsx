@@ -440,6 +440,18 @@ describe('ProfileView post actions and profile picture removal', () => {
 			expect(getPostsCountText()).toBe('0posts');
 		});
 
+		it('does not navigate anywhere when the last post is deleted from the grid', async () => {
+			deleteUserPost.mockResolvedValue(undefined);
+			await renderOwnProfile({ profile: { posts: [posts[0]] } });
+
+			openDeleteConfirmForTile(0);
+			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+			await waitFor(() => expect(screen.queryByText(/permanently deleted/i)).not.toBeInTheDocument());
+			expect(deleteUserPost).toHaveBeenCalledTimes(1);
+			expect(mockNavigate).not.toHaveBeenCalled();
+		});
+
 		it('disables Delete while the request is in flight', async () => {
 			let resolveDelete;
 

@@ -11,11 +11,12 @@ import './AddCommentForm.css';
 const AddCommentForm = ({
 	onSubmit,
 	placeholder = 'Add a comment...',
+	initialText = '',
 	fallbackMessage = ACTION_FALLBACK_MESSAGES.ADD_COMMENT,
 	isDisabled = false,
 	className,
 }) => {
-	const [text, setText] = useState('');
+	const [text, setText] = useState(initialText);
 	const [formError, setFormError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const isSubmittingRef = useRef(false);
@@ -25,7 +26,8 @@ const AddCommentForm = ({
 	const redirectToLogin = useLoginRedirect();
 
 	const isGuest = !loggedInUser;
-	const hasText = Boolean(text.trim());
+	const trimmedText = text.trim();
+	const hasText = Boolean(trimmedText) && trimmedText !== initialText.trim();
 
 	const changeHandler = (event) => {
 		setText(event.target.value);
@@ -81,7 +83,7 @@ const AddCommentForm = ({
 					onClick={isGuest ? redirectToLogin : undefined}
 				/>
 
-				<button type='submit' className='add-comment-form-submit' disabled={isDisabled || isSubmitting || (!isGuest && !hasText)}>
+				<button type='submit' className='add-comment-form-submit' disabled={isDisabled || isSubmitting || !hasText}>
 					Post
 				</button>
 			</form>

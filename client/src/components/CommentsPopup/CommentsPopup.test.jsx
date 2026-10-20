@@ -299,6 +299,100 @@ describe('CommentsPopup', () => {
 			expect(await screen.findByText(copy)).toBeInTheDocument();
 		});
 
+		describe('when the comment is saved but the reload fails', () => {
+			const datedComments = [
+				buildComment('c1', 'Most liked comment', { likes: ['u8', 'u9'], createdAt: '2024-01-01T00:00:00.000Z' }),
+				buildComment('c2', 'Older comment', { createdAt: '2024-02-01T00:00:00.000Z' }),
+			];
+			const savedComment = buildComment('c3', 'Nice shot', { createdAt: '2024-06-01T00:00:00.000Z', parentCommentId: null });
+
+			const postComment = (text) => {
+				userEvent.type(screen.getByPlaceholderText('Add a comment...'), text);
+				userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			};
+
+			beforeEach(() => {
+				getComments.mockResolvedValueOnce(datedComments).mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+				addComment.mockResolvedValue(savedComment);
+			});
+
+			it('keeps the current list and adds the new comment to it', async () => {
+				const { container } = renderPopup();
+
+				await screen.findByText('Most liked comment');
+				postComment('Nice shot');
+
+				expect(await screen.findByText('Nice shot', { selector: '.comment-text' })).toBeInTheDocument();
+				expect(getCommentTexts(container.ownerDocument.body)).toEqual(['Most liked comment', 'Nice shot', 'Older comment']);
+			});
+
+			it('shows no load error and no form message', async () => {
+				renderPopup();
+
+				await screen.findByText('Most liked comment');
+				postComment('Nice shot');
+				await screen.findByText('Nice shot', { selector: '.comment-text' });
+
+				expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
+				expect(screen.queryByText("Couldn't post your comment. Try again.")).not.toBeInTheDocument();
+				expect(document.querySelector('.add-comment-form-error')).not.toBeInTheDocument();
+				expect(document.querySelector('.comments-popup-message')).not.toBeInTheDocument();
+				expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			});
+
+			it('keeps the form usable and clears the typed text', async () => {
+				renderPopup();
+
+				await screen.findByText('Most liked comment');
+				postComment('Nice shot');
+				await screen.findByText('Nice shot', { selector: '.comment-text' });
+
+				await waitFor(() => expect(screen.getByPlaceholderText('Add a comment...')).toHaveValue(''));
+				expect(screen.getByPlaceholderText('Add a comment...')).toBeEnabled();
+			});
+
+			it('lets the user post another comment afterwards', async () => {
+				addComment
+					.mockResolvedValueOnce(savedComment)
+					.mockResolvedValueOnce(buildComment('c4', 'Second one', { createdAt: '2024-07-01T00:00:00.000Z' }));
+				const { container } = renderPopup();
+
+				await screen.findByText('Most liked comment');
+				postComment('Nice shot');
+				await screen.findByText('Nice shot', { selector: '.comment-text' });
+				await waitFor(() => expect(screen.getByPlaceholderText('Add a comment...')).toHaveValue(''));
+				postComment('Second one');
+
+				expect(await screen.findByText('Second one', { selector: '.comment-text' })).toBeInTheDocument();
+				expect(addComment).toHaveBeenCalledTimes(2);
+				expect(getCommentTexts(container.ownerDocument.body)).toEqual(['Most liked comment', 'Second one', 'Nice shot', 'Older comment']);
+			});
+
+			it('reports the locally updated list to the post card', async () => {
+				const { onCommentsLoaded } = renderPopup();
+
+				await screen.findByText('Most liked comment');
+				postComment('Nice shot');
+
+				await waitFor(() =>
+					expect(onCommentsLoaded).toHaveBeenLastCalledWith([datedComments[0], { ...savedComment, replies: [] }, datedComments[1]]),
+				);
+			});
+
+			it('replaces the empty message when the first comment is added', async () => {
+				getComments.mockReset();
+				getComments.mockResolvedValueOnce([]).mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+				renderPopup();
+
+				await screen.findByText('No comments yet. Be the first to comment.');
+				postComment('Nice shot');
+
+				expect(await screen.findByText('Nice shot', { selector: '.comment-text' })).toBeInTheDocument();
+				expect(screen.queryByText('No comments yet. Be the first to comment.')).not.toBeInTheDocument();
+				expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
+			});
+		});
+
 		it('ends the session when adding fails with UNAUTHENTICATED', async () => {
 			getComments.mockResolvedValue(topComments);
 			addComment.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
@@ -326,6 +420,19 @@ describe('CommentsPopup', () => {
 
 			expect(await screen.findByText('3 likes')).toBeInTheDocument();
 			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1', jwtToken: 'token123' });
+		});
+
+		it('shows the comments load error and disables the box when the reload after a like fails', async () => {
+			getComments.mockResolvedValueOnce(topComments).mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
+			likeComment.mockResolvedValue({});
+			renderPopup();
+
+			await screen.findByText('Most liked comment');
+			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
+
+			expect(await screen.findByText("Couldn't load comments")).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+			expect(screen.getByPlaceholderText('Add a comment...')).toBeDisabled();
 		});
 
 		it('shows a toast when the like fails', async () => {
@@ -416,6 +523,99 @@ describe('CommentsPopup', () => {
 	});
 
 	describe('replies', () => {
+		describe('when the reply is saved but the reload fails', () => {
+			const parentWithReply = buildComment('c1', 'Parent', {
+				createdAt: '2024-01-01T00:00:00.000Z',
+				replies: [buildComment('r1', 'oldest reply', { createdAt: '2024-01-02T00:00:00.000Z', parentCommentId: 'c1' })],
+			});
+			const otherComment = buildComment('c2', 'Other comment', { createdAt: '2024-01-03T00:00:00.000Z' });
+			const savedReply = buildComment('r2', 'Thanks', { createdAt: '2024-06-01T00:00:00.000Z', parentCommentId: 'c1' });
+
+			const getReplyTexts = () => Array.from(document.querySelectorAll('.comment-reply .comment-text')).map((element) => element.textContent);
+
+			const postReply = () => {
+				userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]);
+				userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+				userEvent.click(screen.getAllByRole('button', { name: 'Post' })[0]);
+			};
+
+			beforeEach(() => {
+				getComments.mockResolvedValueOnce([parentWithReply, otherComment]).mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+				addComment.mockResolvedValue(savedReply);
+			});
+
+			it('passes the saved reply to the reload', async () => {
+				renderPopup();
+
+				await screen.findByText('Parent');
+				postReply();
+
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
+				expect(addComment).toHaveBeenCalledWith({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1', jwtToken: 'token123' });
+			});
+
+			it('appends the reply after the existing replies and shows the replies', async () => {
+				renderPopup();
+
+				await screen.findByText('Parent');
+				postReply();
+
+				await waitFor(() => expect(getReplyTexts()).toEqual(['oldest reply', 'Thanks']));
+			});
+
+			it('keeps the other comments in place', async () => {
+				renderPopup();
+
+				await screen.findByText('Parent');
+				postReply();
+				await waitFor(() => expect(getReplyTexts()).toEqual(['oldest reply', 'Thanks']));
+
+				const topLevelTexts = Array.from(document.querySelectorAll('.comments-popup-list > .comment > .comment-row .comment-text')).map(
+					(element) => element.textContent,
+				);
+
+				expect(topLevelTexts).toEqual(['Parent', 'Other comment']);
+			});
+
+			it('shows no load error, no form message and no toast', async () => {
+				renderPopup();
+
+				await screen.findByText('Parent');
+				postReply();
+				await waitFor(() => expect(getReplyTexts()).toEqual(['oldest reply', 'Thanks']));
+
+				expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
+				expect(screen.queryByText("Couldn't post your reply. Try again.")).not.toBeInTheDocument();
+				expect(document.querySelector('.add-comment-form-error')).not.toBeInTheDocument();
+				expect(document.querySelector('.comments-popup-message')).not.toBeInTheDocument();
+				expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			});
+
+			it('keeps the main comment box usable', async () => {
+				renderPopup();
+
+				await screen.findByText('Parent');
+				postReply();
+				await waitFor(() => expect(getReplyTexts()).toEqual(['oldest reply', 'Thanks']));
+
+				expect(screen.getByPlaceholderText('Add a comment...')).toBeEnabled();
+			});
+
+			it('reports the locally updated list to the post card', async () => {
+				const { onCommentsLoaded } = renderPopup();
+
+				await screen.findByText('Parent');
+				postReply();
+
+				await waitFor(() =>
+					expect(onCommentsLoaded).toHaveBeenLastCalledWith([
+						{ ...parentWithReply, replies: [...parentWithReply.replies, savedReply] },
+						otherComment,
+					]),
+				);
+			});
+		});
+
 		it('shows the replies of a comment oldest first after "View replies" is clicked', async () => {
 			const withReplies = [
 				buildComment('c1', 'Parent', {

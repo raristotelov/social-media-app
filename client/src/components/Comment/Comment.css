@@ -60,6 +60,11 @@
 	overflow-wrap: anywhere;
 }
 
+.comment-mention {
+	color: var(--text-link);
+	text-decoration: none;
+}
+
 .comment-utils {
 	padding-top: 4px;
 

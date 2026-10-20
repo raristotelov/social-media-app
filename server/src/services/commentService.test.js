@@ -127,7 +127,7 @@ describe('commentService', () => {
 				expect(save).not.toHaveBeenCalled();
 			});
 
-			it('rejects a parent comment that does not exist with a 404 COMMENT_NOT_FOUND, without saving', async () => {
+			it('rejects a parent that is missing, on another post, or itself a reply with a 404 COMMENT_NOT_FOUND, without saving', async () => {
 				givenPostExists();
 				givenParentExists(false);
 				const { save } = buildCommentModelMock();
@@ -137,7 +137,46 @@ describe('commentService', () => {
 					code: ERROR_CODES.COMMENT_NOT_FOUND,
 				});
 
-				expect(CommentModel.exists).toHaveBeenCalledWith({ _id: PARENT_ID });
+				expect(CommentModel.exists).toHaveBeenCalledWith({ _id: PARENT_ID, userPostId: POST_ID, parentCommentId: null });
+				expect(save).not.toHaveBeenCalled();
+			});
+
+			it('looks for a parent that is a top-level comment on the same post', async () => {
+				givenPostExists();
+				givenParentExists();
+				buildCommentModelMock();
+
+				await addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Thanks', parentCommentId: PARENT_ID });
+
+				expect(CommentModel.exists).toHaveBeenCalledTimes(1);
+				expect(CommentModel.exists).toHaveBeenCalledWith({ _id: PARENT_ID, userPostId: POST_ID, parentCommentId: null });
+			});
+
+			it('checks the post before the parent, so a missing post is reported as POST_NOT_FOUND', async () => {
+				givenPostExists(false);
+				CommentModel.exists = jest.fn();
+				buildCommentModelMock();
+
+				await expect(addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Hi', parentCommentId: PARENT_ID })).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.POST_NOT_FOUND,
+				});
+
+				expect(CommentModel.exists).not.toHaveBeenCalled();
+			});
+
+			it('wraps a failing parent lookup in a 500 AppError that keeps the cause', async () => {
+				const lookupError = new Error('connection lost');
+
+				givenPostExists();
+				CommentModel.exists = jest.fn().mockRejectedValue(lookupError);
+				const { save } = buildCommentModelMock();
+
+				await expect(addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Hi', parentCommentId: PARENT_ID })).rejects.toMatchObject({
+					statusCode: 500,
+					cause: lookupError,
+				});
+
 				expect(save).not.toHaveBeenCalled();
 			});
 

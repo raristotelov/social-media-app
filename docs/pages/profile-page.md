@@ -31,7 +31,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - Username; counts "N posts", "N followers", "N following".
 - Bio: optional, max 150 characters (enforced at model level), long bio wraps, no bio element when empty.
 - Desktop/tablet: avatar left; username + action button on one row; stats row; bio; divider; post grid.
-- Mobile: avatar with stats beside it; then username, bio, full-width action button.
+- Mobile: avatar with stats beside it; then username, bio, full-width action button, 12px apart. With no bio the button sits 12px under the username.
 
 ## Post grid — Built
 

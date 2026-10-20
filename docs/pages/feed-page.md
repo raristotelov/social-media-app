@@ -29,6 +29,10 @@ Routes `/user-feed` and `/user/:userId/posts` (`client/src/Router.jsx`). Tokens:
 - Two top-level comments preview under the caption. Replies never preview; they show only in the comments popup.
 - Comment order, in the preview and the popup: most likes first, then newest first. Replies under a comment: oldest first.
 - Post (comment and reply): disabled at 50% opacity while the box is empty or only spaces; the client sends no empty comment.
+- The comment count includes replies.
+- Reply (on a comment or a reply) opens the reply box under what was clicked, prefilled with "@username " of its author (`Comments – Reply` frames). The reply goes under the top-level comment; replies stay one level deep.
+- The server saves the mentioned user with the reply; the posted reply shows "@username" as a link to that profile. If the mention is removed before posting, it is a plain reply. Also a plain reply (no error): the text doesn't start with "@<username>" of the sent user, or the user id is unknown or malformed. Post stays disabled while the box holds only the mention.
+- The post author link (avatar and username) has no hover fade; the like and comment icons keep theirs.
 
 ## Profile posts view
 
@@ -41,8 +45,10 @@ Feed layout opened from a profile. Shows that user's posts, not the user's feed.
 - Reuses the profile endpoint's data: posts with comment counts, plus the user's username and picture for card headers. No new endpoint.
 - Opens scrolled to the clicked post. Order newest first: newer posts above it, older below.
 - The hash follows the scroll, updated with replace (no history entry per post), so Back returns to the grid and a copied URL shares the post on screen.
-- The current post changes only once the next post is fully in view; while two are partly visible the previous one stays. A post taller than the visible area counts as current once it fills the visible area.
-- Posts bar above the list: back chevron, "Posts", the username beneath. Hides on scroll down, reappears on scroll up. Desktop / tablet: sticky 20px below the header. Mobile: replaces the top bar.
+- The current post changes only once the next post is fully in view; while two are partly visible the previous one stays. A post taller than the visible area becomes current once its top reaches the top of the visible area (scrolling down) or its bottom reaches the bottom (scrolling up). After a jump where no post meets the rule, the first visible post becomes current (scrolling down), or the last (scrolling up).
+- Posts bar above the list: back chevron, "Posts", the username beneath.
+- Desktop / tablet: the bar sits at the top of the list and scrolls away with it (not sticky). The clicked post opens 20px below the header.
+- Mobile: the bar replaces the top bar; hides on scroll down, reappears on scroll up.
 - Back chevron goes back in history; when the posts view is the first entry (shared link), it goes to the profile grid.
 - Own profile: each post shows the three-dots post actions in its header (`PostCard`, `Owner=Yes`), opening the same Edit / Delete menu and popups as the grid.
 - Deleting the last post returns to the profile grid, which shows its empty state.
@@ -57,6 +63,7 @@ On any feed-layout view they can reach, i.e. the profile posts view.
 - Like and comment controls are shown, not hidden. Using them redirects to `/log-in`; the guest returns to the same URL after login.
 - Guests can open the comments popup and read every comment. Clicking into the comment box redirects to `/log-in` (on click, not focus, so keyboard Tab isn't hijacked).
 - Reply and the comment heart also redirect a guest to `/log-in`.
+- A guest's Post button shows disabled at 50%, like an empty box for a logged-in user.
 - While comments fail to load, the comment box is disabled for guests too; they use "Try again" first.
 - Clicking an avatar or username — on a post or a comment — opens that person's profile (same for everyone).
 
@@ -97,4 +104,5 @@ Base: `https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Desi
 | Empty | [324:833](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=324-833) / [350:1052](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=350-1052) | [335:1763](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=335-1763) / [354:2972](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=354-2972) | [334:1536](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=334-1536) / [355:2555](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=355-2555) |
 | Scrolled | — | [337:1853](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=337-1853) / [354:2980](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=354-2980) | [267:692](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=267-692) / [355:2534](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=355-2534) |
 | Comments – Load Error | [564:6780](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=564-6780) / [564:6928](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=564-6928) | [568:4333](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-4333) / [568:4513](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-4513) | [568:7483](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-7483) / [568:7654](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=568-7654) |
+| Comments – Reply | [617:5059](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=617-5059) / [619:5239](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=619-5239) | [619:8333](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=619-8333) / [619:8531](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=619-8531) | [619:8729](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=619-8729) / [619:8899](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=619-8899) |
 | Profile View – Posts | [598:4815](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=598-4815) / [599:4879](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=599-4879) | [599:7711](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=599-7711) / [599:7787](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=599-7787) | [599:7863](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=599-7863) / [599:7935](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=599-7935) |

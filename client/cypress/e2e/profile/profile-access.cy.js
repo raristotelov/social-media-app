@@ -7,6 +7,7 @@ import {
 	uploadPostViaApi,
 	uploadProfilePictureViaApi,
 	getProfileViaApi,
+	getFollowedUsersPostsViaApi,
 	getFollowersViaApi,
 	getFollowingViaApi,
 	updateProfileViaApi,
@@ -176,10 +177,10 @@ describe('profile access', () => {
 		it('exposes neither the email nor the password hash of followed users in the followed posts', () => {
 			cy.then(() => followUserViaApi(ownerToken, targetId));
 
-			cy.then(() => getProfileViaApi(ownerId, ownerToken)).then((profile) => {
-				expect(profile.followedUsersPosts).to.have.length.greaterThan(0);
+			cy.then(() => getFollowedUsersPostsViaApi(ownerToken)).then((followedPosts) => {
+				expect(followedPosts).to.have.length.greaterThan(0);
 
-				profile.followedUsersPosts.forEach((post) => {
+				followedPosts.forEach((post) => {
 					expect(post.userId).to.have.property('username', target.username);
 					expect(post.userId).not.to.have.property('email');
 					expect(post.userId).not.to.have.property('password');
@@ -193,12 +194,12 @@ describe('profile access', () => {
 			cy.then(() => uploadProfilePictureViaApi(targetToken)).then((picture) => {
 				cy.then(() => followUserViaApi(ownerToken, targetId));
 
-				cy.then(() => getProfileViaApi(ownerId, ownerToken)).then((profile) => {
-					const imageUrls = profile.followedUsersPosts.map((post) => post.imageUrl);
+				cy.then(() => getFollowedUsersPostsViaApi(ownerToken)).then((followedPosts) => {
+					const imageUrls = followedPosts.map((post) => post.imageUrl);
 
-					expect(profile.followedUsersPosts).to.have.length(1);
+					expect(followedPosts).to.have.length(1);
 					expect(imageUrls).not.to.include(picture.imageUrl);
-					expect(profile.followedUsersPosts[0].userId.profilePicture).to.have.property('imageUrl', picture.imageUrl);
+					expect(followedPosts[0].userId.profilePicture).to.have.property('imageUrl', picture.imageUrl);
 				});
 			});
 		});

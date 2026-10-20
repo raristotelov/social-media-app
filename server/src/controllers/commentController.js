@@ -6,13 +6,14 @@ const verifyJwtToken = require('../middlewares/verifyJwtToken');
 
 // Add a comment, or a reply when parentCommentId is provided.
 router.post('/', verifyJwtToken, async (req, res) => {
-	const { userPostId, text, parentCommentId } = req.body;
+	const { userPostId, text, parentCommentId, mentionedUserId } = req.body;
 
 	const comment = await commentService.addComment({
 		userPostId,
 		userId: res.userId,
 		text,
 		parentCommentId,
+		mentionedUserId,
 	});
 
 	return res.json(comment);

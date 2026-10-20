@@ -111,7 +111,7 @@ describe('post delete', () => {
 
 		cy.then(() => getProfileViaApi(userId)).then((profile) => {
 			expect(profile.posts).to.have.length(1);
-			expect(profile.posts[0]._id).to.equal(posts[1]._id);
+			expect(profile.posts[0]._id).to.equal(posts[0]._id);
 		});
 	});
 

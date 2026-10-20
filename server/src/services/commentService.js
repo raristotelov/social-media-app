@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const CommentModel = require('../models/commentModel');
 const UserPostModel = require('../models/userPostModel');
+const UserModel = require('../models/userModel');
 const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
@@ -10,6 +11,11 @@ const { createPostNotFoundError, createCommentNotFoundError } = require('../util
 const AUTHOR_POPULATE = {
 	path: 'userId',
 	select: 'username profilePicture',
+};
+
+const MENTIONED_USER_POPULATE = {
+	path: 'mentionedUserId',
+	select: 'username',
 };
 
 const compareTopLevelComments = (a, b) => b.likes.length - a.likes.length || new Date(b.createdAt) - new Date(a.createdAt);
@@ -29,7 +35,21 @@ const assertValidReplyParent = async ({ parentCommentId, userPostId }) => {
 	}
 };
 
-const addComment = async ({ userPostId, userId, text, parentCommentId }) => {
+const resolveMentionedUserId = async ({ mentionedUserId, text }) => {
+	if (!mongoose.isObjectIdOrHexString(mentionedUserId)) {
+		return null;
+	}
+
+	const mentionedUser = await UserModel.findById(mentionedUserId).select({ username: 1 });
+
+	if (mentionedUser && text.startsWith(`@${mentionedUser.username}`)) {
+		return mentionedUser._id;
+	}
+
+	return null;
+};
+
+const addComment = async ({ userPostId, userId, text, parentCommentId, mentionedUserId }) => {
 	try {
 		if (typeof text !== 'string' || !text.trim()) {
 			throw new AppError('Comment text is required', 400, { code: ERROR_CODES.COMMENT_TEXT_REQUIRED });
@@ -41,15 +61,18 @@ const addComment = async ({ userPostId, userId, text, parentCommentId }) => {
 			await assertValidReplyParent({ parentCommentId, userPostId });
 		}
 
+		const trimmedText = text.trim();
+
 		const comment = new CommentModel({
 			userPostId,
 			userId,
-			text: text.trim(),
+			text: trimmedText,
 			parentCommentId: parentCommentId || null,
+			mentionedUserId: parentCommentId ? await resolveMentionedUserId({ mentionedUserId, text: trimmedText }) : null,
 		});
 
 		await comment.save();
-		await comment.populate(AUTHOR_POPULATE);
+		await comment.populate([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
 
 		return comment;
 	} catch (error) {
@@ -66,7 +89,7 @@ const getCommentsForPost = async ({ userPostId }) => {
 	try {
 		await assertPostExists(userPostId);
 
-		const comments = await CommentModel.find({ userPostId }).sort({ createdAt: 1 }).populate(AUTHOR_POPULATE);
+		const comments = await CommentModel.find({ userPostId }).sort({ createdAt: 1 }).populate([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
 
 		const topLevel = [];
 		const repliesByParent = {};

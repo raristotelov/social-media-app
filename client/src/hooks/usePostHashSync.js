@@ -14,11 +14,26 @@ const getVisibleBounds = () => {
 	};
 };
 
-const isPostInCurrentPosition = ({ top, bottom }, bounds) => {
-	const isFullyInView = top >= bounds.top && bottom <= bounds.bottom;
-	const fillsVisibleArea = top <= bounds.top && bottom >= bounds.bottom;
+const isPostVisible = ({ top, bottom }, bounds) => bottom > bounds.top && top < bounds.bottom;
 
-	return isFullyInView || fillsVisibleArea;
+const isPostTallerThanVisibleArea = ({ top, bottom }, bounds) => bottom - top > bounds.bottom - bounds.top;
+
+const isPostFullyInView = ({ top, bottom }, bounds) => top >= bounds.top && bottom <= bounds.bottom;
+
+const hasTallPostReachedEdge = ({ top, bottom }, bounds, isScrollingDown) => {
+	if (isScrollingDown) {
+		return top <= bounds.top && bottom > bounds.top;
+	}
+
+	return bottom >= bounds.bottom && top < bounds.bottom;
+};
+
+const canPostBecomeCurrent = (rect, bounds, isScrollingDown) => {
+	if (isPostFullyInView(rect, bounds)) {
+		return true;
+	}
+
+	return isPostTallerThanVisibleArea(rect, bounds) && hasTallPostReachedEdge(rect, bounds, isScrollingDown);
 };
 
 const usePostHashSync = (postsContainerRef) => {
@@ -38,13 +53,14 @@ const usePostHashSync = (postsContainerRef) => {
 
 		const getPostElements = () => Array.from(postsContainer.children);
 
-		const getPostIdsInCurrentPosition = () => {
-			const bounds = getVisibleBounds();
+		const readPostRects = () =>
+			getPostElements().map((postElement) => {
+				const { top, bottom } = postElement.getBoundingClientRect();
 
-			return getPostElements()
-				.filter((postElement) => isPostInCurrentPosition(postElement.getBoundingClientRect(), bounds))
-				.map((postElement) => postElement.id);
-		};
+				return { id: postElement.id, top, bottom };
+			});
+
+		const toRectsById = (rects) => new Map(rects.map((rect) => [rect.id, rect]));
 
 		if (!hasScrolledToInitialPostRef.current) {
 			hasScrolledToInitialPostRef.current = true;
@@ -54,26 +70,44 @@ const usePostHashSync = (postsContainerRef) => {
 				?.scrollIntoView();
 		}
 
-		let previousPostIds = new Set(getPostIdsInCurrentPosition());
+		let previousRectsById = toRectsById(readPostRects());
 		let lastScrollY = window.scrollY;
 		let pendingFrame = null;
 
 		const syncHashWithScroll = () => {
 			pendingFrame = null;
 
-			const postIds = getPostIdsInCurrentPosition();
+			const bounds = getVisibleBounds();
+			const rects = readPostRects();
+			const rectsById = toRectsById(rects);
 			const isScrollingDown = window.scrollY >= lastScrollY;
-			const enteringPostIds = postIds.filter((postId) => !previousPostIds.has(postId));
+
+			const enteringPostIds = rects
+				.filter((rect) => {
+					const previousRect = previousRectsById.get(rect.id);
+					const wasCurrentCandidate = previousRect && canPostBecomeCurrent(previousRect, bounds, isScrollingDown);
+
+					return canPostBecomeCurrent(rect, bounds, isScrollingDown) && !wasCurrentCandidate;
+				})
+				.map((rect) => rect.id);
 
 			lastScrollY = window.scrollY;
-			previousPostIds = new Set(postIds);
+			previousRectsById = rectsById;
 
 			let nextPostId = currentPostIdRef.current;
 
 			if (enteringPostIds.length) {
 				nextPostId = isScrollingDown ? enteringPostIds[enteringPostIds.length - 1] : enteringPostIds[0];
-			} else if (postIds.length && !postIds.includes(nextPostId)) {
-				nextPostId = postIds[0];
+			} else {
+				const currentRect = rectsById.get(nextPostId);
+
+				if (!currentRect || !isPostVisible(currentRect, bounds)) {
+					const visibleRects = rects.filter((rect) => isPostVisible(rect, bounds));
+
+					if (visibleRects.length) {
+						nextPostId = (isScrollingDown ? visibleRects[0] : visibleRects[visibleRects.length - 1]).id;
+					}
+				}
 			}
 
 			if (nextPostId && nextPostId !== currentPostIdRef.current) {

@@ -1,7 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 
-import useHideOnScrollDown from '../../hooks/useHideOnScrollDown';
 import usePostHashSync from '../../hooks/usePostHashSync';
 
 import PostsBar from '../PostsBar/PostsBar';
@@ -15,8 +14,6 @@ const ProfilePostsView = () => {
 	const { userData, userPosts, setUserPosts, isLoggedInUserProfile, onEditPostClick, onDeletePostClick } = useOutletContext();
 
 	const postsListRef = useRef(null);
-
-	const isPostsBarHidden = useHideOnScrollDown();
 
 	usePostHashSync(postsListRef);
 
@@ -42,7 +39,7 @@ const ProfilePostsView = () => {
 
 	return (
 		<section className='profile-posts-view'>
-			<PostsBar username={userData.username} isHidden={isPostsBarHidden} onBackClick={goBackToProfile} />
+			<PostsBar username={userData.username} onBackClick={goBackToProfile} />
 
 			<div className='profile-posts-list' ref={postsListRef}>
 				{userPosts.map((post) => (
