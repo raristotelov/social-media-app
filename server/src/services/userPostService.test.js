@@ -21,6 +21,8 @@ const buildPost = (overrides = {}) => ({
 	_id: POST_ID,
 	imageIdentifier: 'cloudinary-id-1',
 	imageUrl: 'https://example.com/1.jpg',
+	imageWidth: 1080,
+	imageHeight: 1350,
 	caption: 'old caption',
 	userId: OWNER_ID,
 	save: jest.fn().mockResolvedValue(undefined),
@@ -114,7 +116,7 @@ describe('userPostService', () => {
 
 	describe('addUserPost', () => {
 		const imageFile = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), originalname: 'photo.jpg' };
-		const uploadedImage = { imageIdentifier: 'new-cloudinary-id', imageUrl: 'https://example.com/new.jpg' };
+		const uploadedImage = { imageIdentifier: 'new-cloudinary-id', imageUrl: 'https://example.com/new.jpg', imageWidth: 1920, imageHeight: 1080 };
 
 		const buildUserPostModelMock = (save = jest.fn().mockResolvedValue(undefined)) => {
 			UserPostModel.mockImplementation(function UserPostModelMock(data) {
@@ -155,6 +157,14 @@ describe('userPostService', () => {
 
 			expect(UserPostModel).toHaveBeenCalledWith({ ...uploadedImage, caption: 'Sunset', userId: OWNER_ID });
 			expect(save).toHaveBeenCalledTimes(1);
+		});
+
+		it('saves the width and height from the uploaded image on the post', async () => {
+			buildUserPostModelMock();
+
+			await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID);
+
+			expect(UserPostModel).toHaveBeenCalledWith(expect.objectContaining({ imageWidth: 1920, imageHeight: 1080 }));
 		});
 
 		it("adds the new post to the owner's posts", async () => {
@@ -296,7 +306,12 @@ describe('userPostService', () => {
 
 		beforeEach(() => {
 			UserPostModel.validate.mockImplementation((...args) => ActualUserPostModel.validate(...args));
-			imageStorageService.uploadImage.mockResolvedValue({ imageIdentifier: 'new-cloudinary-id', imageUrl: 'https://example.com/new.jpg' });
+			imageStorageService.uploadImage.mockResolvedValue({
+				imageIdentifier: 'new-cloudinary-id',
+				imageUrl: 'https://example.com/new.jpg',
+				imageWidth: 1080,
+				imageHeight: 1350,
+			});
 			UserPostModel.mockImplementation(function UserPostModelMock(data) {
 				Object.assign(this, data);
 				this._id = 'newPost1';

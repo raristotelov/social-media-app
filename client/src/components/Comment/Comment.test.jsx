@@ -274,14 +274,45 @@ describe('Comment', () => {
 			expect(unlikeComment).not.toHaveBeenCalled();
 		});
 
-		it('reloads without passing a comment after a like', async () => {
+		it('reloads without a comment and describes the like it just made', async () => {
 			likeComment.mockResolvedValue({ _id: 'c1', likes: ['user1'] });
 			const { onReload } = renderComment();
 
 			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
-			expect(onReload.mock.calls[0]).toEqual([]);
+			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'c1', userId: 'user1', isLiked: true });
+		});
+
+		it('describes the unlike it just made with isLiked false', async () => {
+			unlikeComment.mockResolvedValue({});
+			const { onReload } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
+
+			userEvent.click(screen.getByRole('button', { name: 'Unlike comment' }));
+
+			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'c1', userId: 'user1', isLiked: false });
+		});
+
+		it('describes a like on a reply with the id of the reply', async () => {
+			likeComment.mockResolvedValue({});
+			const { onReload } = renderComment({ comment: { ...baseComment, replies } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+
+			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'r1', userId: 'user1', isLiked: true });
+		});
+
+		it('shows no toast when the like was saved and the reload that follows is handled by the parent', async () => {
+			likeComment.mockResolvedValue({});
+			const { onReload } = renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+
+			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			expect(screen.queryByText("Couldn't update your like. Try again.")).not.toBeInTheDocument();
 		});
 
 		it('unlikes a comment the user already liked', async () => {
@@ -409,6 +440,31 @@ describe('Comment', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toBeInTheDocument();
+		});
+
+		it('puts the cursor in the reply box as soon as it opens', () => {
+			renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+
+			expect(screen.getByPlaceholderText('Write a reply...')).toHaveFocus();
+		});
+
+		it('puts the cursor after the mention in the reply box', () => {
+			renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+
+			expect(screen.getByPlaceholderText('Write a reply...').selectionStart).toBe('@alice '.length);
+		});
+
+		it('focuses the reply box opened under a reply', () => {
+			const { container } = renderComment({ comment: { ...baseComment, replies } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+
+			expect(screen.getByPlaceholderText('Write a reply...')).toHaveFocus();
 		});
 
 		it('prefills the reply box with the @username of the author of the comment', () => {

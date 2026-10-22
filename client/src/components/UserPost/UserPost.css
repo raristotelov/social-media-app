@@ -73,13 +73,11 @@
 
 .user-post-image {
 	width: 100%;
-	aspect-ratio: 500 / 550;
 }
 
 .user-post-image img {
 	display: block;
 	width: 100%;
-	height: 100%;
 	object-fit: cover;
 }
 

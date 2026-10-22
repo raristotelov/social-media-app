@@ -1,4 +1,4 @@
-import { addCommentLocally, compareComments, countCommentsAndReplies, getPreviewComments } from './comments';
+import { addCommentLocally, applyLikeLocally, compareComments, countCommentsAndReplies, getPreviewComments } from './comments';
 
 const buildComment = (id, { likes = [], createdAt = '2024-01-01T00:00:00.000Z', replies } = {}) => ({ _id: id, likes, createdAt, replies });
 
@@ -198,6 +198,144 @@ describe('addCommentLocally', () => {
 			const result = addCommentLocally(comments, { ...buildComment('r1'), parentCommentId: 'missing' });
 
 			expect(result).toEqual(comments);
+		});
+	});
+});
+
+describe('applyLikeLocally', () => {
+	const getIds = (comments) => comments.map((comment) => comment._id);
+
+	describe('liking', () => {
+		it('adds the user to the likes of a top-level comment', () => {
+			const result = applyLikeLocally([buildComment('a')], { commentId: 'a', userId: 'u1', isLiked: true });
+
+			expect(result[0].likes).toEqual(['u1']);
+		});
+
+		it('keeps the likes already there', () => {
+			const result = applyLikeLocally([buildComment('a', { likes: ['u2'] })], { commentId: 'a', userId: 'u1', isLiked: true });
+
+			expect(result[0].likes).toEqual(['u2', 'u1']);
+		});
+
+		it('adds the user to the likes of a reply and keeps the parent likes', () => {
+			const comments = [buildComment('parent', { likes: ['u2'], replies: [buildComment('r1'), buildComment('r2')] })];
+
+			const result = applyLikeLocally(comments, { commentId: 'r2', userId: 'u1', isLiked: true });
+
+			expect(result[0].likes).toEqual(['u2']);
+			expect(result[0].replies.map((reply) => reply.likes)).toEqual([[], ['u1']]);
+		});
+
+		it('does not add the same user twice', () => {
+			const result = applyLikeLocally([buildComment('a', { likes: ['u1'] })], { commentId: 'a', userId: 'u1', isLiked: true });
+
+			expect(result[0].likes).toEqual(['u1']);
+		});
+
+		it('treats a comment without a likes array as having no likes', () => {
+			const comments = [{ _id: 'a', createdAt: '2024-01-01T00:00:00.000Z' }];
+
+			const result = applyLikeLocally(comments, { commentId: 'a', userId: 'u1', isLiked: true });
+
+			expect(result[0].likes).toEqual(['u1']);
+		});
+
+		it('treats a reply without a likes array as having no likes', () => {
+			const comments = [buildComment('parent', { replies: [{ _id: 'r1' }] })];
+
+			const result = applyLikeLocally(comments, { commentId: 'r1', userId: 'u1', isLiked: true });
+
+			expect(result[0].replies[0].likes).toEqual(['u1']);
+		});
+	});
+
+	describe('unliking', () => {
+		it('removes the user from the likes of a top-level comment', () => {
+			const result = applyLikeLocally([buildComment('a', { likes: ['u1', 'u2'] })], { commentId: 'a', userId: 'u1', isLiked: false });
+
+			expect(result[0].likes).toEqual(['u2']);
+		});
+
+		it('removes the user from the likes of a reply', () => {
+			const comments = [buildComment('parent', { replies: [buildComment('r1', { likes: ['u1'] })] })];
+
+			const result = applyLikeLocally(comments, { commentId: 'r1', userId: 'u1', isLiked: false });
+
+			expect(result[0].replies[0].likes).toEqual([]);
+		});
+
+		it('changes nothing when the user had not liked it', () => {
+			const result = applyLikeLocally([buildComment('a', { likes: ['u2'] })], { commentId: 'a', userId: 'u1', isLiked: false });
+
+			expect(result[0].likes).toEqual(['u2']);
+		});
+
+		it('leaves a comment without a likes array with no likes', () => {
+			const result = applyLikeLocally([{ _id: 'a', createdAt: '2024-01-01T00:00:00.000Z' }], { commentId: 'a', userId: 'u1', isLiked: false });
+
+			expect(result[0].likes).toEqual([]);
+		});
+	});
+
+	describe('a comment that is not in the list', () => {
+		it('changes no likes', () => {
+			const comments = [buildComment('a', { likes: ['u2'], replies: [buildComment('r1')] })];
+
+			const result = applyLikeLocally(comments, { commentId: 'missing', userId: 'u1', isLiked: true });
+
+			expect(result).toEqual(comments);
+		});
+	});
+
+	describe('ordering', () => {
+		it('moves a comment above the others once the like gives it more likes', () => {
+			const comments = [
+				buildComment('newer', { createdAt: '2024-05-01T00:00:00.000Z' }),
+				buildComment('older', { createdAt: '2024-01-01T00:00:00.000Z' }),
+			];
+
+			const result = applyLikeLocally(comments, { commentId: 'older', userId: 'u1', isLiked: true });
+
+			expect(getIds(result)).toEqual(['older', 'newer']);
+		});
+
+		it('moves a comment back down once the unlike removes its lead', () => {
+			const comments = [
+				buildComment('older', { likes: ['u1'], createdAt: '2024-01-01T00:00:00.000Z' }),
+				buildComment('newer', { createdAt: '2024-05-01T00:00:00.000Z' }),
+			];
+
+			const result = applyLikeLocally(comments, { commentId: 'older', userId: 'u1', isLiked: false });
+
+			expect(getIds(result)).toEqual(['newer', 'older']);
+		});
+
+		it('does not reorder the replies', () => {
+			const comments = [buildComment('parent', { replies: [buildComment('r1'), buildComment('r2')] })];
+
+			const result = applyLikeLocally(comments, { commentId: 'r2', userId: 'u1', isLiked: true });
+
+			expect(getIds(result[0].replies)).toEqual(['r1', 'r2']);
+		});
+	});
+
+	describe('immutability', () => {
+		it('does not change the list, the comment or the reply it was given', () => {
+			const reply = buildComment('r1', { likes: ['u2'] });
+			const parent = buildComment('parent', { likes: ['u2'], replies: [reply] });
+			const comments = [parent];
+
+			applyLikeLocally(comments, { commentId: 'parent', userId: 'u1', isLiked: true });
+			applyLikeLocally(comments, { commentId: 'r1', userId: 'u1', isLiked: true });
+
+			expect(comments).toEqual([parent]);
+			expect(parent.likes).toEqual(['u2']);
+			expect(reply.likes).toEqual(['u2']);
+		});
+
+		it('returns an empty list for an empty list', () => {
+			expect(applyLikeLocally([], { commentId: 'a', userId: 'u1', isLiked: true })).toEqual([]);
 		});
 	});
 });

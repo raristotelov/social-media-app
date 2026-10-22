@@ -14,6 +14,26 @@ export const addCommentLocally = (comments, addedComment) => {
 	);
 };
 
+export const applyLikeLocally = (comments, { commentId, userId, isLiked }) => {
+	const updateLikes = (comment) => {
+		if (comment._id !== commentId) {
+			return comment;
+		}
+
+		const otherLikes = (comment.likes ?? []).filter((likeUserId) => likeUserId !== userId);
+
+		return { ...comment, likes: isLiked ? [...otherLikes, userId] : otherLikes };
+	};
+
+	return comments
+		.map((comment) => {
+			const updatedComment = updateLikes(comment);
+
+			return comment.replies ? { ...updatedComment, replies: comment.replies.map(updateLikes) } : updatedComment;
+		})
+		.sort(compareComments);
+};
+
 export const getPreviewComments = (comments) => [...comments].sort(compareComments).slice(0, COMMENT_PREVIEW_LIMIT);
 
 export const countCommentsAndReplies = (comments) =>

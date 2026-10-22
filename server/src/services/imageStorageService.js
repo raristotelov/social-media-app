@@ -53,6 +53,8 @@ const uploadImage = async ({ file, fieldName }) => {
 		return {
 			imageIdentifier: result.public_id,
 			imageUrl: result.secure_url,
+			imageWidth: result.width,
+			imageHeight: result.height,
 		};
 	} catch (error) {
 		throw new AppError('Could not upload image', 502, { cause: error });

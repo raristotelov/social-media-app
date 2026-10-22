@@ -28,6 +28,8 @@ const author = { _id: 'user2', username: 'janedoe', profilePicture: { imageUrl: 
 const basePost = {
 	_id: 'post1',
 	imageUrl: 'https://example.com/1.jpg',
+	imageWidth: 1080,
+	imageHeight: 1350,
 	caption: 'Sunset at the beach',
 	likes: [],
 	commentsCount: 0,
@@ -97,6 +99,40 @@ describe('UserPost', () => {
 			renderPost();
 
 			expect(screen.getByAltText('post')).toHaveAttribute('src', basePost.imageUrl);
+		});
+
+		it('does not focus the main Add a comment box', () => {
+			renderPost();
+
+			expect(screen.getByPlaceholderText('Add a comment...')).not.toHaveFocus();
+		});
+
+		describe('image aspect ratio', () => {
+			const getImageAspectRatio = () => Number(screen.getByAltText('post').style.aspectRatio);
+
+			it('is set on the image from the stored width and height', () => {
+				renderPost({ post: { ...basePost, imageWidth: 1000, imageHeight: 1100 } });
+
+				expect(getImageAspectRatio()).toBeCloseTo(1000 / 1100);
+			});
+
+			it('is 1 for a square image', () => {
+				renderPost({ post: { ...basePost, imageWidth: 800, imageHeight: 800 } });
+
+				expect(getImageAspectRatio()).toBe(1);
+			});
+
+			it('is limited to 4:5 for a portrait image taller than that', () => {
+				renderPost({ post: { ...basePost, imageWidth: 500, imageHeight: 2000 } });
+
+				expect(getImageAspectRatio()).toBeCloseTo(0.8);
+			});
+
+			it('is limited to 1.91:1 for a landscape image wider than that', () => {
+				renderPost({ post: { ...basePost, imageWidth: 3000, imageHeight: 1000 } });
+
+				expect(getImageAspectRatio()).toBeCloseTo(1.91);
+			});
 		});
 
 		it('uses the post id as the id of the card so the URL hash can point at it', () => {

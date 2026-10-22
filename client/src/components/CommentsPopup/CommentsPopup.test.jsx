@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { getComments, addComment, likeComment } from '../../services/commentService';
+import { getComments, addComment, likeComment, unlikeComment } from '../../services/commentService';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -69,6 +69,27 @@ const getCommentTexts = (container) =>
 describe('CommentsPopup', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
+	});
+
+	describe('focus', () => {
+		it('does not focus the main Add a comment box when the popup opens', async () => {
+			getComments.mockResolvedValue(topComments);
+			renderPopup();
+
+			await screen.findByText('Most liked comment');
+
+			expect(screen.getByPlaceholderText('Add a comment...')).not.toHaveFocus();
+		});
+
+		it('focuses a reply box once it is opened from a comment', async () => {
+			getComments.mockResolvedValue(topComments);
+			renderPopup();
+
+			await screen.findByText('Most liked comment');
+			userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]);
+
+			expect(screen.getByPlaceholderText('Write a reply...')).toHaveFocus();
+		});
 	});
 
 	describe('loading comments', () => {
@@ -422,17 +443,256 @@ describe('CommentsPopup', () => {
 			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1', jwtToken: 'token123' });
 		});
 
-		it('shows the comments load error and disables the box when the reload after a like fails', async () => {
-			getComments.mockResolvedValueOnce(topComments).mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
-			likeComment.mockResolvedValue({});
-			renderPopup();
+		describe('when the like is saved but the reload fails', () => {
+			const loadFailure = { code: 'INTERNAL_ERROR', status: 500 };
 
-			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
+			const top = buildComment('c1', 'Top', { likes: ['u8', 'u9'], createdAt: '2024-01-01T00:00:00.000Z' });
+			const newer = buildComment('c2', 'Newer', { createdAt: '2024-03-01T00:00:00.000Z' });
+			const older = buildComment('c3', 'Older', { createdAt: '2024-02-01T00:00:00.000Z' });
 
-			expect(await screen.findByText("Couldn't load comments")).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
-			expect(screen.getByPlaceholderText('Add a comment...')).toBeDisabled();
+			const getTopLevelTexts = () =>
+				Array.from(document.querySelectorAll('.comments-popup-list > .comment > .comment-row .comment-text')).map(
+					(element) => element.textContent,
+				);
+
+			const getTopLevelLikeLabels = () =>
+				Array.from(document.querySelectorAll('.comments-popup-list > .comment > .comment-row .comment-util-label')).map(
+					(element) => element.textContent,
+				);
+
+			const getReplyLikeLabels = () =>
+				Array.from(document.querySelectorAll('.comment-reply .comment-util-label')).map((element) => element.textContent);
+
+			it('applies the like to the current list without reloading it', async () => {
+				getComments.mockResolvedValueOnce([top, newer, older]).mockRejectedValue(loadFailure);
+				likeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Top');
+				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+
+				await waitFor(() => expect(getTopLevelLikeLabels()).toEqual(['2 likes', '1 like', '0 likes']));
+				expect(getComments).toHaveBeenCalledTimes(2);
+			});
+
+			it('moves the liked comment up when the like gives it more likes than the others', async () => {
+				getComments.mockResolvedValueOnce([top, newer, older]).mockRejectedValue(loadFailure);
+				likeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Top');
+				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+
+				await waitFor(() => expect(getTopLevelTexts()).toEqual(['Top', 'Older', 'Newer']));
+			});
+
+			it('removes the like locally when the user unlikes and re-sorts', async () => {
+				const mine = buildComment('c1', 'Mine', { likes: ['u8', 'user1'], createdAt: '2024-01-01T00:00:00.000Z' });
+				const rival = buildComment('c2', 'Rival', { likes: ['u8'], createdAt: '2024-05-01T00:00:00.000Z' });
+
+				getComments.mockResolvedValueOnce([mine, rival]).mockRejectedValue(loadFailure);
+				unlikeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Mine');
+				expect(getTopLevelTexts()).toEqual(['Mine', 'Rival']);
+				userEvent.click(screen.getByRole('button', { name: 'Unlike comment' }));
+
+				await waitFor(() => expect(getTopLevelTexts()).toEqual(['Rival', 'Mine']));
+				expect(getTopLevelLikeLabels()).toEqual(['1 like', '1 like']);
+				expect(screen.getAllByRole('button', { name: 'Like comment' })).toHaveLength(2);
+			});
+
+			it('applies a like on a reply to that reply only', async () => {
+				const parent = buildComment('c1', 'Parent', {
+					replies: [buildComment('r1', 'A reply', { createdAt: '2024-01-02T00:00:00.000Z', parentCommentId: 'c1' })],
+				});
+
+				getComments.mockResolvedValueOnce([parent]).mockRejectedValue(loadFailure);
+				likeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Parent');
+				userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+
+				await waitFor(() => expect(getReplyLikeLabels()).toEqual(['1 like']));
+				expect(getTopLevelLikeLabels()).toEqual(['0 likes']);
+				expect(likeComment).toHaveBeenCalledWith({ commentId: 'r1', jwtToken: 'token123' });
+			});
+
+			it('reports the locally updated list to the post card', async () => {
+				getComments.mockResolvedValueOnce([top, newer, older]).mockRejectedValue(loadFailure);
+				likeComment.mockResolvedValue({});
+				const { onCommentsLoaded } = renderPopup();
+
+				await screen.findByText('Top');
+				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+
+				await waitFor(() => expect(onCommentsLoaded).toHaveBeenLastCalledWith([top, { ...older, likes: ['user1'] }, newer]));
+			});
+
+			it('shows no load error, no like error and no toast', async () => {
+				getComments.mockResolvedValueOnce([top, newer, older]).mockRejectedValue(loadFailure);
+				likeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Top');
+				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+				await waitFor(() => expect(getTopLevelLikeLabels()).toEqual(['2 likes', '1 like', '0 likes']));
+
+				expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
+				expect(screen.queryByText("Couldn't update your like. Try again.")).not.toBeInTheDocument();
+				expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+				expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			});
+
+			it('keeps the comment box enabled', async () => {
+				getComments.mockResolvedValueOnce([top, newer, older]).mockRejectedValue(loadFailure);
+				likeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Top');
+				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+				await waitFor(() => expect(getTopLevelLikeLabels()).toEqual(['2 likes', '1 like', '0 likes']));
+
+				expect(screen.getByPlaceholderText('Add a comment...')).toBeEnabled();
+			});
+
+			it('still shows the like error toast and no local like when the like request itself fails', async () => {
+				getComments.mockResolvedValueOnce([top, newer, older]).mockRejectedValue(loadFailure);
+				likeComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+				renderPopup();
+
+				await screen.findByText('Top');
+				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+
+				expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
+				expect(getTopLevelLikeLabels()).toEqual(['2 likes', '0 likes', '0 likes']);
+			});
+		});
+
+		describe('when fallbacks overlap because several reloads fail', () => {
+			const top = buildComment('c1', 'Top', { likes: ['u8', 'u9'], createdAt: '2024-01-01T00:00:00.000Z' });
+			const other = buildComment('c2', 'Other', { createdAt: '2024-02-01T00:00:00.000Z' });
+			const savedComment = buildComment('c9', 'Brand new', { createdAt: '2024-06-01T00:00:00.000Z', parentCommentId: null });
+			const savedReply = buildComment('r9', 'Reply text', { createdAt: '2024-06-02T00:00:00.000Z', parentCommentId: 'c2' });
+
+			const getTopLevelTexts = () =>
+				Array.from(document.querySelectorAll('.comments-popup-list > .comment > .comment-row .comment-text')).map(
+					(element) => element.textContent,
+				);
+
+			const getTopLevelLikeLabels = () =>
+				Array.from(document.querySelectorAll('.comments-popup-list > .comment > .comment-row .comment-util-label')).map(
+					(element) => element.textContent,
+				);
+
+			const getReplyTexts = () => Array.from(document.querySelectorAll('.comment-reply .comment-text')).map((element) => element.textContent);
+
+			const givenTwoPendingReloads = () => {
+				const firstReload = buildDeferred();
+				const secondReload = buildDeferred();
+
+				getComments.mockResolvedValueOnce([top, other]).mockReturnValueOnce(firstReload.promise).mockReturnValueOnce(secondReload.promise);
+
+				return { firstReload, secondReload };
+			};
+
+			const postMainComment = () => {
+				userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Brand new');
+				userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			};
+
+			const likeOther = () => userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+
+			it('builds the second fallback on the first when a comment is added and then a like is made', async () => {
+				const { firstReload, secondReload } = givenTwoPendingReloads();
+
+				addComment.mockResolvedValue(savedComment);
+				likeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Top');
+				postMainComment();
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
+				likeOther();
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(3));
+
+				firstReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
+				await waitFor(() => expect(getTopLevelTexts()).toContain('Brand new'));
+				secondReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
+
+				await waitFor(() => expect(getTopLevelLikeLabels()).toContain('1 like'));
+				expect(getTopLevelTexts()).toEqual(['Top', 'Other', 'Brand new']);
+				expect(getTopLevelLikeLabels()).toEqual(['2 likes', '1 like', '0 likes']);
+			});
+
+			it('keeps the added comment when the like fallback runs first', async () => {
+				const { firstReload, secondReload } = givenTwoPendingReloads();
+
+				addComment.mockResolvedValue(savedComment);
+				likeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Top');
+				postMainComment();
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
+				likeOther();
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(3));
+
+				secondReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
+				await waitFor(() => expect(getTopLevelLikeLabels()).toContain('1 like'));
+				firstReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
+
+				await waitFor(() => expect(getTopLevelTexts()).toContain('Brand new'));
+				expect(getTopLevelTexts()).toEqual(['Top', 'Other', 'Brand new']);
+				expect(getTopLevelLikeLabels()).toEqual(['2 likes', '1 like', '0 likes']);
+			});
+
+			it('keeps both a comment and a reply when both are added before their reloads fail', async () => {
+				const { firstReload, secondReload } = givenTwoPendingReloads();
+
+				addComment.mockResolvedValueOnce(savedComment).mockResolvedValueOnce(savedReply);
+				renderPopup();
+
+				await screen.findByText('Top');
+				postMainComment();
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
+
+				userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[1]);
+				userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Reply text');
+				userEvent.click(screen.getAllByRole('button', { name: 'Post' })[0]);
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(3));
+
+				firstReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
+				await waitFor(() => expect(getTopLevelTexts()).toContain('Brand new'));
+				secondReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
+
+				await waitFor(() => expect(getReplyTexts()).toEqual(['Reply text']));
+				expect(getTopLevelTexts()).toEqual(['Top', 'Brand new', 'Other']);
+			});
+
+			it('shows no load error after overlapping fallbacks', async () => {
+				const { firstReload, secondReload } = givenTwoPendingReloads();
+
+				addComment.mockResolvedValue(savedComment);
+				likeComment.mockResolvedValue({});
+				renderPopup();
+
+				await screen.findByText('Top');
+				postMainComment();
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
+				likeOther();
+				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(3));
+
+				firstReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
+				secondReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
+
+				await waitFor(() => expect(getTopLevelLikeLabels()).toContain('1 like'));
+				expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
+				expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			});
 		});
 
 		it('shows a toast when the like fails', async () => {

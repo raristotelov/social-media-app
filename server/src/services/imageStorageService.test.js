@@ -18,7 +18,9 @@ const WEBP_BUFFER = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00,
 
 const buildFile = (buffer = JPEG_BUFFER) => ({ buffer, originalname: 'photo.jpg', mimetype: 'image/jpeg' });
 
-const givenCloudinaryUploadResolves = (result = { public_id: 'abc123', secure_url: 'https://res.cloudinary.com/demo/abc123.jpg' }) => {
+const givenCloudinaryUploadResolves = (
+	result = { public_id: 'abc123', secure_url: 'https://res.cloudinary.com/demo/abc123.jpg', width: 1080, height: 1350 },
+) => {
 	const end = jest.fn();
 
 	cloudinary.uploader.upload_stream.mockImplementation((options, callback) => {
@@ -49,12 +51,25 @@ describe('imageStorageService', () => {
 	});
 
 	describe('uploadImage', () => {
-		it('resolves with the Cloudinary public id and secure url', async () => {
+		it('resolves with the Cloudinary public id, secure url, width and height', async () => {
 			givenCloudinaryUploadResolves();
 
 			const result = await uploadImage({ file: buildFile(), fieldName: FIELD_NAME });
 
-			expect(result).toEqual({ imageIdentifier: 'abc123', imageUrl: 'https://res.cloudinary.com/demo/abc123.jpg' });
+			expect(result).toEqual({
+				imageIdentifier: 'abc123',
+				imageUrl: 'https://res.cloudinary.com/demo/abc123.jpg',
+				imageWidth: 1080,
+				imageHeight: 1350,
+			});
+		});
+
+		it('returns the width and height Cloudinary reports for a landscape image', async () => {
+			givenCloudinaryUploadResolves({ public_id: 'wide1', secure_url: 'https://res.cloudinary.com/demo/wide1.jpg', width: 1920, height: 1080 });
+
+			const result = await uploadImage({ file: buildFile(), fieldName: FIELD_NAME });
+
+			expect(result).toMatchObject({ imageWidth: 1920, imageHeight: 1080 });
 		});
 
 		it('streams the file buffer to Cloudinary', async () => {

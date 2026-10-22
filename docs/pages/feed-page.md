@@ -1,6 +1,6 @@
 # Feed Page
 
-Status: In Development
+Status: Complete
 
 Routes `/user-feed` and `/user/:userId/posts` (`client/src/Router.jsx`). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 
@@ -24,6 +24,7 @@ Routes `/user-feed` and `/user/:userId/posts` (`client/src/Router.jsx`). Tokens:
 
 ## Post card
 
+- Image: full card width, height from the image's own ratio, limited to 4:5 (portrait) and 1.91:1 (landscape); beyond those limits it is cropped to the limit, centred. The Figma frames show one example ratio.
 - Caption: cut at 2 lines at the card's width; "… more" shows only when it overflows. Clicking "more" expands the full caption on the card, which grows taller.
 - Captions are limited to 1000 characters, enforced on the server like the bio.
 - Two top-level comments preview under the caption. Replies never preview; they show only in the comments popup.
@@ -31,7 +32,7 @@ Routes `/user-feed` and `/user/:userId/posts` (`client/src/Router.jsx`). Tokens:
 - Post (comment and reply): disabled at 50% opacity while the box is empty or only spaces; the client sends no empty comment.
 - The comment count includes replies.
 - Reply (on a comment or a reply) opens the reply box under what was clicked, prefilled with "@username " of its author (`Comments – Reply` frames). The reply goes under the top-level comment; replies stay one level deep.
-- The server saves the mentioned user with the reply; the posted reply shows "@username" as a link to that profile. If the mention is removed before posting, it is a plain reply. Also a plain reply (no error): the text doesn't start with "@<username>" of the sent user, or the user id is unknown or malformed. Post stays disabled while the box holds only the mention.
+- The server saves the mentioned user with the reply; the posted reply shows "@username" as a link to that profile. If the mention is removed before posting, it is a plain reply. Also a plain reply (no error): the text doesn't start with "@<username>" of the sent user, or the user id is unknown or malformed. Post stays disabled while the box holds only the mention. Opening the reply box puts the cursor in it, after the mention.
 - The post author link (avatar and username) has no hover fade; the like and comment icons keep theirs.
 
 ## Profile posts view
@@ -75,6 +76,7 @@ Apply the #30 error system: behaviour per [error-handling.md](../error-handling.
 - Posts view fails to load: the profile's load error, via the parent route.
 - Comments fail to load: inline "Couldn't load comments · Try again" (`Feed View – Comments – Load Error` frames).
 - Comment or reply saved but the list fails to reload: keep the current list, add the new comment locally, keep the form usable, show no error.
+- Comment like saved but the list fails to reload: keep the current list, apply the like locally, show no error.
 - New codes: `COMMENT_TEXT_REQUIRED` (400, empty comment or reply) — "Comment can't be empty"; `COMMENT_NOT_FOUND` (404, like or reply on a deleted or malformed comment) — "This comment no longer exists".
 - New code: `CAPTION_TOO_LONG` (400, field `caption`, post upload and caption edit) — "Caption must be at most 1000 characters".
 - `POST_NOT_FOUND` also covers like, unlike, add comment and load comments on a missing or malformed post.
@@ -91,6 +93,7 @@ Apply the #30 error system: behaviour per [error-handling.md](../error-handling.
 - The empty-comment 400 carries no code; it becomes `COMMENT_TEXT_REQUIRED`.
 - A reply's parent is not checked. It must be a top-level comment (`parentCommentId: null`) on the same post; otherwise `COMMENT_NOT_FOUND`.
 - The feed route returns 500 when the token's user no longer exists; it becomes `UNAUTHENTICATED`.
+- Posts store `imageWidth` / `imageHeight` (from the Cloudinary upload result) so the card reserves the image height before it loads. No backfill: existing posts are test data.
 
 ## Figma frames
 

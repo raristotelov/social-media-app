@@ -1,4 +1,4 @@
-import { useContext, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import useLoginRedirect from '../../hooks/useLoginRedirect';
@@ -14,12 +14,14 @@ const AddCommentForm = ({
 	initialText = '',
 	fallbackMessage = ACTION_FALLBACK_MESSAGES.ADD_COMMENT,
 	isDisabled = false,
+	shouldFocusOnMount = false,
 	className,
 }) => {
 	const [text, setText] = useState(initialText);
 	const [formError, setFormError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const isSubmittingRef = useRef(false);
+	const inputRef = useRef(null);
 
 	const { loggedInUser } = useContext(LoggedInUserContext);
 	const { runWithSessionGuard } = useSessionGuard();
@@ -28,6 +30,17 @@ const AddCommentForm = ({
 	const isGuest = !loggedInUser;
 	const trimmedText = text.trim();
 	const hasText = Boolean(trimmedText) && trimmedText !== initialText.trim();
+
+	useEffect(() => {
+		const input = inputRef.current;
+
+		if (!shouldFocusOnMount || !input) {
+			return;
+		}
+
+		input.focus();
+		input.setSelectionRange(input.value.length, input.value.length);
+	}, [shouldFocusOnMount]);
 
 	const changeHandler = (event) => {
 		setText(event.target.value);
@@ -72,6 +85,7 @@ const AddCommentForm = ({
 		<div className={classNames}>
 			<form className='add-comment-form-row' onSubmit={submitHandler}>
 				<input
+					ref={inputRef}
 					type='text'
 					className='add-comment-form-input'
 					placeholder={placeholder}

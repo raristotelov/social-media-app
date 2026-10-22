@@ -86,6 +86,8 @@ const addUserPost = async ({ caption, imageFile }, userId) => {
 		userPost = new UserPostModel({
 			imageIdentifier: uploadedImage.imageIdentifier,
 			imageUrl: uploadedImage.imageUrl,
+			imageWidth: uploadedImage.imageWidth,
+			imageHeight: uploadedImage.imageHeight,
 			caption,
 			userId,
 		});

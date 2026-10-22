@@ -134,11 +134,126 @@ describe('profile posts view', () => {
 			cy.get('.profile-post').should('have.length', 3);
 		});
 
+		it('sends the back chevron to the grid after a shared-link visit, a scroll that replaces the hash and a reload', () => {
+			cy.visit(`${gridPath()}/posts#${gridPosts[1]._id}`);
+
+			cy.get('.user-post').should('have.length', 3);
+
+			cy.scrollTo('bottom');
+			cy.location('hash').should('not.eq', `#${gridPosts[1]._id}`);
+
+			cy.reload();
+			cy.get('.user-post').should('have.length', 3);
+
+			cy.get('.posts-bar-back').then(($back) => $back[0].click());
+
+			cy.location('pathname').should('eq', gridPath());
+			cy.get('.profile-post').should('have.length', 3);
+		});
+
 		it('loads the posts view from a shared link', () => {
 			cy.visit(`${gridPath()}/posts#${gridPosts[1]._id}`);
 
 			cy.get('.user-post').should('have.length', 3);
 			cy.contains('.posts-bar .posts-bar-username', gridAuthor.username).should('be.visible');
+		});
+	});
+
+	describe('opening an older post with newer posts above it', () => {
+		const longAuthor = buildTestUser();
+		const POST_COUNT = 5;
+		const TARGET_INDEX = 1;
+		const SCROLL_MARGIN_BELOW_HEADER = 20;
+		const POSITION_TOLERANCE = 2;
+
+		let longAuthorToken;
+		let longAuthorId;
+		let longPosts;
+
+		const readHeaderHeight = () =>
+			cy.window().then((win) => Number.parseFloat(win.getComputedStyle(win.document.documentElement).getPropertyValue('--header-height')));
+
+		const expectAllPostImagesLoaded = () => {
+			cy.get('.user-post-image img').should('have.length', POST_COUNT);
+			cy.get('.user-post-image img').should(($images) => {
+				$images.each((index, image) => {
+					expect(image.complete && image.naturalWidth > 0, `post image ${index} loaded`).to.eq(true);
+				});
+			});
+		};
+
+		const expectTargetJustUnderHeader = (targetId) =>
+			readHeaderHeight().then((headerHeight) => {
+				cy.get(`[id="${targetId}"]`).should(($post) => {
+					const { top } = $post[0].getBoundingClientRect();
+
+					expect(top).to.be.at.least(headerHeight - POSITION_TOLERANCE);
+					expect(top).to.be.at.most(headerHeight + SCROLL_MARGIN_BELOW_HEADER + POSITION_TOLERANCE);
+				});
+			});
+
+		before(() => {
+			createUserViaApi(longAuthor);
+
+			loginViaApi(longAuthor).then((token) => {
+				longAuthorToken = token;
+				longAuthorId = userIdFromToken(token);
+			});
+
+			longPosts = [];
+
+			Cypress._.times(POST_COUNT, (index) => {
+				cy.then(() => uploadPostViaApi(longAuthorToken, `long ${index}`)).then((post) => longPosts.push(post));
+			});
+		});
+
+		after(() => {
+			cy.task('deleteTestUser', longAuthor.email);
+		});
+
+		it('stores the width and height of the uploaded image on the post', () => {
+			longPosts.forEach((post) => {
+				expect(post.imageWidth, 'imageWidth').to.be.a('number').and.to.be.greaterThan(0);
+				expect(post.imageHeight, 'imageHeight').to.be.a('number').and.to.be.greaterThan(0);
+			});
+		});
+
+		it('reserves the image height from the stored size, so the card has its height before the image loads', () => {
+			cy.visit(`/user/${longAuthorId}/posts`);
+
+			cy.get('.user-post-image img')
+				.first()
+				.should(($image) => {
+					const { width, height } = $image[0].getBoundingClientRect();
+
+					expect(width / height).to.be.closeTo(longPosts[POST_COUNT - 1].imageWidth / longPosts[POST_COUNT - 1].imageHeight, 0.02);
+				});
+		});
+
+		it('lands the clicked post just under the header and keeps the hash on it after the images load', () => {
+			const targetId = longPosts[TARGET_INDEX]._id;
+
+			cy.visit(`/user/${longAuthorId}`);
+			cy.get('.profile-post-link').should('have.length', POST_COUNT);
+
+			cy.intercept('GET', 'https://res.cloudinary.com/**', (req) => {
+				req.on('response', (res) => {
+					res.setDelay(1500);
+				});
+			});
+
+			cy.get('.profile-post-link')
+				.eq(POST_COUNT - 1 - TARGET_INDEX)
+				.click();
+
+			cy.location('pathname').should('eq', `/user/${longAuthorId}/posts`);
+			cy.location('hash').should('eq', `#${targetId}`);
+			expectTargetJustUnderHeader(targetId);
+
+			expectAllPostImagesLoaded();
+
+			cy.location('hash').should('eq', `#${targetId}`);
+			expectTargetJustUnderHeader(targetId);
 		});
 	});
 
@@ -368,6 +483,27 @@ describe('profile posts view', () => {
 			cy.get('.comments-popup input[placeholder="Write a reply..."]').type('thanks');
 
 			cy.get('.comments-popup .comment .add-comment-form-submit').should('be.enabled');
+		});
+
+		it('puts the cursor in the reply box after the mention, while the main comment box stays unfocused', () => {
+			cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top focus'));
+
+			openCommentsPopup(replyAuthorToken);
+
+			cy.get('.user-post .add-comment-form-input').should('not.have.focus');
+			cy.get('.comments-popup .add-comment-form-input').should('not.have.focus');
+
+			topComment('top focus').then(($comment) => {
+				replyButtonOf($comment).click();
+			});
+
+			cy.focused()
+				.should('have.attr', 'placeholder', 'Write a reply...')
+				.and('have.value', `@${commenter.username} `)
+				.and(($input) => {
+					expect($input[0].selectionStart).to.eq($input[0].value.length);
+					expect($input[0].selectionEnd).to.eq($input[0].value.length);
+				});
 		});
 
 		it('keeps Post disabled when only spaces follow the mention', () => {

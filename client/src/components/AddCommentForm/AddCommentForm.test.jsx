@@ -432,6 +432,58 @@ describe('AddCommentForm', () => {
 		});
 	});
 
+	describe('focus on mount', () => {
+		it('does not focus the box by default', () => {
+			renderForm();
+
+			expect(getInput()).not.toHaveFocus();
+		});
+
+		it('does not focus the box when shouldFocusOnMount is false', () => {
+			renderForm({ shouldFocusOnMount: false, initialText: '@alice ' });
+
+			expect(getInput()).not.toHaveFocus();
+		});
+
+		it('focuses the box when shouldFocusOnMount is set', () => {
+			renderForm({ shouldFocusOnMount: true });
+
+			expect(getInput()).toHaveFocus();
+		});
+
+		it('puts the caret at the end of the initial text', () => {
+			renderForm({ shouldFocusOnMount: true, initialText: '@alice ' });
+
+			expect([getInput().selectionStart, getInput().selectionEnd]).toEqual([7, 7]);
+		});
+
+		it('puts the caret after a long initial text, not at the start', () => {
+			renderForm({ shouldFocusOnMount: true, initialText: '@alice_in_wonderland_1234 ' });
+
+			expect(getInput().selectionStart).toBe('@alice_in_wonderland_1234 '.length);
+		});
+
+		it('keeps the initial text intact when focusing', () => {
+			renderForm({ shouldFocusOnMount: true, initialText: '@alice ' });
+
+			expect(getInput()).toHaveValue('@alice ');
+		});
+
+		it('lets the next typed characters land after the mention', () => {
+			renderForm({ shouldFocusOnMount: true, initialText: '@alice ' });
+
+			userEvent.keyboard('thanks');
+
+			expect(getInput()).toHaveValue('@alice thanks');
+		});
+
+		it('focuses an empty box without error', () => {
+			renderForm({ shouldFocusOnMount: true });
+
+			expect(getInput().selectionStart).toBe(0);
+		});
+	});
+
 	describe('custom placeholder', () => {
 		it('uses the placeholder it was given for the box and its label', () => {
 			renderForm({ placeholder: 'Write a reply...' });

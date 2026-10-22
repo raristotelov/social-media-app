@@ -105,6 +105,7 @@ describe('ProfilePostsView', () => {
 
 	afterEach(() => {
 		delete window.HTMLElement.prototype.scrollIntoView;
+		window.history.replaceState(null, '');
 	});
 
 	describe('showing the posts of the profile', () => {
@@ -331,10 +332,11 @@ describe('ProfilePostsView', () => {
 			expect(screen.getAllByAltText('user-post')).toHaveLength(3);
 		});
 
-		it('goes to the profile grid when the posts view is the first history entry', async () => {
+		it('goes to the profile grid when the stored history index is 0', async () => {
 			renderProfileRoutes({ entries: ['/user/user2/posts#post2'] });
 
 			await screen.findAllByRole('article');
+			window.history.replaceState({ idx: 0 }, '');
 			userEvent.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
@@ -345,9 +347,53 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ entries: ['/user/user2/posts#post2'] });
 
 			await screen.findAllByRole('article');
+			window.history.replaceState({ idx: 0 }, '');
 			userEvent.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE'));
+		});
+
+		it('reads the history index when Back is clicked, not when the view opened', async () => {
+			window.history.replaceState({ idx: 2 }, '');
+			renderProfileRoutes({ entries: ['/user/user2/posts#post2'] });
+
+			await screen.findAllByRole('article');
+			window.history.replaceState({ idx: 0 }, '');
+			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
+			expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE');
+		});
+
+		it('goes back in history instead of replacing when the stored history index is above 0', async () => {
+			renderProfileRoutes({ entries: ['/popular-posts', '/user/user2/posts#post1'], initialIndex: 1 });
+
+			await screen.findAllByRole('article');
+			window.history.replaceState({ idx: 1 }, '');
+			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+			expect(await screen.findByText('Popular posts page')).toBeInTheDocument();
+			expect(screen.getByTestId('navigation-type')).toHaveTextContent('POP');
+		});
+
+		it('goes back in history when there is no stored history state', async () => {
+			renderProfileRoutes({ entries: ['/popular-posts', '/user/user2/posts#post1'], initialIndex: 1 });
+
+			await screen.findAllByRole('article');
+			window.history.replaceState(null, '');
+			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+			expect(await screen.findByText('Popular posts page')).toBeInTheDocument();
+		});
+
+		it('does not treat a stored index of 0 on a different state shape as the first entry', async () => {
+			renderProfileRoutes({ entries: ['/popular-posts', '/user/user2/posts#post1'], initialIndex: 1 });
+
+			await screen.findAllByRole('article');
+			window.history.replaceState({ usr: { idx: 0 } }, '');
+			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+			expect(await screen.findByText('Popular posts page')).toBeInTheDocument();
 		});
 	});
 

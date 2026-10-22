@@ -10,6 +10,7 @@ import { addComment } from '../../services/commentService';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 import { countCommentsAndReplies, getPreviewComments } from '../../utils/comments';
 import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
+import { getPostImageAspectRatio } from '../../utils/images';
 
 import AddCommentForm from '../AddCommentForm/AddCommentForm';
 import CommentsPopup from '../CommentsPopup/CommentsPopup';
@@ -35,7 +36,9 @@ const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDe
 	const redirectToLogin = useLoginRedirect();
 	const { isMenuOpen, menuContainerRef, toggleMenu, closeMenu } = usePostActionsMenu();
 
-	const { _id: userPostId, likes = [], commentsCount = 0, previewComments = [], caption, imageUrl } = userPostData;
+	const { _id: userPostId, likes = [], commentsCount = 0, previewComments = [], caption, imageUrl, imageWidth, imageHeight } = userPostData;
+
+	const imageAspectRatio = getPostImageAspectRatio({ imageWidth, imageHeight });
 
 	const hasLikedUserPost = likes.includes(loggedInUser?._id);
 
@@ -143,7 +146,7 @@ const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDe
 			</header>
 
 			<div className='user-post-image'>
-				<img src={imageUrl} alt='post' />
+				<img src={imageUrl} alt='post' style={{ aspectRatio: imageAspectRatio }} />
 			</div>
 
 			<div className='user-post-footer'>

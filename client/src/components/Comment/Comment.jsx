@@ -66,7 +66,7 @@ const Comment = ({ comment, userPostId, onReload, isReply = false, parentComment
 				await likeComment({ commentId: comment._id, jwtToken });
 			}
 
-			await onReload();
+			await onReload(undefined, { commentId: comment._id, userId: loggedInUser._id, isLiked: !hasLikedComment });
 		} catch (error) {
 			if (isUnauthenticatedError(error)) {
 				endSession();
@@ -166,6 +166,7 @@ const Comment = ({ comment, userPostId, onReload, isReply = false, parentComment
 							onSubmit={submitReply}
 							placeholder='Write a reply...'
 							initialText={`${replyMention} `}
+							shouldFocusOnMount
 							fallbackMessage={ACTION_FALLBACK_MESSAGES.ADD_REPLY}
 						/>
 					) : null}

@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 
 import usePostHashSync from '../../hooks/usePostHashSync';
 
@@ -8,7 +8,9 @@ import UserPost from '../UserPost/UserPost';
 
 import './ProfilePostsView.css';
 
-const INITIAL_HISTORY_ENTRY_KEY = 'default';
+const FIRST_HISTORY_ENTRY_INDEX = 0;
+
+const isFirstHistoryEntry = () => window.history.state?.idx === FIRST_HISTORY_ENTRY_INDEX;
 
 const ProfilePostsView = () => {
 	const { userData, userPosts, setUserPosts, isLoggedInUserProfile, onEditPostClick, onDeletePostClick } = useOutletContext();
@@ -18,12 +20,9 @@ const ProfilePostsView = () => {
 	usePostHashSync(postsListRef);
 
 	const navigate = useNavigate();
-	const location = useLocation();
-
-	const isFirstHistoryEntryRef = useRef(location.key === INITIAL_HISTORY_ENTRY_KEY);
 
 	const goBackToProfile = () => {
-		if (isFirstHistoryEntryRef.current) {
+		if (isFirstHistoryEntry()) {
 			navigate(`/user/${userData._id}`, { replace: true });
 
 			return;

@@ -1,9 +1,9 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getComments, addComment } from '../../services/commentService';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';
-import { addCommentLocally } from '../../utils/comments';
+import { addCommentLocally, applyLikeLocally } from '../../utils/comments';
 
 import AddCommentForm from '../AddCommentForm/AddCommentForm';
 import Comment from '../Comment/Comment';
@@ -26,6 +26,14 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 		onCommentsLoadedRef.current = onCommentsLoaded;
 	}, [onCommentsLoaded]);
 
+	const commentsRef = useRef(comments);
+
+	const applyComments = useCallback((nextComments) => {
+		commentsRef.current = nextComments;
+		setComments(nextComments);
+		onCommentsLoadedRef.current(nextComments);
+	}, []);
+
 	useEffect(() => {
 		let isCurrentRequest = true;
 
@@ -38,8 +46,7 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 					return;
 				}
 
-				setComments(result);
-				onCommentsLoadedRef.current(result);
+				applyComments(result);
 			})
 			.catch(() => {
 				if (isCurrentRequest) {
@@ -55,31 +62,41 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [userPostId, jwtToken, retryCount]);
+	}, [userPostId, jwtToken, retryCount, applyComments]);
 
 	const retryLoad = () => {
 		setRetryCount((count) => count + 1);
 	};
 
-	const reloadComments = async (addedComment) => {
+	const getLocallyUpdatedComments = (addedComment, likeChange) => {
+		if (addedComment) {
+			return addCommentLocally(commentsRef.current, addedComment);
+		}
+
+		if (likeChange) {
+			return applyLikeLocally(commentsRef.current, likeChange);
+		}
+
+		return null;
+	};
+
+	const reloadComments = async (addedComment, likeChange) => {
 		try {
 			const result = await getComments({ userPostId, jwtToken });
 
-			setComments(result);
 			setHasLoadFailed(false);
-			onCommentsLoadedRef.current(result);
+			applyComments(result);
 		} catch {
-			if (!addedComment) {
+			const locallyUpdatedComments = getLocallyUpdatedComments(addedComment, likeChange);
+
+			if (!locallyUpdatedComments) {
 				setHasLoadFailed(true);
 
 				return;
 			}
 
-			const updatedComments = addCommentLocally(comments, addedComment);
-
-			setComments(updatedComments);
 			setHasLoadFailed(false);
-			onCommentsLoadedRef.current(updatedComments);
+			applyComments(locallyUpdatedComments);
 		}
 	};
 
