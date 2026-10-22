@@ -44,9 +44,9 @@ describe('profile load error', () => {
 		cy.visit(profilePath);
 		cy.wait('@failingProfile');
 
-		cy.contains('.profile-load-error h1', "Couldn't load this profile").should('be.visible');
-		cy.contains('.profile-load-error', 'Check your connection and try again.').should('be.visible');
-		cy.contains('.profile-load-error button', 'Retry').should('be.visible');
+		cy.contains('.page-load-error h1', "Couldn't load this profile").should('be.visible');
+		cy.contains('.page-load-error', 'Check your connection and try again.').should('be.visible');
+		cy.contains('.page-load-error button', 'Retry').should('be.visible');
 		cy.get('.profile-header').should('not.exist');
 	});
 
@@ -60,7 +60,7 @@ describe('profile load error', () => {
 		cy.wait('@failingProfile');
 
 		cy.get('.header-wrapper').should('be.visible');
-		cy.get('.profile-load-error').should('be.visible');
+		cy.get('.page-load-error').should('be.visible');
 	});
 
 	it('shows the load error when the network fails', () => {
@@ -68,7 +68,7 @@ describe('profile load error', () => {
 
 		cy.visit(profilePath);
 
-		cy.contains('.profile-load-error h1', "Couldn't load this profile").should('be.visible');
+		cy.contains('.page-load-error h1', "Couldn't load this profile").should('be.visible');
 	});
 
 	it('loads the profile when Retry is clicked after a one-off failure', () => {
@@ -77,17 +77,17 @@ describe('profile load error', () => {
 		cy.visit(profilePath);
 		cy.wait('@profileRequest');
 
-		cy.contains('.profile-load-error button', 'Retry')
+		cy.contains('.page-load-error button', 'Retry')
 			.should('be.visible')
 			.then(() => {
 				profileLoad.shouldFail = false;
 			});
 
-		cy.contains('.profile-load-error button', 'Retry').click();
+		cy.contains('.page-load-error button', 'Retry').click();
 		cy.wait('@profileRequest');
 
 		cy.contains('.profile-header .username', user.username).should('be.visible');
-		cy.get('.profile-load-error').should('not.exist');
+		cy.get('.page-load-error').should('not.exist');
 	});
 
 	it('keeps the load error and Retry when the retry fails too', () => {
@@ -98,11 +98,11 @@ describe('profile load error', () => {
 		cy.visit(profilePath);
 		cy.wait('@failingProfile');
 
-		cy.contains('.profile-load-error button', 'Retry').click();
+		cy.contains('.page-load-error button', 'Retry').click();
 		cy.wait('@failingProfile');
 
-		cy.contains('.profile-load-error button', 'Retry').should('be.enabled');
-		cy.contains('.profile-load-error h1', "Couldn't load this profile").should('be.visible');
+		cy.contains('.page-load-error button', 'Retry').should('be.enabled');
+		cy.contains('.page-load-error h1', "Couldn't load this profile").should('be.visible');
 	});
 
 	it('works at 390 wide', () => {
@@ -114,7 +114,7 @@ describe('profile load error', () => {
 		cy.visit(profilePath);
 		cy.wait('@failingProfile');
 
-		cy.contains('.profile-load-error button', 'Retry').should('be.visible');
+		cy.contains('.page-load-error button', 'Retry').should('be.visible');
 		cy.get('.tab-bar').should('be.visible');
 	});
 
@@ -124,7 +124,7 @@ describe('profile load error', () => {
 
 			cy.get('.header-wrapper, .tab-bar').should('exist');
 			cy.get('.profile-header').should('not.exist');
-			cy.get('.profile-load-error').should('not.exist');
+			cy.get('.page-load-error').should('not.exist');
 			cy.get('.toast').should('not.exist');
 		});
 
@@ -132,7 +132,7 @@ describe('profile load error', () => {
 			cy.visit('/user/not-an-object-id');
 
 			cy.get('.profile-header').should('not.exist');
-			cy.get('.profile-load-error').should('not.exist');
+			cy.get('.page-load-error').should('not.exist');
 			cy.get('.toast').should('not.exist');
 		});
 	});

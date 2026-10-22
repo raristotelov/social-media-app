@@ -108,6 +108,35 @@ describe('EditPostForm', () => {
 		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
 	});
 
+	it('limits the caption input to 1000 characters', () => {
+		renderEditPostForm(jest.fn(), jest.fn());
+
+		expect(screen.getByPlaceholderText('Write a caption...')).toHaveAttribute('maxlength', '1000');
+	});
+
+	it('shows CAPTION_TOO_LONG under the caption field and no form message', async () => {
+		const editPostHandler = jest.fn().mockRejectedValue({ code: 'CAPTION_TOO_LONG', fields: { caption: 'CAPTION_TOO_LONG' }, status: 400 });
+		const { container } = renderEditPostForm(editPostHandler, jest.fn());
+
+		userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' extra');
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+		const message = await screen.findByText('Caption must be at most 1000 characters');
+		expect(message).toHaveClass('field-error');
+		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
+	});
+
+	it('marks the caption field as invalid when CAPTION_TOO_LONG comes back', async () => {
+		const editPostHandler = jest.fn().mockRejectedValue({ code: 'CAPTION_TOO_LONG', fields: { caption: 'CAPTION_TOO_LONG' }, status: 400 });
+		renderEditPostForm(editPostHandler, jest.fn());
+
+		userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' extra');
+		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+		await screen.findByText('Caption must be at most 1000 characters');
+		expect(screen.getByPlaceholderText('Write a caption...')).toHaveAttribute('aria-invalid', 'true');
+	});
+
 	it('shows the edit-caption fallback copy for INTERNAL_ERROR', async () => {
 		const editPostHandler = jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 		renderEditPostForm(editPostHandler, jest.fn());

@@ -7,10 +7,10 @@ export const getComments = ({ userPostId, jwtToken }) => {
 	return request.get(`${serverUrl}/comments/post/${userPostId}`);
 };
 
-export const addComment = ({ userPostId, text, parentCommentId, jwtToken }) => {
+export const addComment = ({ userPostId, text, parentCommentId, mentionedUserId, jwtToken }) => {
 	const request = requestFactory(jwtToken);
 
-	return request.post(`${serverUrl}/comments`, { userPostId, text, parentCommentId });
+	return request.post(`${serverUrl}/comments`, { userPostId, text, parentCommentId, mentionedUserId });
 };
 
 export const likeComment = ({ commentId, jwtToken }) => {

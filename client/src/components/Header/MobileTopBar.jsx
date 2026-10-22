@@ -27,6 +27,8 @@ const getTrailingAction = (pathname, loggedInUser) => {
 	return 'none';
 };
 
+const PROFILE_POSTS_PATH_PATTERN = /^\/user\/[^/]+\/posts\/?$/;
+
 const MobileTopBar = ({ logoutHandler }) => {
 	const { loggedInUser } = useContext(LoggedInUserContext);
 	const { pathname } = useLocation();
@@ -48,6 +50,10 @@ const MobileTopBar = ({ logoutHandler }) => {
 		setIsSearching(false);
 		clearSearch();
 	};
+
+	if (PROFILE_POSTS_PATH_PATTERN.test(pathname)) {
+		return null;
+	}
 
 	if (isSearching) {
 		return (

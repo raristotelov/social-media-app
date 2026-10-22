@@ -1,4 +1,4 @@
-import { isAcceptedImageType, resizeImage } from './images';
+import { getPostImageAspectRatio, isAcceptedImageType, resizeImage } from './images';
 
 const buildImage = (name = 'photo.png', type = 'image/png') => new File(['(image)'], name, { type });
 
@@ -13,6 +13,36 @@ describe('isAcceptedImageType', () => {
 
 	it.each([[undefined], [null]])('rejects %p without throwing', (file) => {
 		expect(isAcceptedImageType(file)).toBe(false);
+	});
+});
+
+describe('getPostImageAspectRatio', () => {
+	it('returns 1 for a square image', () => {
+		expect(getPostImageAspectRatio({ imageWidth: 1080, imageHeight: 1080 })).toBe(1);
+	});
+
+	it('returns width over height for a ratio inside the allowed range', () => {
+		expect(getPostImageAspectRatio({ imageWidth: 1000, imageHeight: 1100 })).toBeCloseTo(1000 / 1100);
+	});
+
+	it('returns 4:5 exactly at the portrait limit', () => {
+		expect(getPostImageAspectRatio({ imageWidth: 1080, imageHeight: 1350 })).toBeCloseTo(0.8);
+	});
+
+	it('returns 1.91 exactly at the landscape limit', () => {
+		expect(getPostImageAspectRatio({ imageWidth: 1910, imageHeight: 1000 })).toBeCloseTo(1.91);
+	});
+
+	it('limits a portrait image taller than 4:5 to 0.8', () => {
+		expect(getPostImageAspectRatio({ imageWidth: 500, imageHeight: 2000 })).toBeCloseTo(0.8);
+	});
+
+	it('limits a landscape image wider than 1.91:1 to 1.91', () => {
+		expect(getPostImageAspectRatio({ imageWidth: 4000, imageHeight: 1000 })).toBe(1.91);
+	});
+
+	it('does not limit a 16:9 image, which is inside the range', () => {
+		expect(getPostImageAspectRatio({ imageWidth: 1920, imageHeight: 1080 })).toBeCloseTo(16 / 9);
 	});
 });
 

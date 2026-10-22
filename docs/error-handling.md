@@ -51,4 +51,4 @@ Base: `https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Desi
 | Profile View – Load Error | 564:4266 / 564:4320 | 568:4272 / 568:4326 | 568:7407 / 568:7475 |
 | Feed View – Comments – Load Error | 564:6780 / 564:6928 | 568:4333 / 568:4513 | 568:7483 / 568:7654 |
 
-The comments frames are the reference for inline errors; the feed adopts them when it is redesigned.
+The comments frames are the reference for inline errors; the feed uses them.

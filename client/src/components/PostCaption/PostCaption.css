@@ -1,0 +1,43 @@
+.post-caption {
+	position: relative;
+	margin: 0 0 13px;
+
+	font-family: 'Mada';
+	font-size: 15px;
+	color: var(--text-primary);
+	overflow-wrap: anywhere;
+}
+
+.post-caption-clamped {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+
+	overflow: hidden;
+}
+
+.post-caption-username {
+	font-weight: bold;
+}
+
+.post-caption-more {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	padding: 0 0 0 4px;
+
+	border: none;
+	background-color: var(--background-surface);
+
+	font: inherit;
+	color: var(--text-secondary);
+}
+
+.post-caption-more:hover {
+	cursor: pointer;
+}
+
+.post-caption-more-ellipsis {
+	color: var(--text-primary);
+}

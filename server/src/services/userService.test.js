@@ -1037,8 +1037,6 @@ describe('userService', () => {
 		describe('resolving profiles', () => {
 			const OWNER_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
 			const OTHER_ID = '64b7f0a1c2d3e4f5a6b7c8e2';
-			const AUTHOR_ONE_ID = '64b7f0a1c2d3e4f5a6b7c8f1';
-			const AUTHOR_TWO_ID = '64b7f0a1c2d3e4f5a6b7c8f2';
 
 			const buildUser = ({ _id, email = `${_id}@example.com`, posts = [], following = [] }) => {
 				const data = { _id, username: `user-${_id}`, email, posts, following, followers: [] };
@@ -1046,33 +1044,12 @@ describe('userService', () => {
 				return { _id, posts, toObject: () => ({ ...data }) };
 			};
 
-			const buildPostDoc = ({ _id, author }) => {
-				const data = { _id, userId: { _id: author, username: `user-${author}` }, imageUrl: `https://example.com/${_id}.jpg` };
-
-				return { _id, toObject: () => ({ ...data }) };
-			};
-
-			const givenLookup = ({ users, followedUserDocs = [], followedPostDocs = [], commentCounts = {} }) => {
-				const populateFollowedPostAuthor = jest.fn();
-
-				UserModel.find = jest
-					.fn()
-					.mockReturnValueOnce({
-						select: jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(users) }),
-					})
-					.mockReturnValueOnce({ select: jest.fn().mockResolvedValue(followedUserDocs) });
-				UserPostModel.find = jest.fn().mockImplementation((filter) => {
-					const requestedAuthorIds = filter.userId.$in.map(String);
-
-					populateFollowedPostAuthor.mockResolvedValue(
-						followedPostDocs.filter((postDoc) => requestedAuthorIds.includes(String(postDoc.toObject().userId._id))),
-					);
-
-					return { populate: populateFollowedPostAuthor };
+			const givenLookup = ({ users, commentCounts = {}, previewComments = {} }) => {
+				UserModel.find = jest.fn().mockReturnValue({
+					select: jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(users) }),
 				});
 				commentService.getCommentCountsForPosts.mockResolvedValue(commentCounts);
-
-				return populateFollowedPostAuthor;
+				commentService.getPreviewCommentsForPosts.mockResolvedValue(previewComments);
 			};
 
 			describe('email visibility', () => {
@@ -1129,8 +1106,8 @@ describe('userService', () => {
 					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
 
 					expect(profile.posts).toEqual([
-						{ _id: 'post1', commentsCount: 3 },
-						{ _id: 'post2', commentsCount: 0 },
+						{ _id: 'post1', commentsCount: 3, previewComments: [] },
+						{ _id: 'post2', commentsCount: 0, previewComments: [] },
 					]);
 				});
 
@@ -1145,100 +1122,145 @@ describe('userService', () => {
 				});
 			});
 
-			describe('followed users posts', () => {
-				it('populates each post author with only the username and profile picture, never the email or password hash', async () => {
-					const populateAuthor = givenLookup({
-						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID] })],
-						followedUserDocs: [{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] }],
-					});
-
-					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
-
-					expect(populateAuthor).toHaveBeenCalledWith({ path: 'userId', select: 'username profilePicture' });
-				});
-
-				it('keeps every post of a followed author, not just the last one', async () => {
+			describe('profile posts', () => {
+				it('puts the newest post first, whatever order the user stores them in', async () => {
 					givenLookup({
-						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID] })],
-						followedUserDocs: [{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] }],
-						followedPostDocs: [
-							buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }),
-							buildPostDoc({ _id: 'p2', author: AUTHOR_ONE_ID }),
-							buildPostDoc({ _id: 'p3', author: AUTHOR_ONE_ID }),
+						users: [
+							buildUser({
+								_id: OWNER_ID,
+								posts: [
+									{ _id: 'oldest', createdAt: '2024-01-01T00:00:00.000Z' },
+									{ _id: 'newest', createdAt: '2024-03-01T00:00:00.000Z' },
+									{ _id: 'middle', createdAt: '2024-02-01T00:00:00.000Z' },
+								],
+							}),
 						],
 					});
 
 					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
 
-					expect(profile.followedUsersPosts.map((post) => post._id)).toEqual(['p1', 'p2', 'p3']);
+					expect(profile.posts.map((post) => post._id)).toEqual(['newest', 'middle', 'oldest']);
 				});
 
-				it('gives each user only the posts of the authors they follow', async () => {
+				it('orders posts stored as Date values newest first as well', async () => {
 					givenLookup({
-						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID] }), buildUser({ _id: OTHER_ID, following: [AUTHOR_TWO_ID] })],
-						followedUserDocs: [
-							{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] },
-							{ _id: OTHER_ID, following: [AUTHOR_TWO_ID] },
+						users: [
+							buildUser({
+								_id: OWNER_ID,
+								posts: [
+									{ _id: 'older', createdAt: new Date('2024-01-01T00:00:00.000Z') },
+									{ _id: 'newer', createdAt: new Date('2024-02-01T00:00:00.000Z') },
+								],
+							}),
 						],
-						followedPostDocs: [buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }), buildPostDoc({ _id: 'p2', author: AUTHOR_TWO_ID })],
+					});
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(profile.posts.map((post) => post._id)).toEqual(['newer', 'older']);
+				});
+
+				it('sorts the posts of each requested profile on its own', async () => {
+					givenLookup({
+						users: [
+							buildUser({
+								_id: OWNER_ID,
+								posts: [
+									{ _id: 'a-old', createdAt: '2024-01-01T00:00:00.000Z' },
+									{ _id: 'a-new', createdAt: '2024-02-01T00:00:00.000Z' },
+								],
+							}),
+							buildUser({
+								_id: OTHER_ID,
+								posts: [
+									{ _id: 'b-old', createdAt: '2024-03-01T00:00:00.000Z' },
+									{ _id: 'b-new', createdAt: '2024-04-01T00:00:00.000Z' },
+								],
+							}),
+						],
 					});
 
 					const profiles = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
 
-					expect(profiles.map((profile) => profile.followedUsersPosts.map((post) => post._id))).toEqual([['p1'], ['p2']]);
+					expect(profiles.map((profile) => profile.posts.map((post) => post._id))).toEqual([
+						['a-new', 'a-old'],
+						['b-new', 'b-old'],
+					]);
 				});
 
-				it('maps users by their _id, so a lookup that returns them in a different order than requested attaches the right posts', async () => {
+				it('returns an empty list for a profile without posts', async () => {
+					givenLookup({ users: [buildUser({ _id: OWNER_ID })] });
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+
+					expect(profile.posts).toEqual([]);
+				});
+
+				it('adds the preview comments of each post, defaulting to an empty list', async () => {
+					const preview = [{ _id: 'c1' }, { _id: 'c2' }];
+
 					givenLookup({
-						users: [buildUser({ _id: OWNER_ID }), buildUser({ _id: OTHER_ID })],
-						followedUserDocs: [
-							{ _id: OTHER_ID, following: [AUTHOR_TWO_ID] },
-							{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] },
+						users: [
+							buildUser({
+								_id: OWNER_ID,
+								posts: [
+									{ _id: 'post2', createdAt: '2024-02-01T00:00:00.000Z' },
+									{ _id: 'post1', createdAt: '2024-01-01T00:00:00.000Z' },
+								],
+							}),
 						],
-						followedPostDocs: [buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }), buildPostDoc({ _id: 'p2', author: AUTHOR_TWO_ID })],
-					});
-
-					const profiles = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
-
-					expect(profiles.map((profile) => profile.followedUsersPosts.map((post) => post._id))).toEqual([['p1'], ['p2']]);
-				});
-
-				it('attaches a commentsCount to each followed post', async () => {
-					givenLookup({
-						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID] })],
-						followedUserDocs: [{ _id: OWNER_ID, following: [AUTHOR_ONE_ID] }],
-						followedPostDocs: [buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }), buildPostDoc({ _id: 'p2', author: AUTHOR_ONE_ID })],
-						commentCounts: { p1: 4 },
+						previewComments: { post2: preview },
 					});
 
 					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
 
-					expect(profile.followedUsersPosts.map((post) => post.commentsCount)).toEqual([4, 0]);
+					expect(profile.posts.map((post) => post.previewComments)).toEqual([preview, []]);
 				});
 
-				it('loads the posts of all followed users with a single userId query', async () => {
+				it('asks for the preview comments of all profile posts in one call', async () => {
 					givenLookup({
-						users: [buildUser({ _id: OWNER_ID, following: [AUTHOR_ONE_ID, AUTHOR_TWO_ID] })],
-						followedUserDocs: [{ _id: OWNER_ID, following: [AUTHOR_ONE_ID, AUTHOR_TWO_ID] }],
-						followedPostDocs: [buildPostDoc({ _id: 'p1', author: AUTHOR_ONE_ID }), buildPostDoc({ _id: 'p2', author: AUTHOR_TWO_ID })],
+						users: [buildUser({ _id: OWNER_ID, posts: [{ _id: 'post1' }] }), buildUser({ _id: OTHER_ID, posts: [{ _id: 'post2' }] })],
 					});
 
-					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
 
-					expect(UserPostModel.find).toHaveBeenCalledTimes(1);
-					expect(UserPostModel.find).toHaveBeenCalledWith({ userId: { $in: [AUTHOR_ONE_ID, AUTHOR_TWO_ID] } });
-					expect(UserModel.find).toHaveBeenCalledTimes(2);
+					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
+					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2']);
+				});
+			});
+
+			describe('the response no longer carries the feed', () => {
+				it('has no followedUsersPosts on a profile', async () => {
+					givenLookup({ users: [buildUser({ _id: OWNER_ID, following: [OTHER_ID] })] });
+
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID], requesterId: OWNER_ID });
+
+					expect(profile).not.toHaveProperty('followedUsersPosts');
 				});
 
-				it('returns an empty list for a user who follows nobody', async () => {
-					givenLookup({
-						users: [buildUser({ _id: OWNER_ID })],
-						followedUserDocs: [{ _id: OWNER_ID, following: [] }],
-					});
+				it('keeps the list of followed users, which the profile still needs', async () => {
+					givenLookup({ users: [buildUser({ _id: OWNER_ID, following: [OTHER_ID] })] });
 
-					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
+					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID], requesterId: OWNER_ID });
 
-					expect(profile.followedUsersPosts).toEqual([]);
+					expect(profile.following).toEqual([OTHER_ID]);
+				});
+
+				it('does not load the posts of the followed users', async () => {
+					UserPostModel.find = jest.fn();
+					givenLookup({ users: [buildUser({ _id: OWNER_ID, following: [OTHER_ID] })] });
+
+					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID], requesterId: OWNER_ID });
+
+					expect(UserPostModel.find).not.toHaveBeenCalled();
+				});
+
+				it('queries the users once, without a second lookup for followed users', async () => {
+					givenLookup({ users: [buildUser({ _id: OWNER_ID, following: [OTHER_ID] })] });
+
+					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID], requesterId: OWNER_ID });
+
+					expect(UserModel.find).toHaveBeenCalledTimes(1);
 				});
 			});
 		});

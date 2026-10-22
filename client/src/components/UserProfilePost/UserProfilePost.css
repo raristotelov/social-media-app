@@ -4,6 +4,12 @@
 	aspect-ratio: 1;
 }
 
+.profile-post-link {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
 .profile-post img {
 	display: block;
 	width: 100%;

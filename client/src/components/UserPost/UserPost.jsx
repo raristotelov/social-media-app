@@ -1,219 +1,201 @@
-import { useState, useContext } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 
-import Comment from '../Comment/Comment';
-import CommentIcon from '../icons/Comment';
-import ArrowDownIcon from '../icons/ArrowDown';
-import HeartIcon from '../icons/Heart';
-
-import { likeUserPost, unlikeUserPost } from '../../services/userPostService';
-import { getComments, addComment } from '../../services/commentService';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import Popup from '../Popup/Popup';
+import ToastContext from '../../contexts/ToastContext';
+import useLoginRedirect from '../../hooks/useLoginRedirect';
+import usePostActionsMenu from '../../hooks/usePostActionsMenu';
+import { likeUserPost, unlikeUserPost } from '../../services/userPostService';
+import { addComment } from '../../services/commentService';
+import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
+import { countCommentsAndReplies, getPreviewComments } from '../../utils/comments';
+import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
+import { getPostImageAspectRatio } from '../../utils/images';
+
+import AddCommentForm from '../AddCommentForm/AddCommentForm';
+import CommentsPopup from '../CommentsPopup/CommentsPopup';
+import PostActionsMenu from '../PostActionsMenu/PostActionsMenu';
+import PostCaption from '../PostCaption/PostCaption';
+import ProfilePicture from '../ProfilePicture/ProfilePicture';
+import CommentOutlineIcon from '../icons/CommentOutline';
+import HeartIcon from '../icons/Heart';
+import PostActionsIcon from '../icons/PostActions';
 
 import './UserPost.css';
 
-const UserPost = (props) => {
+const HEART_PULSE_DURATION_MS = 500;
+
+const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDeleteClick, onPostChange }) => {
 	const [isHeartPulsing, setIsHeartPulsing] = useState(false);
 	const [isCommentsPopupOpen, setIsCommentsPopupOpen] = useState(false);
-	const [comments, setComments] = useState([]);
-	const [newComment, setNewComment] = useState('');
+	const isUpdatingLikeRef = useRef(false);
+	const heartPulseTimeoutRef = useRef(null);
 
-	const { userPostData } = props;
+	const { jwtToken, loggedInUser, endSession } = useContext(LoggedInUserContext);
+	const { showToast } = useContext(ToastContext);
+	const redirectToLogin = useLoginRedirect();
+	const { isMenuOpen, menuContainerRef, toggleMenu, closeMenu } = usePostActionsMenu();
 
-	const userPostAuthor = userPostData.userId;
+	const { _id: userPostId, likes = [], commentsCount = 0, previewComments = [], caption, imageUrl, imageWidth, imageHeight } = userPostData;
 
-	const { jwtToken, loggedInUser, setLoggedInUser } = useContext(LoggedInUserContext);
+	const imageAspectRatio = getPostImageAspectRatio({ imageWidth, imageHeight });
 
-	const [commentsCount, setCommentsCount] = useState(userPostData.commentsCount || 0);
+	const hasLikedUserPost = likes.includes(loggedInUser?._id);
 
-	const triggerPulse = () => {
+	useEffect(() => {
+		return () => {
+			clearTimeout(heartPulseTimeoutRef.current);
+		};
+	}, []);
+
+	const triggerHeartPulse = () => {
 		setIsHeartPulsing(true);
-		setTimeout(() => setIsHeartPulsing(false), 500);
+
+		heartPulseTimeoutRef.current = setTimeout(() => setIsHeartPulsing(false), HEART_PULSE_DURATION_MS);
 	};
 
-	const onLikeUserPostHandler = async ({ userPostToLikeId }) => {
-		try {
-			const updatedUserPostData = await likeUserPost({ userPostToLikeId, jwtToken });
+	const toggleLike = async () => {
+		if (!loggedInUser) {
+			redirectToLogin();
 
-			// TODO make this better
-			setLoggedInUser((currLoggedInUser) => {
-				const followedUsersPosts = currLoggedInUser.followedUsersPosts;
-
-				const currUserPost = followedUsersPosts.find((userPost) => userPost._id === updatedUserPostData._id);
-
-				currUserPost.likes = updatedUserPostData.likes;
-
-				return {
-					...currLoggedInUser,
-					followedUsersPosts: [...followedUsersPosts.filter((userPost) => userPost._id !== updatedUserPostData._id), currUserPost].sort(
-						(a, b) => b.createdAt - a.createdAt,
-					),
-				};
-			});
-
-			triggerPulse();
-		} catch (error) {
-			console.log('error', error);
-		}
-	};
-
-	const onUnlikeUserPostHandler = async ({ userPostToUnlikeId }) => {
-		try {
-			const updatedUserPostData = await unlikeUserPost({ userPostToUnlikeId, jwtToken });
-
-			// TODO make this better
-			setLoggedInUser((currLoggedInUser) => {
-				const followedUsersPosts = currLoggedInUser.followedUsersPosts;
-
-				const currUserPost = followedUsersPosts.find((userPost) => userPost._id === updatedUserPostData._id);
-
-				currUserPost.likes = updatedUserPostData.likes;
-
-				return {
-					...currLoggedInUser,
-					followedUsersPosts: [...followedUsersPosts.filter((userPost) => userPost._id !== updatedUserPostData._id), currUserPost].sort(
-						(a, b) => b.createdAt - a.createdAt,
-					),
-				};
-			});
-		} catch (error) {
-			console.log('error', error);
-		}
-	};
-
-	const loadComments = async () => {
-		try {
-			const fetchedComments = await getComments({ userPostId: userPostData._id, jwtToken });
-
-			setComments(fetchedComments);
-
-			const total = fetchedComments.reduce((sum, comment) => sum + 1 + (comment.replies ? comment.replies.length : 0), 0);
-			setCommentsCount(total);
-		} catch (error) {
-			console.log('Something went wrong while loading comments', error);
-		}
-	};
-
-	const openCommentsPopup = () => {
-		setIsCommentsPopupOpen(true);
-		loadComments();
-	};
-
-	const closeCommentsPopup = () => {
-		setIsCommentsPopupOpen(false);
-	};
-
-	const onAddCommentSubmit = async (e) => {
-		e.preventDefault();
-
-		if (!newComment.trim()) {
 			return;
 		}
 
+		if (isUpdatingLikeRef.current) {
+			return;
+		}
+
+		isUpdatingLikeRef.current = true;
+
 		try {
-			await addComment({ userPostId: userPostData._id, text: newComment, jwtToken });
+			const updatedUserPost = hasLikedUserPost
+				? await unlikeUserPost({ userPostToUnlikeId: userPostId, jwtToken })
+				: await likeUserPost({ userPostToLikeId: userPostId, jwtToken });
 
-			setNewComment('');
+			onPostChange(userPostId, { likes: updatedUserPost.likes });
 
-			await loadComments();
+			if (!hasLikedUserPost) {
+				triggerHeartPulse();
+			}
 		} catch (error) {
-			console.log('Something went wrong while adding a comment', error);
+			if (isUnauthenticatedError(error)) {
+				endSession();
+			} else {
+				showToast(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.UPDATE_LIKE));
+			}
+		} finally {
+			isUpdatingLikeRef.current = false;
 		}
 	};
 
-	const loggedInUserHasLikedUserPost = userPostData.likes.includes(loggedInUser?._id);
-
-	const addCommentForm = (
-		<form className='add-comment-textarea-wrapper' onSubmit={onAddCommentSubmit}>
-			<input
-				type='text'
-				className='add-comment-input'
-				placeholder='Add a comment...'
-				value={newComment}
-				onChange={(e) => setNewComment(e.target.value)}
-			/>
-		</form>
+	const updateFromLoadedComments = useCallback(
+		(loadedComments) => {
+			onPostChange(userPostId, {
+				commentsCount: countCommentsAndReplies(loadedComments),
+				previewComments: getPreviewComments(loadedComments),
+			});
+		},
+		[onPostChange, userPostId],
 	);
 
+	const submitComment = async (text) => {
+		const addedComment = await addComment({ userPostId, text, jwtToken });
+
+		onPostChange(userPostId, {
+			commentsCount: commentsCount + 1,
+			previewComments: getPreviewComments([...previewComments, addedComment]),
+		});
+	};
+
+	const editClickHandler = () => {
+		closeMenu();
+		onEditClick(userPostData);
+	};
+
+	const deleteClickHandler = () => {
+		closeMenu();
+		onDeleteClick(userPostData);
+	};
+
 	return (
-		<div className='post-wrapper'>
-			<div className='account-details'>
-				<img src='https://i.pinimg.com/736x/30/df/1c/30df1cb8981338d42ed2722ab74cb51e.jpg' alt='post-img' />
+		<article className='user-post' id={userPostId}>
+			<header className='user-post-header'>
+				<Link to={`/user/${author._id}`} className='user-post-author'>
+					<ProfilePicture imageUrl={author.profilePicture?.imageUrl} className='user-post-avatar' />
 
-				<span>{userPostAuthor.username}</span>
+					<span className='user-post-username'>{author.username}</span>
+				</Link>
+
+				{showActions ? (
+					<div className='user-post-actions' ref={menuContainerRef}>
+						<button
+							type='button'
+							className='user-post-actions-button'
+							aria-label='Post actions'
+							aria-expanded={isMenuOpen}
+							onClick={toggleMenu}
+						>
+							<PostActionsIcon iconColorProp='currentColor' />
+						</button>
+
+						{isMenuOpen ? (
+							<PostActionsMenu onEditClick={editClickHandler} onDeleteClick={deleteClickHandler} onClose={closeMenu} />
+						) : null}
+					</div>
+				) : null}
+			</header>
+
+			<div className='user-post-image'>
+				<img src={imageUrl} alt='post' style={{ aspectRatio: imageAspectRatio }} />
 			</div>
 
-			<div className='post-image-wrapper'>
-				<img src={`${userPostData.imageUrl}`} alt='post-img' />
-			</div>
+			<div className='user-post-footer'>
+				<div className='user-post-stats'>
+					<div className='user-post-stat'>
+						<button
+							type='button'
+							className={isHeartPulsing ? 'user-post-like-button user-post-like-button-pulse' : 'user-post-like-button'}
+							aria-label={hasLikedUserPost ? 'Unlike post' : 'Like post'}
+							aria-pressed={hasLikedUserPost}
+							onClick={toggleLike}
+						>
+							<HeartIcon
+								fillColorProp={hasLikedUserPost ? 'var(--brand-red)' : 'none'}
+								iconColorProp={hasLikedUserPost ? 'var(--brand-red)' : 'var(--text-primary)'}
+							/>
+						</button>
 
-			<div className='like-action-wrapper'>
-				<button
-					onClick={
-						loggedInUserHasLikedUserPost
-							? () => onUnlikeUserPostHandler({ userPostToUnlikeId: userPostData._id })
-							: () => onLikeUserPostHandler({ userPostToLikeId: userPostData._id })
-					}
-					className={`like-btn ${isHeartPulsing ? 'heart-pulse' : ''}`}
-					onMouseLeave={!loggedInUserHasLikedUserPost ? triggerPulse : () => {}}
-				>
-					<HeartIcon
-						fillColorProp={loggedInUserHasLikedUserPost ? '#F64D4D' : 'none'}
-						iconColorProp={loggedInUserHasLikedUserPost ? '#F64D4D' : null}
-					/>
-				</button>
-
-				<span>
-					{userPostData.likes.length}
-
-					{userPostData.likes.length === 1 ? ' like' : ' likes'}
-				</span>
-			</div>
-
-			{userPostData.caption ? (
-				<div className='post-caption'>
-					<span className='post-caption-username'>{userPostAuthor.username}</span>
-
-					{` ${userPostData.caption}`}
-				</div>
-			) : null}
-
-			<div className='comments-section'>
-				<div className='comments-section-toggle-wrapper' onClick={openCommentsPopup}>
-					<div className='comments-count-section'>
-						<CommentIcon />
-
-						<span>
-							{commentsCount}
-
-							{commentsCount === 1 ? ' comment' : ' comments'}
-						</span>
+						<span>{`${likes.length} ${likes.length === 1 ? 'like' : 'likes'}`}</span>
 					</div>
 
-					<button className='toggle-comments-btn'>
-						<ArrowDownIcon />
+					<button type='button' className='user-post-stat user-post-comments-button' onClick={() => setIsCommentsPopupOpen(true)}>
+						<CommentOutlineIcon iconColorProp='var(--text-primary)' />
+
+						<span>{`${commentsCount} ${commentsCount === 1 ? 'comment' : 'comments'}`}</span>
 					</button>
 				</div>
+
+				{caption ? <PostCaption username={author.username} caption={caption} /> : null}
+
+				{previewComments.length ? (
+					<div className='user-post-previews'>
+						{previewComments.map((comment) => (
+							<p key={comment._id} className='user-post-preview'>
+								<span className='user-post-preview-username'>{comment.userId?.username}</span>
+
+								{` ${comment.text}`}
+							</p>
+						))}
+					</div>
+				) : null}
+
+				<AddCommentForm onSubmit={submitComment} />
 			</div>
 
-			{addCommentForm}
-
 			{isCommentsPopupOpen ? (
-				<Popup onClosePopupClick={closeCommentsPopup}>
-					<div className='comments-wrapper'>
-						{comments.length ? (
-							comments.map((comment) => (
-								<Comment key={comment._id} comment={comment} userPostId={userPostData._id} onReload={loadComments} />
-							))
-						) : (
-							<p className='no-comments-text'>No comments yet. Be the first to comment.</p>
-						)}
-					</div>
-
-					{addCommentForm}
-				</Popup>
+				<CommentsPopup userPostId={userPostId} onClose={() => setIsCommentsPopupOpen(false)} onCommentsLoaded={updateFromLoadedComments} />
 			) : null}
-		</div>
+		</article>
 	);
 };
 

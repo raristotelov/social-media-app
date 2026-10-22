@@ -97,6 +97,13 @@
 		padding: 0 16px 20px;
 	}
 
+	.profile-header-no-bio {
+		grid-template-areas:
+			'avatar stats'
+			'username username'
+			'action action';
+	}
+
 	.profile-picture-wrapper .profile-picture {
 		width: 86px;
 		height: 86px;

@@ -45,7 +45,7 @@ const ProfileHeader = (props) => {
 	const isFollowed = loggedInUserData?.following?.includes(userData._id);
 
 	return (
-		<header className='profile-header'>
+		<header className={bio ? 'profile-header' : 'profile-header profile-header-no-bio'}>
 			<div className='profile-picture-wrapper'>
 				<ProfilePicture imageUrl={profilePictureUrl} />
 			</div>

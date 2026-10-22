@@ -9,7 +9,13 @@ import {
 
 const MIN_IMAGE_EDGE = 1;
 
+const MIN_POST_IMAGE_ASPECT_RATIO = 4 / 5;
+const MAX_POST_IMAGE_ASPECT_RATIO = 1.91;
+
 export const isAcceptedImageType = (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type);
+
+export const getPostImageAspectRatio = ({ imageWidth, imageHeight }) =>
+	Math.min(MAX_POST_IMAGE_ASPECT_RATIO, Math.max(MIN_POST_IMAGE_ASPECT_RATIO, imageWidth / imageHeight));
 
 const getResizedFileName = (fileName) => {
 	const extensionStart = fileName.lastIndexOf('.');

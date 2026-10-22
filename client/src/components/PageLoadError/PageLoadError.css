@@ -1,4 +1,4 @@
-.profile-load-error {
+.page-load-error {
 	width: 100%;
 	min-height: 100vh;
 	padding: var(--header-height) 16px 0;
@@ -15,7 +15,7 @@
 	text-align: center;
 }
 
-.profile-load-error-heading {
+.page-load-error-heading {
 	margin: 0;
 
 	font-size: 26px;
@@ -23,19 +23,19 @@
 	overflow-wrap: anywhere;
 }
 
-.profile-load-error-description {
+.page-load-error-description {
 	margin: 0;
 
 	font-size: 15px;
 	overflow-wrap: anywhere;
 }
 
-.profile-load-error-action {
+.page-load-error-action {
 	margin-top: 24px;
 }
 
 @media (max-width: 599px) {
-	.profile-load-error {
+	.page-load-error {
 		padding-bottom: var(--tab-bar-height);
 	}
 }

@@ -1,0 +1,71 @@
+.add-comment-form {
+	padding: 18px 0 8px;
+	box-sizing: border-box;
+
+	border-bottom: 1px solid var(--border-inset);
+
+	font-family: 'Mada';
+}
+
+.add-comment-form-disabled {
+	opacity: 0.5;
+}
+
+.add-comment-form-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.add-comment-form-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0;
+
+	border: none;
+	outline: none;
+	background-color: transparent;
+
+	font-family: 'Mada';
+	font-size: 16px;
+	color: var(--text-primary);
+}
+
+.add-comment-form-input::placeholder {
+	color: var(--text-muted);
+	opacity: 1;
+}
+
+.add-comment-form-input[readonly]:hover {
+	cursor: pointer;
+}
+
+.add-comment-form-submit {
+	flex-shrink: 0;
+	padding: 0;
+
+	border: none;
+	background-color: transparent;
+
+	font-family: 'Mada';
+	font-size: 15px;
+	font-weight: bold;
+	color: var(--brand-red);
+}
+
+.add-comment-form-submit:hover {
+	cursor: pointer;
+}
+
+.add-comment-form-submit:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+.add-comment-form-error {
+	margin: 8px 0 0;
+
+	font-size: 13px;
+	color: var(--feedback-error);
+}

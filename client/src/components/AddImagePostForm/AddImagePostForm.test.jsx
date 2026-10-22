@@ -73,6 +73,12 @@ describe('AddImagePostForm', () => {
 		expect(captionInput).toHaveValue('A lovely sunset');
 	});
 
+	it('limits the caption input to 1000 characters', () => {
+		renderAddImagePostForm(jest.fn(), jest.fn());
+
+		expect(screen.getByPlaceholderText('Write a caption...')).toHaveAttribute('maxlength', '1000');
+	});
+
 	describe('submitting', () => {
 		it('passes the chosen picture and caption to the handler', async () => {
 			const addImagePostHandler = jest.fn().mockResolvedValue(undefined);
@@ -260,6 +266,35 @@ describe('AddImagePostForm', () => {
 
 			expect(screen.getByText('This image is over 10 MB')).toBeInTheDocument();
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+		});
+
+		it('shows CAPTION_TOO_LONG under the caption field and no form message', async () => {
+			await submitWithError(buildRequestError({ code: 'CAPTION_TOO_LONG', fields: { caption: 'CAPTION_TOO_LONG' }, status: 400 }));
+
+			expect(screen.getByText('Caption must be at most 1000 characters')).toHaveClass('field-error');
+			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+		});
+
+		it('marks the caption field as invalid when CAPTION_TOO_LONG comes back', async () => {
+			await submitWithError(buildRequestError({ code: 'CAPTION_TOO_LONG', fields: { caption: 'CAPTION_TOO_LONG' }, status: 400 }));
+
+			expect(screen.getByPlaceholderText('Write a caption...')).toHaveAttribute('aria-invalid', 'true');
+		});
+
+		it('clears the caption message when the caption is edited', async () => {
+			await submitWithError(buildRequestError({ code: 'CAPTION_TOO_LONG', fields: { caption: 'CAPTION_TOO_LONG' }, status: 400 }));
+
+			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'x');
+
+			expect(screen.queryByText('Caption must be at most 1000 characters')).not.toBeInTheDocument();
+		});
+
+		it('shows no picture error when only the caption is rejected', async () => {
+			const { container } = await submitWithError(
+				buildRequestError({ code: 'CAPTION_TOO_LONG', fields: { caption: 'CAPTION_TOO_LONG' }, status: 400 }),
+			);
+
+			expect(container.querySelector('.add-image-post-image-wrapper')).not.toHaveClass('has-error');
 		});
 
 		it('marks the picture wrapper as having an error', async () => {

@@ -1,5 +1,5 @@
 import { requestFactory } from './requester';
-import { addUserPost } from './userPostService';
+import { addUserPost, getFollowedUsersPosts, likeUserPost, unlikeUserPost } from './userPostService';
 
 jest.mock('./requester');
 
@@ -44,6 +44,51 @@ describe('userPostService', () => {
 
 		it('resolves with the saved post', async () => {
 			await expect(addUserPost({ image, caption: 'Sunset' }, 'token123')).resolves.toEqual({ _id: 'post1' });
+		});
+	});
+
+	describe('getFollowedUsersPosts', () => {
+		it('gets the followed users posts endpoint with the token', async () => {
+			const get = jest.fn().mockResolvedValue([{ _id: 'post1' }]);
+
+			requestFactory.mockReturnValue({ get });
+
+			await getFollowedUsersPosts({ jwtToken: 'token123' });
+
+			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/user-posts\/followed-users-posts$/));
+		});
+
+		it('resolves with the posts', async () => {
+			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue([{ _id: 'post1' }]) });
+
+			await expect(getFollowedUsersPosts({ jwtToken: 'token123' })).resolves.toEqual([{ _id: 'post1' }]);
+		});
+	});
+
+	describe('likeUserPost', () => {
+		it('posts to the like endpoint of that post with the token', async () => {
+			const post = jest.fn().mockResolvedValue({ _id: 'post1', likes: ['user1'] });
+
+			requestFactory.mockReturnValue({ post });
+
+			await likeUserPost({ userPostToLikeId: 'post1', jwtToken: 'token123' });
+
+			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/user-posts\/like\/post1$/));
+		});
+	});
+
+	describe('unlikeUserPost', () => {
+		it('posts to the unlike endpoint of that post with the token', async () => {
+			const post = jest.fn().mockResolvedValue({ _id: 'post1', likes: [] });
+
+			requestFactory.mockReturnValue({ post });
+
+			await unlikeUserPost({ userPostToUnlikeId: 'post1', jwtToken: 'token123' });
+
+			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/user-posts\/unlike\/post1$/));
 		});
 	});
 });

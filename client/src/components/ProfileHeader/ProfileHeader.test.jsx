@@ -149,6 +149,24 @@ describe('ProfileHeader', () => {
 		expect(container.querySelector('.bio')).not.toBeInTheDocument();
 	});
 
+	it('marks the header as having no bio when the bio is empty', () => {
+		const { container } = renderProfileHeader({ userData: buildUserData({ bio: '' }) });
+
+		expect(container.querySelector('header')).toHaveClass('profile-header-no-bio');
+	});
+
+	it('marks the header as having no bio when the bio is missing', () => {
+		const { container } = renderProfileHeader({ userData: buildUserData({ bio: undefined }) });
+
+		expect(container.querySelector('header')).toHaveClass('profile-header-no-bio');
+	});
+
+	it('does not mark the header as having no bio when there is a bio', () => {
+		const { container } = renderProfileHeader({ userData: buildUserData({ bio: 'Just a bio' }) });
+
+		expect(container.querySelector('header')).not.toHaveClass('profile-header-no-bio');
+	});
+
 	it('shows "Edit Profile" and calls onEditProfileClick when viewing your own profile', () => {
 		const onEditProfileClick = jest.fn();
 		renderProfileHeader({ isLoggedInUserProfile: true, onEditProfileClick });

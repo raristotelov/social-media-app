@@ -104,6 +104,29 @@ export const editCaptionViaApi = (jwtToken, userPostId, caption, failOnStatusCod
 		failOnStatusCode,
 	});
 
+export const likePostViaApi = (jwtToken, userPostId) =>
+	cy
+		.request({ method: 'POST', url: `${serverUrl}/user-posts/like/${userPostId}`, headers: authHeaders(jwtToken) })
+		.then((response) => response.body);
+
+export const addCommentViaApi = (jwtToken, userPostId, text, { parentCommentId, mentionedUserId } = {}) =>
+	cy
+		.request({
+			method: 'POST',
+			url: `${serverUrl}/comments`,
+			headers: authHeaders(jwtToken),
+			body: { userPostId, text, parentCommentId, mentionedUserId },
+		})
+		.then((response) => response.body);
+
+export const getCommentsViaApi = (userPostId) =>
+	cy.request({ method: 'GET', url: `${serverUrl}/comments/post/${userPostId}` }).then((response) => response.body);
+
+export const getFollowedUsersPostsViaApi = (jwtToken) =>
+	cy
+		.request({ method: 'GET', url: `${serverUrl}/user-posts/followed-users-posts`, headers: authHeaders(jwtToken) })
+		.then((response) => response.body);
+
 export const setThemeViaApi = (jwtToken, theme) =>
 	cy.request({
 		method: 'PATCH',

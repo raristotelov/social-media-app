@@ -15,10 +15,13 @@ describe('ERROR_MESSAGES', () => {
 		['PASSWORD_NOT_EDITABLE', 'Password cannot be changed from the profile form'],
 		['BIO_TOO_LONG', 'Bio must be at most 150 characters'],
 		['CAPTION_INVALID', 'Caption must be text'],
+		['CAPTION_TOO_LONG', 'Caption must be at most 1000 characters'],
 		['IMAGE_TYPE_INVALID', 'Choose a JPEG, PNG or WebP image'],
 		['IMAGE_TOO_LARGE', 'This image is over 10 MB'],
 		['POST_NOT_FOUND', 'This post no longer exists'],
 		['POST_FORBIDDEN', 'You can only change your own posts'],
+		['COMMENT_TEXT_REQUIRED', "Comment can't be empty"],
+		['COMMENT_NOT_FOUND', 'This comment no longer exists'],
 		['PROFILE_FORBIDDEN', 'You can only change your own profile'],
 	])('has the documented copy for %s', (code, copy) => {
 		expect(ERROR_MESSAGES[code]).toBe(copy);
@@ -29,7 +32,7 @@ describe('ERROR_MESSAGES', () => {
 	});
 
 	it('has copy for exactly the codes the spec documents, and no other', () => {
-		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(17);
+		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(20);
 	});
 });
 
@@ -41,6 +44,9 @@ describe('ACTION_FALLBACK_MESSAGES', () => {
 		['EDIT_CAPTION', "Couldn't save the caption. Try again."],
 		['UPLOAD_PICTURE', "Couldn't upload the picture. Try again."],
 		['DELETE_POST', "Couldn't delete the post. Try again."],
+		['UPDATE_LIKE', "Couldn't update your like. Try again."],
+		['ADD_COMMENT', "Couldn't post your comment. Try again."],
+		['ADD_REPLY', "Couldn't post your reply. Try again."],
 	])('has the documented copy for %s', (action, copy) => {
 		expect(ACTION_FALLBACK_MESSAGES[action]).toBe(copy);
 	});
@@ -52,6 +58,21 @@ describe('LOAD_ERROR_MESSAGES', () => {
 			HEADING: "Couldn't load this profile",
 			DESCRIPTION: 'Check your connection and try again.',
 			RETRY_LABEL: 'Retry',
+		});
+	});
+
+	it('has the documented feed load error copy', () => {
+		expect(LOAD_ERROR_MESSAGES.FEED).toEqual({
+			HEADING: "Couldn't load your feed",
+			DESCRIPTION: 'Check your connection and try again.',
+			RETRY_LABEL: 'Retry',
+		});
+	});
+
+	it('has the documented inline comments load error copy', () => {
+		expect(LOAD_ERROR_MESSAGES.COMMENTS).toEqual({
+			MESSAGE: "Couldn't load comments",
+			RETRY_LABEL: 'Try again',
 		});
 	});
 

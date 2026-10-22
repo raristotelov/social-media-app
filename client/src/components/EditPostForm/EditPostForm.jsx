@@ -1,5 +1,6 @@
 import { useForm } from '../../hooks/useForm';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
+import { MAX_CAPTION_LENGTH } from '../../constants/validation';
 
 import Button from '../Button/Button';
 
@@ -29,6 +30,7 @@ const EditPostForm = ({ post, editPostHandler, onCancelClick }) => {
 				name='caption'
 				placeholder='Write a caption...'
 				value={values.caption}
+				maxLength={MAX_CAPTION_LENGTH}
 				onChange={changeHandler}
 				aria-invalid={Boolean(errors.caption?.length)}
 			/>
