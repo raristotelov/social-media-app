@@ -162,7 +162,6 @@ const removeUsersById = async (testUserIds) => {
 
 	const deletedPosts = await UserPostModel.deleteMany({ _id: { $in: testUserPostIds } });
 
-	// Views of the test users' stories, plus views a test user left on anyone's story.
 	const deletedStoryViews = await StoryViewModel.deleteMany({
 		$or: [{ storyId: { $in: testUserStoryIds } }, { viewerId: { $in: testUserIds } }],
 	});

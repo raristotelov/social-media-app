@@ -246,6 +246,10 @@
 	pointer-events: none;
 }
 
+.story-viewer-footer .story-viewer-icon-button {
+	margin-left: auto;
+}
+
 .story-viewer-seen-by {
 	padding: 0;
 	border: none;

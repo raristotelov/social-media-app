@@ -283,7 +283,7 @@ const deleteStory = async ({ storyId, userId }) => {
 };
 
 const deleteExpiredStories = async () => {
-	const expiredStories = await StoryModel.find(getExpiredStoriesFilter());
+	const expiredStories = await StoryModel.find(getExpiredStoriesFilter()).select({ _id: 1, imageIdentifier: 1 }).lean();
 
 	let deletedCount = 0;
 

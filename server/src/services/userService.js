@@ -13,10 +13,14 @@ const imageStorageService = require('./imageStorageService');
 
 const necessaryUserFields = ['_id', 'email', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following'];
 
-const USER_ROW_PROJECTION = {
+const FOLLOW_LIST_ROW_PROJECTION = {
 	_id: 1,
 	username: 1,
 	'profilePicture.imageUrl': 1,
+};
+
+const USER_ROW_PROJECTION = {
+	...FOLLOW_LIST_ROW_PROJECTION,
 	followersCount: { $size: { $ifNull: ['$followers', []] } },
 };
 
@@ -204,7 +208,7 @@ const getFollowListByUserId = async ({ userId, listField, requesterId }) => {
 
 		const listedUserIds = user[listField];
 
-		const rows = await UserModel.aggregate([{ $match: { _id: { $in: listedUserIds } } }, { $project: USER_ROW_PROJECTION }]);
+		const rows = await UserModel.aggregate([{ $match: { _id: { $in: listedUserIds } } }, { $project: FOLLOW_LIST_ROW_PROJECTION }]);
 
 		const rowsById = new Map(rows.map((row) => [String(row._id), row]));
 		const orderedRows = listedUserIds.map((listedUserId) => rowsById.get(String(listedUserId))).filter(Boolean);

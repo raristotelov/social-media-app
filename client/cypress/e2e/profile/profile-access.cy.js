@@ -206,7 +206,7 @@ describe('profile access', () => {
 	});
 
 	describe('followers and following endpoints', () => {
-		const slimRowFields = ['_id', 'username', 'profilePicture', 'followersCount'];
+		const slimRowFields = ['_id', 'username', 'profilePicture'];
 
 		const expectSlimRows = (rows) => {
 			rows.forEach((row) => {
@@ -227,12 +227,12 @@ describe('profile access', () => {
 			});
 		});
 
-		it('returns each row with a username and the follower count', () => {
+		it('returns each row with a username and no follower count', () => {
 			cy.then(() => getFollowersViaApi(targetId)).then((rows) => {
 				const ownerRow = rows.find((row) => row._id === ownerId);
 
 				expect(ownerRow).to.have.property('username', owner.username);
-				expect(ownerRow.followersCount).to.be.a('number');
+				expect(ownerRow).not.to.have.property('followersCount');
 			});
 		});
 

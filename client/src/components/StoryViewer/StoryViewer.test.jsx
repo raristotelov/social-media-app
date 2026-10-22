@@ -240,6 +240,58 @@ describe('StoryViewer', () => {
 			expect(getViewer()).toHaveClass('story-viewer-paused');
 		});
 
+		it('stays paused after going back until the remounted photo has loaded', async () => {
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			expect(getViewer()).not.toHaveClass('story-viewer-paused');
+
+			tapPrevious();
+
+			expect(getPhotoName()).toBe('a1');
+			expect(getViewer()).toHaveClass('story-viewer-paused');
+
+			loadPhoto();
+
+			expect(getViewer()).not.toHaveClass('story-viewer-paused');
+		});
+
+		it.each([
+			['forward to the next story', () => tapNext()],
+			['back to the previous story', () => tapPrevious()],
+		])('starts playback when the photo loads straight after moving %s', async (name, move) => {
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+
+			move();
+			loadPhoto();
+
+			await waitFor(() => expect(getViewer()).not.toHaveClass('story-viewer-paused'));
+		});
+
+		it('starts playback when the first photo of the next user loads straight after the move', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+
+			finishSegment();
+			await screen.findByAltText('Story by bob');
+			loadPhoto();
+
+			expect(getViewer()).not.toHaveClass('story-viewer-paused');
+		});
+
+		it('stays paused when returning to a story whose photo had loaded before, until it loads again', async () => {
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			tapNext();
+			loadPhoto();
+
+			tapPrevious();
+
+			expect(getPhotoName()).toBe('a2');
+			expect(getViewer()).toHaveClass('story-viewer-paused');
+		});
+
 		it('restarts the fill for the new story', async () => {
 			await openViewer({ startIndex: 1 });
 			const firstFill = document.querySelector('.story-viewer-segment-fill-active');
@@ -814,12 +866,40 @@ describe('StoryViewer', () => {
 			expect(screen.getByRole('button', { name: 'Seen by 3' })).toBeInTheDocument();
 		});
 
-		it('shows zero when the story has no viewers yet', async () => {
+		it('is hidden while the story has no viewers, with the trash icon still there', async () => {
 			await openViewer({ startIndex: 0 });
 
 			tapNext();
 
-			expect(screen.getByRole('button', { name: 'Seen by 0' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /Seen by/ })).not.toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Delete story' })).toBeInTheDocument();
+		});
+
+		it('is hidden when the story has no viewers count at all', async () => {
+			storiesByUser.me = [buildStory('m1')];
+
+			await openViewer({ startIndex: 0 });
+
+			expect(screen.queryByRole('button', { name: /Seen by/ })).not.toBeInTheDocument();
+		});
+
+		it('is shown from one viewer up, next to the trash icon', async () => {
+			storiesByUser.me = [buildStory('m1', { viewersCount: 1 })];
+
+			await openViewer({ startIndex: 0 });
+
+			expect(screen.getByRole('button', { name: 'Seen by 1' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Delete story' })).toBeInTheDocument();
+		});
+
+		it('appears and disappears as you move between stories with and without viewers', async () => {
+			await openViewer({ startIndex: 0 });
+
+			expect(screen.getByRole('button', { name: 'Seen by 3' })).toBeInTheDocument();
+			tapNext();
+			expect(screen.queryByRole('button', { name: /Seen by/ })).not.toBeInTheDocument();
+			tapPrevious();
+			expect(screen.getByRole('button', { name: 'Seen by 3' })).toBeInTheDocument();
 		});
 
 		it("is not shown on someone else's story", async () => {

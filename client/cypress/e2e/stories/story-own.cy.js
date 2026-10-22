@@ -83,7 +83,8 @@ describe('your own stories: Seen by', () => {
 
 		cy.get('.story-viewer-zone-next').click();
 
-		cy.get('.story-viewer-seen-by').should('contain.text', 'Seen by 0');
+		cy.get('.story-viewer-seen-by').should('not.exist');
+		cy.get('button[aria-label="Delete story"]').should('be.visible');
 	});
 
 	it('opens the Viewers list with photo and username only, pausing the story, and resumes when it is closed', () => {
@@ -105,16 +106,6 @@ describe('your own stories: Seen by', () => {
 		cy.get('.follow-list-popup').should('not.exist');
 		cy.get('.story-viewer').should('not.have.class', 'story-viewer-paused');
 		cy.get('.story-viewer').should('be.visible');
-	});
-
-	it('shows "No users found" for a story nobody has seen', () => {
-		visitAsUser('/user-feed', ownerToken);
-		openOwnStory();
-		cy.get('.story-viewer-zone-next').click();
-
-		cy.contains('.story-viewer-seen-by', 'Seen by 0').click();
-
-		cy.contains('.follow-list-popup', 'No users found').should('be.visible');
 	});
 
 	it('shows the Viewers list as a bottom sheet over the story on mobile', () => {

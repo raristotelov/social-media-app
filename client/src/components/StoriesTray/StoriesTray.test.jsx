@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { addStory, getStoryTray, getUserStories, markStoryViewed } from '../../services/storyService';
 import { resizeImage } from '../../utils/images';
+import useStoryTray from '../../hooks/useStoryTray';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -39,18 +40,38 @@ const buildStory = (id, overrides = {}) => ({
 	...overrides,
 });
 
+const TrayHost = () => {
+	const { entries, isLoaded, reload } = useStoryTray();
+
+	return <StoriesTray entries={entries} isLoaded={isLoaded} reload={reload} />;
+};
+
 const renderTray = ({ endSession = jest.fn() } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, endSession }}>
 			<ToastProvider>
 				<MemoryRouter>
-					<StoriesTray />
+					<TrayHost />
 				</MemoryRouter>
 			</ToastProvider>
 		</LoggedInUserContext.Provider>,
 	);
 
 	return { ...rendered, endSession };
+};
+
+const renderTrayWithProps = ({ entries = [], isLoaded = true, reload = jest.fn() } = {}) => {
+	const rendered = render(
+		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, endSession: jest.fn() }}>
+			<ToastProvider>
+				<MemoryRouter>
+					<StoriesTray entries={entries} isLoaded={isLoaded} reload={reload} />
+				</MemoryRouter>
+			</ToastProvider>
+		</LoggedInUserContext.Provider>,
+	);
+
+	return { ...rendered, reload };
 };
 
 const getCircleLabels = () => Array.from(document.querySelectorAll('.story-circle-label')).map((label) => label.textContent);
@@ -70,6 +91,57 @@ describe('StoriesTray', () => {
 				stories: [buildStory(`${userId}-1`, userId === 'me' ? { viewersCount: 0 } : { isWatched: false })],
 			}),
 		);
+	});
+
+	describe('given its entries as props', () => {
+		it('makes no tray request of its own', () => {
+			renderTrayWithProps({ entries: [trayEntry('alice')] });
+
+			expect(getStoryTray).not.toHaveBeenCalled();
+		});
+
+		it('renders the entries it is given, after your own circle', () => {
+			renderTrayWithProps({ entries: [ownEntry, trayEntry('alice'), trayEntry('bob')] });
+
+			expect(getCircleLabels()).toEqual(['Your story', 'alice', 'bob']);
+		});
+
+		it('is an empty card while isLoaded is false, even with entries', () => {
+			renderTrayWithProps({ entries: [trayEntry('alice')], isLoaded: false });
+
+			expect(screen.getByRole('region', { name: 'Stories' })).toBeEmptyDOMElement();
+		});
+
+		it('calls reload when the viewer closes', async () => {
+			const { reload } = renderTrayWithProps({ entries: [trayEntry('alice')] });
+
+			userEvent.click(screen.getByRole('button', { name: "View alice's story" }));
+			await screen.findByRole('dialog', { name: 'Story viewer' });
+			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+			expect(reload).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not call reload when the Create popup is only cancelled', () => {
+			const { reload } = renderTrayWithProps();
+
+			userEvent.click(screen.getByRole('button', { name: 'Add to your story' }));
+			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+			expect(reload).not.toHaveBeenCalled();
+		});
+
+		it('calls reload after a story is shared', async () => {
+			resizeImage.mockResolvedValue(new File(['(resized)'], 'new.jpg', { type: 'image/jpeg' }));
+			addStory.mockResolvedValue({ _id: 'story1' });
+			const { reload } = renderTrayWithProps();
+
+			userEvent.click(screen.getByRole('button', { name: 'Add to your story' }));
+			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), new File(['(image)'], 'new.png', { type: 'image/png' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+			await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+		});
 	});
 
 	describe('loading', () => {

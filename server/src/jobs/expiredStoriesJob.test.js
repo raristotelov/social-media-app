@@ -70,6 +70,65 @@ describe('expiredStoriesJob', () => {
 		expect(consoleLogSpy).toHaveBeenCalledWith('Deleted 4 expired stories.');
 	});
 
+	it('does not keep the process alive just for the hourly timer', async () => {
+		timer = startExpiredStoriesJob();
+		await flushPromises();
+
+		expect(timer.hasRef()).toBe(false);
+	});
+
+	it('skips a tick while the previous run is still in flight', async () => {
+		let finishRun;
+
+		storyService.deleteExpiredStories.mockReturnValueOnce(
+			new Promise((resolve) => {
+				finishRun = resolve;
+			}),
+		);
+
+		timer = startExpiredStoriesJob();
+		await flushPromises();
+
+		jest.advanceTimersByTime(constants.EXPIRED_STORIES_JOB_INTERVAL_MS);
+		await flushPromises();
+
+		expect(storyService.deleteExpiredStories).toHaveBeenCalledTimes(1);
+
+		finishRun(0);
+		await flushPromises();
+	});
+
+	it('runs again on the next tick once the slow run has finished', async () => {
+		let finishRun;
+
+		storyService.deleteExpiredStories.mockReturnValueOnce(
+			new Promise((resolve) => {
+				finishRun = resolve;
+			}),
+		);
+
+		timer = startExpiredStoriesJob();
+		await flushPromises();
+		finishRun(0);
+		await flushPromises();
+
+		jest.advanceTimersByTime(constants.EXPIRED_STORIES_JOB_INTERVAL_MS);
+		await flushPromises();
+
+		expect(storyService.deleteExpiredStories).toHaveBeenCalledTimes(2);
+	});
+
+	it('runs again on the next tick after a run that failed', async () => {
+		storyService.deleteExpiredStories.mockRejectedValueOnce(new Error('db down'));
+
+		timer = startExpiredStoriesJob();
+		await flushPromises();
+		jest.advanceTimersByTime(constants.EXPIRED_STORIES_JOB_INTERVAL_MS);
+		await flushPromises();
+
+		expect(storyService.deleteExpiredStories).toHaveBeenCalledTimes(2);
+	});
+
 	it('stays quiet when nothing expired', async () => {
 		timer = startExpiredStoriesJob();
 		await flushPromises();

@@ -1,6 +1,6 @@
 # Stories
 
-Status: In Development
+Status: Complete
 
 Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creation. Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 
@@ -28,6 +28,7 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 - Your own circle always has the grey ring (design).
 - The tray also shows on the empty feed (design), so a user who follows nobody can still post a story.
 - Loading: an empty tray card of the same height. Load failure: stays empty, no error.
+- The tray loads in parallel with the feed and shows straight away; while the posts load, a spinner sits under the tray (no full-page spinner). A feed load error still replaces the whole page, tray included.
 
 ## Errors
 
@@ -51,7 +52,8 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 
 ## Seen by (own stories only)
 
-- Bottom-left of your own story: eye icon + "Seen by N".
+- Bottom-left of your own story: eye icon + "Seen by N". Hidden while nobody has watched (N = 0); the trash icon stays.
+- Empty Viewers list text: "No viewers yet".
 - Tapping it pauses the story and opens the Viewers list; closing it resumes from the same point.
 - Viewers list: photo and username only; you are not listed.
 - Desktop/tablet: the Followers popup titled "Viewers". Mobile: bottom sheet over the story.

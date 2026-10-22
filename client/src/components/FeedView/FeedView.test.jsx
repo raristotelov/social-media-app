@@ -99,6 +99,69 @@ describe('FeedView', () => {
 			expect(screen.getByRole('button', { name: 'View your story' })).toBeInTheDocument();
 		});
 
+		it('loads in parallel with the feed: the tray is requested before the posts have arrived', async () => {
+			getFollowedUsersPosts.mockReturnValue(new Promise(() => {}));
+			getStoryTray.mockResolvedValue(trayEntries);
+			renderFeed();
+
+			expect(getStoryTray).toHaveBeenCalledTimes(1);
+			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows straight away, while the posts are still loading', async () => {
+			getFollowedUsersPosts.mockReturnValue(new Promise(() => {}));
+			getStoryTray.mockResolvedValue(trayEntries);
+			renderFeed();
+
+			expect(await screen.findByRole('button', { name: "View alice's story" })).toBeInTheDocument();
+			expect(screen.queryByRole('article')).not.toBeInTheDocument();
+		});
+
+		it('has a spinner under it, not a full-page one, while the posts load', async () => {
+			getFollowedUsersPosts.mockReturnValue(new Promise(() => {}));
+			getStoryTray.mockResolvedValue(trayEntries);
+			renderFeed();
+
+			const tray = await screen.findByRole('region', { name: 'Stories' });
+			const spinner = document.querySelector('.loading-spinner');
+
+			expect(spinner).toBeInTheDocument();
+			expect(document.querySelector('.spinner-container-full-page')).not.toBeInTheDocument();
+			expect(tray.compareDocumentPosition(spinner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		});
+
+		it('removes the spinner and keeps the tray once the posts arrive', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getStoryTray.mockResolvedValue(trayEntries);
+			renderFeed();
+
+			await screen.findAllByRole('article');
+
+			expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
+			expect(screen.getByRole('region', { name: 'Stories' })).toBeInTheDocument();
+		});
+
+		it('does not show the empty message while the posts are still loading', async () => {
+			getFollowedUsersPosts.mockReturnValue(new Promise(() => {}));
+			renderFeed();
+
+			await screen.findByRole('region', { name: 'Stories' });
+
+			expect(screen.queryByText('Your feed is empty')).not.toBeInTheDocument();
+		});
+
+		it('makes one tray request across a feed load error and its retry, and shows the tray again after it', async () => {
+			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPosts);
+			getStoryTray.mockResolvedValue(trayEntries);
+			renderFeed();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+			expect(await screen.findAllByRole('article')).toHaveLength(3);
+			expect(getStoryTray).toHaveBeenCalledTimes(1);
+			expect(await screen.findByRole('button', { name: "View alice's story" })).toBeInTheDocument();
+		});
+
 		it('is shown on the empty feed too, so someone who follows nobody can post a story', async () => {
 			getFollowedUsersPosts.mockResolvedValue([]);
 			renderFeed();

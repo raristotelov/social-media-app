@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import useSessionGuard from '../../hooks/useSessionGuard';
 import { getFollowers, getFollowing } from '../../services/userService';
 import { getStoryViewers } from '../../services/storyService';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';
@@ -24,6 +25,7 @@ const FollowListPopup = ({ userId, storyId, listType, onClose }) => {
 	const [reloadCount, setReloadCount] = useState(0);
 
 	const { jwtToken } = useContext(LoggedInUserContext);
+	const { endSessionIfUnauthenticated } = useSessionGuard();
 
 	useEffect(() => {
 		let isCurrentRequest = true;
@@ -37,10 +39,16 @@ const FollowListPopup = ({ userId, storyId, listType, onClose }) => {
 					setUsers(result);
 				}
 			})
-			.catch(() => {
-				if (isCurrentRequest) {
-					setHasLoadFailed(true);
+			.catch((error) => {
+				if (!isCurrentRequest) {
+					return;
 				}
+
+				if (listType === FOLLOW_LIST_TYPES.VIEWERS) {
+					endSessionIfUnauthenticated(error);
+				}
+
+				setHasLoadFailed(true);
 			})
 			.finally(() => {
 				if (isCurrentRequest) {
@@ -51,7 +59,7 @@ const FollowListPopup = ({ userId, storyId, listType, onClose }) => {
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [userId, storyId, listType, jwtToken, reloadCount]);
+	}, [userId, storyId, listType, jwtToken, reloadCount, endSessionIfUnauthenticated]);
 
 	const retryLoad = () => {
 		setReloadCount((count) => count + 1);
@@ -83,6 +91,7 @@ const FollowListPopup = ({ userId, storyId, listType, onClose }) => {
 					onResultClick={onClose}
 					className='follow-list-results'
 					showFollowersCount={false}
+					emptyMessage={isViewersList ? 'No viewers yet' : undefined}
 				/>
 			)}
 		</Popup>

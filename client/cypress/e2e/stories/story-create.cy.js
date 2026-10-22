@@ -99,7 +99,8 @@ describe('creating a story', () => {
 		cy.get('.story-viewer-username').should('have.text', user.username);
 		cy.get('.story-viewer-age').should('have.text', '1m');
 		waitForPhotoLoad();
-		cy.contains('.story-viewer-seen-by', 'Seen by 0').should('be.visible');
+		cy.get('.story-viewer-seen-by').should('not.exist');
+		cy.get('button[aria-label="Delete story"]').should('be.visible');
 
 		cy.get('.story-viewer', { timeout: 10000 }).should('not.exist');
 		cy.get('.stories-tray').should('be.visible');

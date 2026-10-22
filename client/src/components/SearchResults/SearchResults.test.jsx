@@ -130,6 +130,13 @@ describe('SearchResults', () => {
 			expect(screen.queryByRole('link')).not.toBeInTheDocument();
 		});
 
+		it('shows a custom empty message when one is given', () => {
+			renderSearchResults({ results: [], emptyMessage: 'No viewers yet' });
+
+			expect(screen.getByText('No viewers yet')).toBeInTheDocument();
+			expect(screen.queryByText('No users found')).not.toBeInTheDocument();
+		});
+
 		it('shows "No users found" when there are no results', () => {
 			renderSearchResults({ results: [] });
 

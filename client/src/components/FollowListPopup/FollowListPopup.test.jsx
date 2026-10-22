@@ -21,9 +21,16 @@ const buildRow = (overrides = {}) => ({
 
 const CurrentPath = () => <p data-testid='current-path'>{useLocation().pathname}</p>;
 
-const renderPopup = ({ loggedInUser = null, userId = 'owner', storyId, listType = 'followers', onClose = jest.fn() } = {}) => {
+const renderPopup = ({
+	loggedInUser = null,
+	userId = 'owner',
+	storyId,
+	listType = 'followers',
+	onClose = jest.fn(),
+	endSession = jest.fn(),
+} = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser }}>
+		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, endSession }}>
 			<MemoryRouter initialEntries={['/user/owner']}>
 				<FollowListPopup userId={userId} storyId={storyId} listType={listType} onClose={onClose} />
 
@@ -32,7 +39,7 @@ const renderPopup = ({ loggedInUser = null, userId = 'owner', storyId, listType 
 		</LoggedInUserContext.Provider>,
 	);
 
-	return { ...rendered, onClose };
+	return { ...rendered, onClose, endSession };
 };
 
 const getRowUsernames = (container) => Array.from(container.querySelectorAll('.search-result-username')).map((row) => row.textContent);
@@ -112,12 +119,22 @@ describe('FollowListPopup', () => {
 			expect(container.querySelector('.search-result-followers')).not.toBeInTheDocument();
 		});
 
-		it('shows "No users found" when nobody has seen the story', async () => {
+		it('shows "No viewers yet", not "No users found", when the list is empty', async () => {
 			getStoryViewers.mockResolvedValue([]);
 
 			renderPopup({ listType: 'viewers', storyId: 'story1' });
 
+			expect(await screen.findByText('No viewers yet')).toBeInTheDocument();
+			expect(screen.queryByText('No users found')).not.toBeInTheDocument();
+		});
+
+		it('keeps "No users found" for an empty following list', async () => {
+			getFollowing.mockResolvedValue([]);
+
+			renderPopup({ listType: 'following' });
+
 			expect(await screen.findByText('No users found')).toBeInTheDocument();
+			expect(screen.queryByText('No viewers yet')).not.toBeInTheDocument();
 		});
 
 		it('offers a retry when the viewers fail to load', async () => {
@@ -129,6 +146,23 @@ describe('FollowListPopup', () => {
 
 			expect(await screen.findByText('alice')).toBeInTheDocument();
 			expect(getStoryViewers).toHaveBeenCalledTimes(2);
+		});
+
+		it('ends the session when the token is no longer valid', async () => {
+			getStoryViewers.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+
+			const { endSession } = renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
+		});
+
+		it('does not end the session for any other failure', async () => {
+			getStoryViewers.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+
+			const { endSession } = renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			await screen.findByRole('button', { name: 'Try again' });
+			expect(endSession).not.toHaveBeenCalled();
 		});
 
 		it('calls onClose from the close button', async () => {
@@ -292,6 +326,17 @@ describe('FollowListPopup', () => {
 			renderPopup();
 
 			expect(await screen.findByText("Couldn't load this list")).toBeInTheDocument();
+		});
+
+		it.each([['followers'], ['following']])('leaves the session alone when the %s list fails with 401, as before', async (listType) => {
+			const loader = listType === 'followers' ? getFollowers : getFollowing;
+
+			loader.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+
+			const { endSession } = renderPopup({ listType });
+
+			await screen.findByRole('button', { name: 'Try again' });
+			expect(endSession).not.toHaveBeenCalled();
 		});
 
 		it('shows the same error for a failing following list', async () => {

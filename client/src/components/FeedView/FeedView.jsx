@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import useStoryTray from '../../hooks/useStoryTray';
 import { getFollowedUsersPosts } from '../../services/userPostService';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';
 import { isUnauthenticatedError } from '../../utils/errors';
@@ -19,6 +20,7 @@ const FeedView = () => {
 	const [reloadCount, setReloadCount] = useState(0);
 
 	const { jwtToken, endSession } = useContext(LoggedInUserContext);
+	const { entries: trayEntries, isLoaded: isTrayLoaded, reload: reloadTray } = useStoryTray();
 
 	useEffect(() => {
 		let isCurrentRequest = true;
@@ -70,33 +72,29 @@ const FeedView = () => {
 		return <PageLoadError onRetryClick={retryLoad} isRetrying={isLoading} messages={LOAD_ERROR_MESSAGES.FEED} />;
 	}
 
-	if (isLoading) {
-		return <LoadingSpinner isFullPage />;
-	}
+	const isEmpty = !isLoading && !posts.length;
 
-	if (!posts.length) {
-		return (
-			<section className='feed-empty'>
-				<StoriesTray />
+	return (
+		<section className={isEmpty ? 'feed-empty' : 'feed-wrapper'}>
+			<StoriesTray entries={trayEntries} isLoaded={isTrayLoaded} reload={reloadTray} />
 
+			{isLoading ? <LoadingSpinner /> : null}
+
+			{isEmpty ? (
 				<div className='feed-empty-message'>
 					<h1 className='feed-empty-title'>Your feed is empty</h1>
 
 					<p className='feed-empty-description'>Follow people to see their posts here</p>
 				</div>
-			</section>
-		);
-	}
+			) : null}
 
-	return (
-		<section className='feed-wrapper'>
-			<StoriesTray />
-
-			<div className='feed-posts'>
-				{posts.map((post) => (
-					<UserPost key={post._id} userPostData={post} author={post.userId} onPostChange={updatePost} />
-				))}
-			</div>
+			{!isLoading && !isEmpty ? (
+				<div className='feed-posts'>
+					{posts.map((post) => (
+						<UserPost key={post._id} userPostData={post} author={post.userId} onPostChange={updatePost} />
+					))}
+				</div>
+			) : null}
 		</section>
 	);
 };

@@ -1,7 +1,6 @@
 import { useCallback, useContext, useState } from 'react';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import useStoryTray from '../../hooks/useStoryTray';
 import { CREATE_MODES, OWN_STORY_LABEL } from '../../constants/stories';
 
 import StoryCircle, { STORY_RING_STATES } from '../StoryCircle/StoryCircle';
@@ -10,12 +9,11 @@ import StoryViewer from '../StoryViewer/StoryViewer';
 
 import './StoriesTray.css';
 
-const StoriesTray = () => {
+const StoriesTray = ({ entries, isLoaded, reload }) => {
 	const [isCreatePopupOpen, setIsCreatePopupOpen] = useState(false);
 	const [openViewer, setOpenViewer] = useState(null);
 
 	const { loggedInUser } = useContext(LoggedInUserContext);
-	const { entries, isLoaded, reload } = useStoryTray();
 
 	const closeViewer = useCallback(() => {
 		setOpenViewer(null);

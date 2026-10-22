@@ -674,7 +674,15 @@ describe('storyService', () => {
 	});
 
 	describe('deleteExpiredStories', () => {
-		const expired = (_id) => ({ _id, userId: AUTHOR_A, imageIdentifier: `folder/${_id}` });
+		const expired = (_id) => ({ _id, imageIdentifier: `folder/${_id}` });
+
+		const givenExpired = (stories) => {
+			const query = buildQuery(stories);
+
+			StoryModel.find = jest.fn().mockReturnValue(query);
+
+			return query;
+		};
 
 		beforeEach(() => {
 			imageStorageService.deleteImage.mockResolvedValue({ result: 'ok' });
@@ -683,15 +691,24 @@ describe('storyService', () => {
 		});
 
 		it('selects the stories that are 24 hours old or older', async () => {
-			StoryModel.find = jest.fn().mockResolvedValue([]);
+			givenExpired([]);
 
 			await deleteExpiredStories();
 
 			expect(StoryModel.find).toHaveBeenCalledWith({ createdAt: { $lte: ACTIVE_SINCE } });
 		});
 
+		it('loads only the id and image identifier of each expired story, as plain objects', async () => {
+			const query = givenExpired([]);
+
+			await deleteExpiredStories();
+
+			expect(query.select).toHaveBeenCalledWith({ _id: 1, imageIdentifier: 1 });
+			expect(query.lean).toHaveBeenCalledTimes(1);
+		});
+
 		it('does nothing and reports zero when there are no expired stories', async () => {
-			StoryModel.find = jest.fn().mockResolvedValue([]);
+			givenExpired([]);
 
 			await expect(deleteExpiredStories()).resolves.toBe(0);
 
@@ -699,7 +716,7 @@ describe('storyService', () => {
 		});
 
 		it('removes the image, the view records and the story of every expired story', async () => {
-			StoryModel.find = jest.fn().mockResolvedValue([expired(STORY_ID), expired(STORY_ID_2)]);
+			givenExpired([expired(STORY_ID), expired(STORY_ID_2)]);
 
 			const deletedCount = await deleteExpiredStories();
 
@@ -713,7 +730,7 @@ describe('storyService', () => {
 		});
 
 		it('logs a failed deletion, keeps the story for the next run and carries on with the others', async () => {
-			StoryModel.find = jest.fn().mockResolvedValue([expired(STORY_ID), expired(STORY_ID_2), expired(STORY_ID_3)]);
+			givenExpired([expired(STORY_ID), expired(STORY_ID_2), expired(STORY_ID_3)]);
 			imageStorageService.deleteImage.mockImplementation(async (identifier) => {
 				if (identifier === `folder/${STORY_ID_2}`) {
 					throw new Error('cloudinary down');
@@ -732,7 +749,7 @@ describe('storyService', () => {
 		});
 
 		it('picks a story whose deletion failed up again on the next run', async () => {
-			StoryModel.find = jest.fn().mockResolvedValue([expired(STORY_ID)]);
+			givenExpired([expired(STORY_ID)]);
 			imageStorageService.deleteImage.mockRejectedValueOnce(new Error('cloudinary down'));
 
 			await expect(deleteExpiredStories()).resolves.toBe(0);

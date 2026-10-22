@@ -5,7 +5,7 @@ import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
 import './SearchResults.css';
 
-const SearchResults = ({ results, isLoading, onResultClick, className = '', showFollowersCount = true }) => {
+const SearchResults = ({ results, isLoading, onResultClick, className = '', showFollowersCount = true, emptyMessage = 'No users found' }) => {
 	const classNames = `search-results ${className}`.trim();
 
 	if (isLoading) {
@@ -19,7 +19,7 @@ const SearchResults = ({ results, isLoading, onResultClick, className = '', show
 	if (!results.length) {
 		return (
 			<div className={classNames}>
-				<p className='search-results-empty'>No users found</p>
+				<p className='search-results-empty'>{emptyMessage}</p>
 			</div>
 		);
 	}

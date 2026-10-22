@@ -62,6 +62,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 
 			startTargetRef.current = STORY_START_TARGETS.FIRST_UNWATCHED;
 
+			setLoadedPhotoStoryId(null);
 			setUserIndex(userIndex + 1);
 			setStoryIndex(nextStories ? getStartStoryIndex(nextStories, STORY_START_TARGETS.FIRST_UNWATCHED) : 0);
 
@@ -77,6 +78,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		}
 
 		if (storyIndex + 1 < userStories.length) {
+			setLoadedPhotoStoryId(null);
 			setStoryIndex(storyIndex + 1);
 
 			return;
@@ -91,6 +93,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		}
 
 		if (storyIndex > 0) {
+			setLoadedPhotoStoryId(null);
 			setStoryIndex(storyIndex - 1);
 		} else if (userIndex > 0) {
 			const previousUserId = queue[userIndex - 1].user._id;
@@ -98,6 +101,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 
 			startTargetRef.current = STORY_START_TARGETS.LAST;
 
+			setLoadedPhotoStoryId(null);
 			setUserIndex(userIndex - 1);
 			setStoryIndex(previousStories ? getStartStoryIndex(previousStories, STORY_START_TARGETS.LAST) : 0);
 		}
@@ -330,11 +334,13 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 
 					{isOwn && currentStory ? (
 						<footer className='story-viewer-footer'>
-							<button type='button' className='story-viewer-seen-by' onClick={() => setOpenOverlay(STORY_VIEWER_OVERLAYS.VIEWERS)}>
-								<EyeIcon />
+							{currentStory.viewersCount > 0 ? (
+								<button type='button' className='story-viewer-seen-by' onClick={() => setOpenOverlay(STORY_VIEWER_OVERLAYS.VIEWERS)}>
+									<EyeIcon />
 
-								<span>{`Seen by ${currentStory.viewersCount ?? 0}`}</span>
-							</button>
+									<span>{`Seen by ${currentStory.viewersCount}`}</span>
+								</button>
+							) : null}
 
 							<button
 								type='button'
