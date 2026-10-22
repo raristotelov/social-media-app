@@ -221,8 +221,37 @@ describe('ProfileView post actions and profile picture removal', () => {
 			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
 			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
 			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Third caption');
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 		};
+
+		it('opens the Create popup on the Post tab from the upload tile', async () => {
+			await renderOwnProfile();
+
+			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
+
+			expect(screen.getByRole('tab', { name: 'Post' })).toHaveAttribute('aria-selected', 'true');
+			expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'false');
+			expect(screen.getByPlaceholderText('Write a caption...')).toBeInTheDocument();
+		});
+
+		it('lets you switch to the Story tab from the profile, which has no caption', async () => {
+			await renderOwnProfile();
+
+			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
+			userEvent.click(screen.getByRole('tab', { name: 'Story' }));
+
+			expect(screen.queryByPlaceholderText('Write a caption...')).not.toBeInTheDocument();
+		});
+
+		it('closes the Create popup without uploading when Cancel is clicked', async () => {
+			await renderOwnProfile();
+
+			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
+			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+			expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+			expect(addUserPost).not.toHaveBeenCalled();
+		});
 
 		it('adds the tile and updates the header post count immediately after a successful upload', async () => {
 			addUserPost.mockResolvedValue(savedPost);
@@ -272,10 +301,10 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 			submitUpload();
 
-			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Upload Picture' })).not.toBeInTheDocument());
+			await waitFor(() => expect(screen.queryByRole('tablist')).not.toBeInTheDocument());
 		});
 
-		it('disables Submit while the upload is in flight and sends one request', async () => {
+		it('disables Share while the upload is in flight and sends one request', async () => {
 			let resolveUpload;
 
 			addUserPost.mockReturnValue(
@@ -288,10 +317,10 @@ describe('ProfileView post actions and profile picture removal', () => {
 			submitUpload();
 
 			await waitFor(() => expect(addUserPost).toHaveBeenCalledTimes(1));
-			expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
+			expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled();
 
 			resolveUpload(savedPost);
-			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Upload Picture' })).not.toBeInTheDocument());
+			await waitFor(() => expect(screen.queryByRole('tablist')).not.toBeInTheDocument());
 			expect(addUserPost).toHaveBeenCalledTimes(1);
 		});
 
@@ -303,7 +332,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 			const message = await screen.findByText('This image is over 10 MB');
 			expect(message).toHaveClass('field-error');
-			expect(screen.getByRole('heading', { name: 'Upload Picture' })).toBeInTheDocument();
+			expect(screen.getByRole('tablist')).toBeInTheDocument();
 			expect(document.querySelector('.form-error')).not.toBeInTheDocument();
 		});
 
@@ -347,7 +376,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 			const message = await screen.findByText("Couldn't upload the picture. Try again.");
 			expect(message).toHaveClass('form-error');
-			expect(screen.getByRole('heading', { name: 'Upload Picture' })).toBeInTheDocument();
+			expect(screen.getByRole('tablist')).toBeInTheDocument();
 		});
 
 		it('shows the upload-picture fallback copy in the popup when resizing fails, and sends no request', async () => {

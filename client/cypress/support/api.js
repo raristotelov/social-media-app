@@ -127,6 +127,25 @@ export const getFollowedUsersPostsViaApi = (jwtToken) =>
 		.request({ method: 'GET', url: `${serverUrl}/user-posts/followed-users-posts`, headers: authHeaders(jwtToken) })
 		.then((response) => response.body);
 
+export const uploadStoryViaApi = (jwtToken) => uploadImageViaApi({ method: 'POST', url: `${serverUrl}/stories`, jwtToken, imageField: 'image' });
+
+export const publicIdFromImageUrl = (imageUrl) => new URL(imageUrl).pathname.replace(/^.*\/upload\/(v\d+\/)?/, '').replace(/\.[^./]+$/, '');
+
+export const getStoryTrayViaApi = (jwtToken) =>
+	cy.request({ method: 'GET', url: `${serverUrl}/stories/tray`, headers: authHeaders(jwtToken) }).then((response) => response.body);
+
+export const getUserStoriesViaApi = (jwtToken, userId) =>
+	cy.request({ method: 'GET', url: `${serverUrl}/stories/user/${userId}`, headers: authHeaders(jwtToken) }).then((response) => response.body);
+
+export const recordStoryViewViaApi = (jwtToken, storyId) =>
+	cy.request({ method: 'POST', url: `${serverUrl}/stories/${storyId}/view`, headers: authHeaders(jwtToken) });
+
+export const getStoryViewersViaApi = (jwtToken, storyId, failOnStatusCode = true) =>
+	cy.request({ method: 'GET', url: `${serverUrl}/stories/${storyId}/viewers`, headers: authHeaders(jwtToken), failOnStatusCode });
+
+export const deleteStoryViaApi = (jwtToken, storyId, failOnStatusCode = true) =>
+	cy.request({ method: 'DELETE', url: `${serverUrl}/stories/${storyId}`, headers: authHeaders(jwtToken), failOnStatusCode });
+
 export const setThemeViaApi = (jwtToken, theme) =>
 	cy.request({
 		method: 'PATCH',

@@ -12,12 +12,12 @@ describe('post upload', () => {
 
 	const openUploadPopup = () => {
 		cy.get('.add-post-button').click();
-		cy.contains('.popup-title', 'Upload Picture').should('be.visible');
+		cy.contains('.create-popup [role="tab"][aria-selected="true"]', 'Post').should('be.visible');
 	};
 
 	const fileInput = () => cy.get('#add-image-post-form input[type="file"]');
 
-	const submitForm = () => cy.get('#add-image-post-form').contains('button', 'Submit').click();
+	const submitForm = () => cy.get('#add-image-post-form').contains('button', 'Share').click();
 
 	const buildSolidPng = (width, height) =>
 		cy.window().then(

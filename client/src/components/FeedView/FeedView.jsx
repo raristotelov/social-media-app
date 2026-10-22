@@ -1,12 +1,14 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import useStoryTray from '../../hooks/useStoryTray';
 import { getFollowedUsersPosts } from '../../services/userPostService';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';
 import { isUnauthenticatedError } from '../../utils/errors';
 
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 import PageLoadError from '../PageLoadError/PageLoadError';
+import StoriesTray from '../StoriesTray/StoriesTray';
 import UserPost from '../UserPost/UserPost';
 
 import './FeedView.css';
@@ -18,6 +20,7 @@ const FeedView = () => {
 	const [reloadCount, setReloadCount] = useState(0);
 
 	const { jwtToken, endSession } = useContext(LoggedInUserContext);
+	const { entries: trayEntries, isLoaded: isTrayLoaded, reload: reloadTray } = useStoryTray();
 
 	useEffect(() => {
 		let isCurrentRequest = true;
@@ -69,27 +72,29 @@ const FeedView = () => {
 		return <PageLoadError onRetryClick={retryLoad} isRetrying={isLoading} messages={LOAD_ERROR_MESSAGES.FEED} />;
 	}
 
-	if (isLoading) {
-		return <LoadingSpinner isFullPage />;
-	}
-
-	if (!posts.length) {
-		return (
-			<section className='feed-empty'>
-				<h1 className='feed-empty-title'>Your feed is empty</h1>
-
-				<p className='feed-empty-description'>Follow people to see their posts here</p>
-			</section>
-		);
-	}
+	const isEmpty = !isLoading && !posts.length;
 
 	return (
-		<section className='feed-wrapper'>
-			<div className='feed-posts'>
-				{posts.map((post) => (
-					<UserPost key={post._id} userPostData={post} author={post.userId} onPostChange={updatePost} />
-				))}
-			</div>
+		<section className={isEmpty ? 'feed-empty' : 'feed-wrapper'}>
+			<StoriesTray entries={trayEntries} isLoaded={isTrayLoaded} reload={reloadTray} />
+
+			{isLoading ? <LoadingSpinner /> : null}
+
+			{isEmpty ? (
+				<div className='feed-empty-message'>
+					<h1 className='feed-empty-title'>Your feed is empty</h1>
+
+					<p className='feed-empty-description'>Follow people to see their posts here</p>
+				</div>
+			) : null}
+
+			{!isLoading && !isEmpty ? (
+				<div className='feed-posts'>
+					{posts.map((post) => (
+						<UserPost key={post._id} userPostData={post} author={post.userId} onPostChange={updatePost} />
+					))}
+				</div>
+			) : null}
 		</section>
 	);
 };

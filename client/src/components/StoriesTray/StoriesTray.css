@@ -1,0 +1,30 @@
+.stories-tray {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 500px;
+	min-height: 119px;
+	padding: 16px;
+	overflow-x: auto;
+
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+
+	background-color: var(--background-surface);
+	border: 1px solid var(--border-card);
+	border-radius: 12px;
+}
+
+@media (max-width: 599px) {
+	.stories-tray {
+		max-width: none;
+		min-height: 118px;
+		padding: 16px 12px;
+
+		gap: 14px;
+
+		border-width: 0 0 1px;
+		border-radius: 0;
+		border-bottom-color: var(--border-divider);
+	}
+}

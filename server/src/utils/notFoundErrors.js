@@ -5,7 +5,13 @@ const createPostNotFoundError = () => new AppError('Post not found', 404, { code
 
 const createCommentNotFoundError = () => new AppError('Comment not found', 404, { code: ERROR_CODES.COMMENT_NOT_FOUND });
 
+const createStoryNotFoundError = () => new AppError('Story not found', 404, { code: ERROR_CODES.STORY_NOT_FOUND });
+
+const createUserNotFoundError = () => new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
+
 module.exports = {
 	createPostNotFoundError,
 	createCommentNotFoundError,
+	createStoryNotFoundError,
+	createUserNotFoundError,
 };

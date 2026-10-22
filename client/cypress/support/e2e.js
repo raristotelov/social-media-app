@@ -11,7 +11,9 @@
 after(() => {
 	cy.task('cleanTestUsers').then((removed) => {
 		if (removed.users) {
-			cy.log(`swept ${removed.users} leftover test users, ${removed.posts} posts, ${removed.comments} comments`);
+			cy.log(
+				`swept ${removed.users} leftover test users, ${removed.posts} posts, ${removed.comments} comments, ${removed.stories} stories, ${removed.storyViews} story views`,
+			);
 		}
 	});
 });

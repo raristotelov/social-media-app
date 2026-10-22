@@ -54,7 +54,7 @@ describe('followers and following popup', () => {
 		cy.task('deleteTestUser', secondFollower.email);
 	});
 
-	it('opens from the followers count and lists each follower with their follower count', () => {
+	it('opens from the followers count and lists each follower by photo and username, without a follower count', () => {
 		cy.viewport(1440, 900);
 		cy.visit(ownerPath);
 
@@ -62,10 +62,20 @@ describe('followers and following popup', () => {
 
 		cy.contains('.follow-list-popup .popup-title', 'Followers').should('be.visible');
 		rows().should('have.length', 2);
-		cy.contains('.follow-list-results .search-result', firstFollower.username).find('.search-result-followers').should('have.text', '1 follower');
-		cy.contains('.follow-list-results .search-result', secondFollower.username)
-			.find('.search-result-followers')
-			.should('have.text', '0 followers');
+		cy.contains('.follow-list-results .search-result', firstFollower.username).should('be.visible');
+		cy.contains('.follow-list-results .search-result', secondFollower.username).should('be.visible');
+		cy.get('.follow-list-results .search-result-followers').should('not.exist');
+	});
+
+	it('lists the people they follow by photo and username, without a follower count', () => {
+		cy.viewport(1440, 900);
+		cy.visit(ownerPath);
+
+		statButton('following').click();
+
+		cy.contains('.follow-list-popup .popup-title', 'Following').should('be.visible');
+		cy.contains('.follow-list-results .search-result', firstFollower.username).find('.search-result-avatar').should('be.visible');
+		cy.get('.follow-list-results .search-result-followers').should('not.exist');
 	});
 
 	it('shows an avatar on every row', () => {

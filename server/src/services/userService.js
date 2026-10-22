@@ -7,15 +7,20 @@ const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { asFieldError } = require('../utils/fieldErrors');
+const { createUserNotFoundError } = require('../utils/notFoundErrors');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 
 const necessaryUserFields = ['_id', 'email', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following'];
 
-const USER_ROW_PROJECTION = {
+const FOLLOW_LIST_ROW_PROJECTION = {
 	_id: 1,
 	username: 1,
 	'profilePicture.imageUrl': 1,
+};
+
+const USER_ROW_PROJECTION = {
+	...FOLLOW_LIST_ROW_PROJECTION,
 	followersCount: { $size: { $ifNull: ['$followers', []] } },
 };
 
@@ -40,8 +45,6 @@ const getNeccessaryUserData = (user) => {
 		jwt: signAuthToken(user),
 	};
 };
-
-const createUserNotFoundError = () => new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
 
 const assertValidUserIds = (userIds) => {
 	if (!userIds.every((userId) => mongoose.isObjectIdOrHexString(userId))) {
@@ -205,7 +208,7 @@ const getFollowListByUserId = async ({ userId, listField, requesterId }) => {
 
 		const listedUserIds = user[listField];
 
-		const rows = await UserModel.aggregate([{ $match: { _id: { $in: listedUserIds } } }, { $project: USER_ROW_PROJECTION }]);
+		const rows = await UserModel.aggregate([{ $match: { _id: { $in: listedUserIds } } }, { $project: FOLLOW_LIST_ROW_PROJECTION }]);
 
 		const rowsById = new Map(rows.map((row) => [String(row._id), row]));
 		const orderedRows = listedUserIds.map((listedUserId) => rowsById.get(String(listedUserId))).filter(Boolean);

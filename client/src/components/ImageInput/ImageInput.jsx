@@ -31,6 +31,7 @@ const ImageInput = (props) => {
 		iconWidthProp,
 		iconHeightProp,
 		fontSizeProp,
+		hasBlurredBackdrop,
 	} = props;
 
 	useEffect(() => {
@@ -118,6 +119,10 @@ const ImageInput = (props) => {
 			previewWrapperClasses = previewWrapperClasses.concat(' removable');
 		}
 
+		if (hasBlurredBackdrop) {
+			previewWrapperClasses = previewWrapperClasses.concat(' has-backdrop');
+		}
+
 		if (!uploadedImage) {
 			previewWrapperClasses = previewWrapperClasses.concat(' hidden');
 		}
@@ -143,6 +148,12 @@ const ImageInput = (props) => {
 			</div>
 
 			<div className={getPreviewWrapperClasses()}>
+				{hasBlurredBackdrop ? (
+					<div className='preview-backdrop' aria-hidden='true'>
+						<img src={imagePreview} alt='' />
+					</div>
+				) : null}
+
 				<img src={imagePreview} alt='preview' onClick={openFilePicker} />
 
 				<button onClick={openFilePicker} className='image-change-button'>

@@ -39,6 +39,8 @@ export const ACTION_FALLBACK_MESSAGES = Object.freeze({
 	UPDATE_LIKE: "Couldn't update your like. Try again.",
 	ADD_COMMENT: "Couldn't post your comment. Try again.",
 	ADD_REPLY: "Couldn't post your reply. Try again.",
+	LOAD_STORIES: "Couldn't load stories. Try again.",
+	DELETE_STORY: "Couldn't delete your story. Try again.",
 });
 
 export const LOAD_ERROR_MESSAGES = Object.freeze({

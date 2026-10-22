@@ -13,6 +13,13 @@ describe('DeletePostConfirm', () => {
 		expect(screen.getByText(/permanently deleted/i)).toBeInTheDocument();
 	});
 
+	it('shows the given message instead of the post warning, e.g. for a story', () => {
+		renderConfirm({ message: 'This story will be permanently deleted. This cannot be undone.' });
+
+		expect(screen.getByText('This story will be permanently deleted. This cannot be undone.')).toBeInTheDocument();
+		expect(screen.queryByText(/post and its comments/i)).not.toBeInTheDocument();
+	});
+
 	it('shows Delete and Cancel buttons', () => {
 		renderConfirm();
 

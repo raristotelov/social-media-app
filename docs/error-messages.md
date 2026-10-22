@@ -22,13 +22,15 @@ Every error code the server sends and the copy the client shows for it. The clie
 | `BIO_TOO_LONG` | 400 | field `bio` | Bio must be at most 150 characters |
 | `CAPTION_INVALID` | 400 | field `caption` | Caption must be text |
 | `CAPTION_TOO_LONG` | 400 | field `caption`, post upload and caption edit (#11) | Caption must be at most 1000 characters |
-| `IMAGE_TYPE_INVALID` | 400 | image field, post upload and profile update (#15) | Choose a JPEG, PNG or WebP image |
+| `IMAGE_TYPE_INVALID` | 400 | image field, post and story upload and profile update (#15, #13) | Choose a JPEG, PNG or WebP image |
 | `IMAGE_TOO_LARGE` | 413 | image field, upload over 10 MB (#15) | This image is over 10 MB |
 | `USER_NOT_FOUND` | 404 | Profile load, profile update, follow / unfollow, unknown or malformed user id | — (blank page until #29) |
 | `POST_NOT_FOUND` | 404 | Post edit / delete; like, unlike, add comment and load comments on a missing or malformed post (#11) | This post no longer exists |
 | `POST_FORBIDDEN` | 403 | Post edit / delete on someone else's post | You can only change your own posts |
 | `COMMENT_TEXT_REQUIRED` | 400 | Add comment and reply, empty text (#11) | Comment can't be empty |
 | `COMMENT_NOT_FOUND` | 404 | Like, unlike or reply on a deleted or malformed comment; reply to a comment that is on another post or is itself a reply (#11) | This comment no longer exists |
+| `STORY_NOT_FOUND` | 404 | View, list viewers of or delete a story that expired, was deleted or has a malformed id (#13) | The action's fallback (no dedicated copy yet) |
+| `STORY_FORBIDDEN` | 403 | List viewers of or delete someone else's story (#13) | The action's fallback (no dedicated copy yet) |
 | `PROFILE_FORBIDDEN` | 403 | Profile update, follow / unfollow for someone else's account | You can only change your own profile |
 | `BAD_REQUEST` | 400 | Malformed request body; 4xx errors not yet given their own code | The action's fallback (below) |
 | `INTERNAL_ERROR` | 500 | Anywhere | The action's fallback (below) |
@@ -60,6 +62,8 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Like / unlike a post or a comment (#11) | Toast | Couldn't update your like. Try again. |
 | Add comment (#11) | Form message | Couldn't post your comment. Try again. |
 | Reply (#11) | Form message | Couldn't post your reply. Try again. |
+| Open a user's stories (#13) | Toast | Couldn't load stories. Try again. |
+| Delete story (#13) | Toast | Couldn't delete your story. Try again. |
 
 ## Load errors
 

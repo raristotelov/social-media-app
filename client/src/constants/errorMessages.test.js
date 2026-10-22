@@ -27,9 +27,12 @@ describe('ERROR_MESSAGES', () => {
 		expect(ERROR_MESSAGES[code]).toBe(copy);
 	});
 
-	it.each([['UNAUTHENTICATED'], ['USER_NOT_FOUND'], ['INTERNAL_ERROR']])('has no copy for %s (the fallback or no message applies)', (code) => {
-		expect(ERROR_MESSAGES[code]).toBeUndefined();
-	});
+	it.each([['UNAUTHENTICATED'], ['USER_NOT_FOUND'], ['INTERNAL_ERROR'], ['STORY_NOT_FOUND'], ['STORY_FORBIDDEN']])(
+		'has no copy for %s (the fallback or no message applies)',
+		(code) => {
+			expect(ERROR_MESSAGES[code]).toBeUndefined();
+		},
+	);
 
 	it('has copy for exactly the codes the spec documents, and no other', () => {
 		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(20);
@@ -47,6 +50,8 @@ describe('ACTION_FALLBACK_MESSAGES', () => {
 		['UPDATE_LIKE', "Couldn't update your like. Try again."],
 		['ADD_COMMENT', "Couldn't post your comment. Try again."],
 		['ADD_REPLY', "Couldn't post your reply. Try again."],
+		['LOAD_STORIES', "Couldn't load stories. Try again."],
+		['DELETE_STORY', "Couldn't delete your story. Try again."],
 	])('has the documented copy for %s', (action, copy) => {
 		expect(ACTION_FALLBACK_MESSAGES[action]).toBe(copy);
 	});

@@ -224,6 +224,37 @@ describe('ImageInput', () => {
 		});
 	});
 
+	describe('blurred backdrop', () => {
+		it('shows no blurred copy by default', () => {
+			const { container } = renderImageInput({ initialValue: initialPicture });
+
+			expect(container.querySelector('.preview-backdrop')).not.toBeInTheDocument();
+		});
+
+		it('puts a decorative blurred copy of the picture behind the preview when asked to', () => {
+			const { container } = renderImageInput({ initialValue: initialPicture, hasBlurredBackdrop: true });
+			const backdrop = container.querySelector('.preview-backdrop');
+
+			expect(backdrop).toHaveAttribute('aria-hidden', 'true');
+			expect(backdrop.querySelector('img')).toHaveAttribute('src', initialPicture);
+			expect(backdrop.querySelector('img')).toHaveAttribute('alt', '');
+		});
+
+		it('keeps the real preview picture available by its alt text', () => {
+			renderImageInput({ initialValue: initialPicture, hasBlurredBackdrop: true });
+
+			expect(screen.getByAltText('preview')).toHaveAttribute('src', initialPicture);
+		});
+
+		it('blurs a newly chosen file too', () => {
+			const { container, fileInput } = renderImageInput({ hasBlurredBackdrop: true });
+
+			userEvent.upload(fileInput, buildFile());
+
+			expect(container.querySelector('.preview-backdrop img')).toHaveAttribute('src', 'blob:preview');
+		});
+	});
+
 	describe('remove button', () => {
 		it('is not rendered when onRemove is not given', () => {
 			renderImageInput({ initialValue: initialPicture });

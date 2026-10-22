@@ -9,6 +9,9 @@ module.exports = {
 	COMMENT_PREVIEW_LIMIT: 2,
 	MAX_IMAGE_BYTES: 10 * 1024 * 1024,
 	POST_IMAGE_FIELD: 'image',
+	STORY_IMAGE_FIELD: 'image',
+	STORY_LIFETIME_MS: 24 * 60 * 60 * 1000,
+	EXPIRED_STORIES_JOB_INTERVAL_MS: 60 * 60 * 1000,
 	PROFILE_PICTURE_FIELD: 'profilePicture',
 	ALLOWED_PROFILE_UPDATE_FIELDS: ['email', 'username', 'bio', 'theme', 'profilePicture'],
 };

@@ -1,0 +1,82 @@
+.story-circle {
+	position: relative;
+	flex-shrink: 0;
+	width: 64px;
+}
+
+.story-circle-button {
+	width: 100%;
+	padding: 0;
+	border: none;
+	background: none;
+
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+
+	font-family: 'Mada';
+}
+
+.story-circle-button:hover {
+	cursor: pointer;
+}
+
+.story-circle-ring {
+	box-sizing: border-box;
+	width: 64px;
+	height: 64px;
+	padding: 2px;
+
+	border: 2px solid var(--border-divider);
+	border-radius: 50%;
+}
+
+.story-circle-ring-unwatched {
+	border-color: var(--brand-red);
+}
+
+.story-circle-avatar {
+	width: 56px;
+	height: 56px;
+}
+
+.story-circle-label {
+	width: 100%;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+
+	font-size: 12px;
+	line-height: 15px;
+	color: var(--text-primary);
+	text-align: center;
+}
+
+.story-circle-badge {
+	position: absolute;
+	top: 42px;
+	left: 42px;
+
+	box-sizing: border-box;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 2px solid var(--background-surface);
+	border-radius: 50%;
+	background-color: var(--brand-red);
+	color: var(--static-white);
+	line-height: 0;
+
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+button.story-circle-badge:hover {
+	cursor: pointer;
+}
+
+.story-circle-badge-decorative {
+	pointer-events: none;
+}

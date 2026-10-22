@@ -1375,7 +1375,7 @@ describe('userService', () => {
 			expect(select).toHaveBeenCalledWith({ [listField]: 1 });
 		});
 
-		it('matches the listed users and projects slim rows with a $size follower count', async () => {
+		it('matches the listed users and projects only the id, username and photo, with no follower count', async () => {
 			givenProfileWithList([FIRST_ID, SECOND_ID], []);
 
 			await getList({ userId: PROFILE_ID });
@@ -1384,8 +1384,8 @@ describe('userService', () => {
 			const project = pipeline.find((stage) => stage.$project).$project;
 
 			expect(pipeline.find((stage) => stage.$match).$match).toEqual({ _id: { $in: [FIRST_ID, SECOND_ID] } });
-			expect(Object.keys(project).sort()).toEqual(['_id', 'followersCount', 'profilePicture.imageUrl', 'username']);
-			expect(project.followersCount).toEqual({ $size: { $ifNull: ['$followers', []] } });
+			expect(Object.keys(project).sort()).toEqual(['_id', 'profilePicture.imageUrl', 'username']);
+			expect(project).not.toHaveProperty('followersCount');
 		});
 
 		it('returns the rows as given by the projection, without email', async () => {
