@@ -1,8 +1,10 @@
 jest.mock('../models/commentModel');
 jest.mock('../models/userPostModel');
+jest.mock('../models/userModel');
 
 const CommentModel = require('../models/commentModel');
 const UserPostModel = require('../models/userPostModel');
+const UserModel = require('../models/userModel');
 const { ERROR_CODES } = require('../config/errorCodes');
 const {
 	addComment,
@@ -18,7 +20,9 @@ const POST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
 const COMMENT_ID = '64b7f0a1c2d3e4f5a6b7c8f1';
 const PARENT_ID = '64b7f0a1c2d3e4f5a6b7c8f2';
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
+const MENTIONED_ID = '64b7f0a1c2d3e4f5a6b7c8d2';
 const AUTHOR_POPULATE = { path: 'userId', select: 'username profilePicture' };
+const MENTIONED_USER_POPULATE = { path: 'mentionedUserId', select: 'username' };
 
 describe('commentService', () => {
 	beforeEach(() => {
@@ -42,6 +46,14 @@ describe('commentService', () => {
 
 		const givenParentExists = (exists = true) => {
 			CommentModel.exists = jest.fn().mockResolvedValue(exists ? { _id: PARENT_ID } : null);
+		};
+
+		const givenMentionedUser = (user) => {
+			const select = jest.fn().mockResolvedValue(user);
+
+			UserModel.findById = jest.fn().mockReturnValue({ select });
+
+			return { select };
 		};
 
 		describe('the comment text', () => {
@@ -191,6 +203,112 @@ describe('commentService', () => {
 			});
 		});
 
+		describe('the mentioned user of a reply', () => {
+			const sendReply = (overrides = {}) =>
+				addComment({
+					userPostId: POST_ID,
+					userId: USER_ID,
+					parentCommentId: PARENT_ID,
+					text: '@bob thanks',
+					mentionedUserId: MENTIONED_ID,
+					...overrides,
+				});
+
+			beforeEach(() => {
+				givenPostExists();
+				givenParentExists();
+				buildCommentModelMock();
+			});
+
+			it('saves the id when the user exists and the reply starts with their @username', async () => {
+				const { select } = givenMentionedUser({ _id: MENTIONED_ID, username: 'bob' });
+
+				await sendReply();
+
+				expect(UserModel.findById).toHaveBeenCalledWith(MENTIONED_ID);
+				expect(select).toHaveBeenCalledWith({ username: 1 });
+				expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: MENTIONED_ID }));
+			});
+
+			it('still saves the id when the reply is only the mention', async () => {
+				givenMentionedUser({ _id: MENTIONED_ID, username: 'bob' });
+
+				await sendReply({ text: '@bob' });
+
+				expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: MENTIONED_ID }));
+			});
+
+			it('checks the mention against the trimmed text', async () => {
+				givenMentionedUser({ _id: MENTIONED_ID, username: 'bob' });
+
+				await sendReply({ text: '   @bob thanks  ' });
+
+				expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ text: '@bob thanks', mentionedUserId: MENTIONED_ID }));
+			});
+
+			it('saves null, with no error, when the user id is unknown', async () => {
+				givenMentionedUser(null);
+
+				await expect(sendReply()).resolves.toBeDefined();
+
+				expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: null }));
+			});
+
+			it('saves null, with no error and no lookup, when the user id is malformed', async () => {
+				givenMentionedUser({ _id: MENTIONED_ID, username: 'bob' });
+
+				await expect(sendReply({ mentionedUserId: 'not-an-object-id' })).resolves.toBeDefined();
+
+				expect(UserModel.findById).not.toHaveBeenCalled();
+				expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: null }));
+			});
+
+			it.each([[undefined], [null], [''], [42], [{}]])(
+				'saves null, with no error and no lookup, when the user id is %p',
+				async (mentionedUserId) => {
+					givenMentionedUser({ _id: MENTIONED_ID, username: 'bob' });
+
+					await expect(sendReply({ mentionedUserId })).resolves.toBeDefined();
+
+					expect(UserModel.findById).not.toHaveBeenCalled();
+					expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: null }));
+				},
+			);
+
+			it('saves null, with no error, when the reply starts with a different @name', async () => {
+				givenMentionedUser({ _id: MENTIONED_ID, username: 'alice' });
+
+				await expect(sendReply({ text: '@bob thanks' })).resolves.toBeDefined();
+
+				expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: null }));
+			});
+
+			it('saves null when the mention was removed from the start of the reply', async () => {
+				givenMentionedUser({ _id: MENTIONED_ID, username: 'bob' });
+
+				await sendReply({ text: 'thanks @bob' });
+
+				expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: null }));
+			});
+
+			it('saves null for a top-level comment even when a user id is sent, without looking the user up', async () => {
+				givenMentionedUser({ _id: MENTIONED_ID, username: 'bob' });
+
+				await addComment({ userPostId: POST_ID, userId: USER_ID, text: '@bob hi', mentionedUserId: MENTIONED_ID });
+
+				expect(UserModel.findById).not.toHaveBeenCalled();
+				expect(CommentModel).toHaveBeenCalledWith(expect.objectContaining({ parentCommentId: null, mentionedUserId: null }));
+			});
+
+			it('wraps a failing user lookup in a 500 AppError that keeps the cause', async () => {
+				const lookupError = new Error('connection lost');
+
+				UserModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockRejectedValue(lookupError) });
+
+				await expect(sendReply()).rejects.toMatchObject({ statusCode: 500, cause: lookupError });
+			});
+		});
+
 		describe('saving', () => {
 			it('saves a top-level comment by the user on the post, with no parent', async () => {
 				givenPostExists();
@@ -198,7 +316,13 @@ describe('commentService', () => {
 
 				await addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Nice shot' });
 
-				expect(CommentModel).toHaveBeenCalledWith({ userPostId: POST_ID, userId: USER_ID, text: 'Nice shot', parentCommentId: null });
+				expect(CommentModel).toHaveBeenCalledWith({
+					userPostId: POST_ID,
+					userId: USER_ID,
+					text: 'Nice shot',
+					parentCommentId: null,
+					mentionedUserId: null,
+				});
 				expect(save).toHaveBeenCalledTimes(1);
 			});
 
@@ -209,16 +333,22 @@ describe('commentService', () => {
 
 				await addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Thanks', parentCommentId: PARENT_ID });
 
-				expect(CommentModel).toHaveBeenCalledWith({ userPostId: POST_ID, userId: USER_ID, text: 'Thanks', parentCommentId: PARENT_ID });
+				expect(CommentModel).toHaveBeenCalledWith({
+					userPostId: POST_ID,
+					userId: USER_ID,
+					text: 'Thanks',
+					parentCommentId: PARENT_ID,
+					mentionedUserId: null,
+				});
 			});
 
-			it('populates only the username and profile picture of the author', async () => {
+			it('populates only the username and profile picture of the author, and only the username of the mentioned user', async () => {
 				givenPostExists();
 				const { populate } = buildCommentModelMock();
 
 				await addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Nice shot' });
 
-				expect(populate).toHaveBeenCalledWith(AUTHOR_POPULATE);
+				expect(populate).toHaveBeenCalledWith([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
 			});
 
 			it('resolves with the saved comment', async () => {
@@ -301,14 +431,14 @@ describe('commentService', () => {
 			expect(CommentModel.find).not.toHaveBeenCalled();
 		});
 
-		it('loads the comments of the post oldest first, with only the username and picture of each author', async () => {
+		it('loads the comments of the post oldest first, with the username and picture of each author and the username of each mentioned user', async () => {
 			const { sort, populate } = givenStoredComments([]);
 
 			await getCommentsForPost({ userPostId: POST_ID });
 
 			expect(CommentModel.find).toHaveBeenCalledWith({ userPostId: POST_ID });
 			expect(sort).toHaveBeenCalledWith({ createdAt: 1 });
-			expect(populate).toHaveBeenCalledWith(AUTHOR_POPULATE);
+			expect(populate).toHaveBeenCalledWith([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
 		});
 
 		it('returns an empty list for a post without comments', async () => {

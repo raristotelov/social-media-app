@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -154,12 +154,111 @@ describe('Comment', () => {
 			expect(screen.queryByRole('button', { name: 'View replies' })).not.toBeInTheDocument();
 		});
 
-		it('offers Reply and "View replies" on the comment, but no Reply on its replies', () => {
+		it('offers Reply on the comment and on each of its replies, and "View replies" only on the comment', () => {
 			renderComment({ comment: { ...baseComment, replies } });
 
 			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
 
-			expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(1);
+			expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(3);
+			expect(screen.queryByRole('button', { name: 'View replies' })).not.toBeInTheDocument();
+		});
+
+		it('offers no "View replies" or "Hide replies" on a reply', () => {
+			const { container } = renderComment({ comment: { ...baseComment, replies } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+
+			expect(container.querySelectorAll('.comment-reply .comment-replies')).toHaveLength(0);
+			expect(screen.getAllByRole('button', { name: 'Hide replies' })).toHaveLength(1);
+		});
+	});
+
+	describe('the mention in a reply', () => {
+		const mentionedAlice = { _id: 'user3', username: 'alice' };
+
+		const renderWithReply = (reply) => {
+			const rendered = renderComment({
+				comment: { ...baseComment, replies: [{ _id: 'r1', likes: [], userId: { _id: 'user4', username: 'bob' }, ...reply }] },
+			});
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+
+			return rendered;
+		};
+
+		it('shows the leading @username as a link to the profile of the mentioned user', () => {
+			const { container } = renderWithReply({ text: '@alice thanks', mentionedUserId: mentionedAlice });
+
+			const mention = container.querySelector('.comment-reply .comment-mention');
+
+			expect(mention).toHaveTextContent('@alice');
+			expect(mention).toHaveAttribute('href', '/user/user3');
+		});
+
+		it('keeps the rest of the reply as plain text after the link', () => {
+			const { container } = renderWithReply({ text: '@alice thanks a lot', mentionedUserId: mentionedAlice });
+
+			const text = container.querySelector('.comment-reply .comment-text');
+
+			expect(text).toHaveTextContent('@alice thanks a lot');
+			expect(text.querySelectorAll('a')).toHaveLength(1);
+			expect(text.lastChild.textContent).toBe(' thanks a lot');
+		});
+
+		it('links a reply that is only the mention', () => {
+			const { container } = renderWithReply({ text: '@alice', mentionedUserId: mentionedAlice });
+
+			expect(container.querySelector('.comment-reply .comment-mention')).toHaveAttribute('href', '/user/user3');
+		});
+
+		it('shows a plain reply as plain text when no user is mentioned', () => {
+			const { container } = renderWithReply({ text: '@alice thanks', mentionedUserId: null });
+
+			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
+			expect(container.querySelector('.comment-reply .comment-text')).toHaveTextContent('@alice thanks');
+		});
+
+		it('shows a reply without the field as plain text', () => {
+			const { container } = renderWithReply({ text: '@alice thanks' });
+
+			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
+		});
+
+		it('shows the reply as plain text when it no longer starts with the @username of the mentioned user', () => {
+			const { container } = renderWithReply({ text: 'thanks @alice', mentionedUserId: mentionedAlice });
+
+			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
+			expect(container.querySelector('.comment-reply .comment-text')).toHaveTextContent('thanks @alice');
+		});
+
+		it('shows the reply as plain text when it starts with a different @name', () => {
+			const { container } = renderWithReply({ text: '@carol thanks', mentionedUserId: mentionedAlice });
+
+			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
+		});
+
+		it('shows the reply as plain text when the mentioned user is only an id, not populated', () => {
+			const { container } = renderWithReply({ text: '@alice thanks', mentionedUserId: 'user3' });
+
+			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
+			expect(container.querySelector('.comment-reply .comment-text')).toHaveTextContent('@alice thanks');
+		});
+
+		it('lets a guest follow the mention link', () => {
+			const { container } = renderComment({
+				user: null,
+				comment: {
+					...baseComment,
+					replies: [
+						{ _id: 'r1', text: '@alice hi', likes: [], userId: { _id: 'user4', username: 'bob' }, mentionedUserId: mentionedAlice },
+					],
+				},
+			});
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+
+			expect(container.querySelector('.comment-mention')).toHaveAttribute('href', '/user/user3');
+			expect(mockNavigate).not.toHaveBeenCalled();
 		});
 	});
 
@@ -312,6 +411,50 @@ describe('Comment', () => {
 			expect(screen.getByPlaceholderText('Write a reply...')).toBeInTheDocument();
 		});
 
+		it('prefills the reply box with the @username of the author of the comment', () => {
+			renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+
+			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@alice ');
+		});
+
+		it('keeps Post disabled while the box holds only the mention', () => {
+			renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+
+			expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
+		});
+
+		it('enables Post once text follows the mention', () => {
+			renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+
+			expect(screen.getByRole('button', { name: 'Post' })).toBeEnabled();
+		});
+
+		it('prefills the reply box of a reply with the @username of the author of that reply', () => {
+			const { container } = renderComment({ comment: { ...baseComment, replies } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+
+			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@bob ');
+		});
+
+		it('opens the reply box under the reply that was clicked', () => {
+			const { container } = renderComment({ comment: { ...baseComment, replies } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(within(container.querySelectorAll('.comment-reply')[1]).getByRole('button', { name: 'Reply' }));
+
+			expect(within(container.querySelectorAll('.comment-reply')[1]).getByPlaceholderText('Write a reply...')).toHaveValue('@carol ');
+			expect(within(container.querySelectorAll('.comment-reply')[0]).queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument();
+		});
+
 		it('closes the reply box when Reply is clicked again', () => {
 			renderComment();
 
@@ -330,7 +473,7 @@ describe('Comment', () => {
 			expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
 		});
 
-		it('sends the reply to the parent comment of the post', async () => {
+		it('sends the reply to the comment, with the id of the mentioned author', async () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			renderComment();
 
@@ -339,8 +482,94 @@ describe('Comment', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() =>
-				expect(addComment).toHaveBeenCalledWith({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1', jwtToken: 'token123' }),
+				expect(addComment).toHaveBeenCalledWith({
+					userPostId: 'post1',
+					text: '@alice Thanks',
+					parentCommentId: 'c1',
+					mentionedUserId: 'user3',
+					jwtToken: 'token123',
+				}),
 			);
+		});
+
+		it('sends a reply on a reply under the top-level comment, mentioning the author of that reply', async () => {
+			addComment.mockResolvedValue({ _id: 'r9' });
+			const { container } = renderComment({ comment: { ...baseComment, replies } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
+			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+			await waitFor(() =>
+				expect(addComment).toHaveBeenCalledWith({
+					userPostId: 'post1',
+					text: '@bob Agreed',
+					parentCommentId: 'c1',
+					mentionedUserId: 'user4',
+					jwtToken: 'token123',
+				}),
+			);
+		});
+
+		it('keeps the replies shown and closes the reply box after a reply on a reply', async () => {
+			const savedReply = { _id: 'r9', text: '@bob Agreed', parentCommentId: 'c1', likes: [] };
+
+			addComment.mockResolvedValue(savedReply);
+			const { container, onReload } = renderComment({ comment: { ...baseComment, replies } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
+			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+			await waitFor(() => expect(onReload).toHaveBeenCalledWith(savedReply));
+			await waitFor(() => expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument());
+			expect(getReplyTexts(container)).toEqual(['first reply', 'second reply']);
+		});
+
+		it('sends no mentioned user when the mention was removed from the start of the reply', async () => {
+			addComment.mockResolvedValue({ _id: 'r9' });
+			renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			userEvent.clear(screen.getByPlaceholderText('Write a reply...'));
+			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+			await waitFor(() =>
+				expect(addComment).toHaveBeenCalledWith({
+					userPostId: 'post1',
+					text: 'Thanks',
+					parentCommentId: 'c1',
+					mentionedUserId: null,
+					jwtToken: 'token123',
+				}),
+			);
+		});
+
+		it('sends no mentioned user when the mention is no longer at the start of the reply', async () => {
+			addComment.mockResolvedValue({ _id: 'r9' });
+			renderComment();
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			userEvent.clear(screen.getByPlaceholderText('Write a reply...'));
+			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks @alice');
+			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+			await waitFor(() => expect(addComment).toHaveBeenCalledWith(expect.objectContaining({ text: 'Thanks @alice', mentionedUserId: null })));
+		});
+
+		it('sends no mentioned user when the author of the comment was deleted', async () => {
+			addComment.mockResolvedValue({ _id: 'r9' });
+			renderComment({ comment: { ...baseComment, userId: null } });
+
+			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			userEvent.clear(screen.getByPlaceholderText('Write a reply...'));
+			userEvent.type(screen.getByPlaceholderText('Write a reply...'), '@undefined hi');
+			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+			await waitFor(() => expect(addComment).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: null })));
 		});
 
 		it('reloads the comments and closes the reply box after a successful reply', async () => {
@@ -414,7 +643,7 @@ describe('Comment', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Post' }));
 			await screen.findByText("Couldn't post your reply. Try again.");
 
-			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('Thanks');
+			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@alice Thanks');
 			expect(onReload).not.toHaveBeenCalled();
 		});
 
@@ -453,6 +682,16 @@ describe('Comment', () => {
 			renderComment({ user: null });
 
 			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+
+			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
+			expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument();
+		});
+
+		it('sends the guest to /log-in when Reply on a reply is clicked, opening no reply box', () => {
+			const { container } = renderComment({ user: null, comment: { ...baseComment, replies } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 			expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument();

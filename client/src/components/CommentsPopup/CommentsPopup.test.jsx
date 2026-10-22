@@ -488,14 +488,15 @@ describe('CommentsPopup', () => {
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 		});
 
-		it('sends the guest to /log-in when Post is clicked, without adding a comment', async () => {
+		it('shows Post disabled, and clicking it adds no comment and does not redirect', async () => {
 			getComments.mockResolvedValue(topComments);
 			renderPopup({ user: null });
 
 			await screen.findByText('Most liked comment');
 			userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
-			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
+			expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
+			expect(mockNavigate).not.toHaveBeenCalled();
 			expect(addComment).not.toHaveBeenCalled();
 		});
 	});
@@ -551,7 +552,13 @@ describe('CommentsPopup', () => {
 				postReply();
 
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
-				expect(addComment).toHaveBeenCalledWith({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1', jwtToken: 'token123' });
+				expect(addComment).toHaveBeenCalledWith({
+					userPostId: 'post1',
+					text: '@alice Thanks',
+					parentCommentId: 'c1',
+					mentionedUserId: 'user3',
+					jwtToken: 'token123',
+				});
 			});
 
 			it('appends the reply after the existing replies and shows the replies', async () => {
@@ -614,6 +621,45 @@ describe('CommentsPopup', () => {
 					]),
 				);
 			});
+		});
+
+		it('replies to a reply under the top-level comment, prefilled with and mentioning the author of that reply', async () => {
+			const reply = buildComment('r1', 'a reply', { userId: { _id: 'user4', username: 'bob' }, parentCommentId: 'c1' });
+
+			getComments.mockResolvedValue([buildComment('c1', 'Parent', { replies: [reply] })]);
+			addComment.mockResolvedValue(buildComment('r2', '@bob Agreed', { parentCommentId: 'c1' }));
+			renderPopup();
+
+			await screen.findByText('Parent');
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[1]);
+
+			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@bob ');
+
+			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
+			userEvent.click(screen.getAllByRole('button', { name: 'Post' })[0]);
+
+			await waitFor(() =>
+				expect(addComment).toHaveBeenCalledWith({
+					userPostId: 'post1',
+					text: '@bob Agreed',
+					parentCommentId: 'c1',
+					mentionedUserId: 'user4',
+					jwtToken: 'token123',
+				}),
+			);
+		});
+
+		it('shows a saved mention in a loaded reply as a link to the profile', async () => {
+			const reply = buildComment('r1', '@alice thanks', { parentCommentId: 'c1', mentionedUserId: { _id: 'user3', username: 'alice' } });
+
+			getComments.mockResolvedValue([buildComment('c1', 'Parent', { replies: [reply] })]);
+			renderPopup();
+
+			await screen.findByText('Parent');
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+
+			expect(document.querySelector('.comment-reply .comment-mention')).toHaveAttribute('href', '/user/user3');
 		});
 
 		it('shows the replies of a comment oldest first after "View replies" is clicked', async () => {

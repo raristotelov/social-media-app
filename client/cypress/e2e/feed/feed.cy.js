@@ -1,5 +1,14 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, uploadPostViaApi, followUserViaApi, userIdFromToken } from '../../support/api';
+import {
+	createUserViaApi,
+	loginViaApi,
+	visitAsUser,
+	uploadPostViaApi,
+	followUserViaApi,
+	userIdFromToken,
+	addCommentViaApi,
+	deletePostViaApi,
+} from '../../support/api';
 
 describe('feed', () => {
 	const viewer = buildTestUser();
@@ -75,6 +84,84 @@ describe('feed', () => {
 
 			cy.get('.user-post').should('have.length', 3);
 			cy.get('.user-post-actions-button').should('not.exist');
+		});
+	});
+
+	describe('replying to a comment', () => {
+		const replyViewer = buildTestUser();
+		const replyPostAuthor = buildTestUser();
+		const replyCommenter = buildTestUser();
+
+		let replyViewerToken;
+		let replyPostAuthorToken;
+		let replyCommenterToken;
+		let replyCommenterId;
+		let feedPost;
+
+		const openCommentsPopup = () => {
+			visitAsUser('/user-feed', replyViewerToken);
+
+			cy.get('.user-post-comments-button').click();
+		};
+
+		before(() => {
+			createUserViaApi(replyViewer);
+			createUserViaApi(replyPostAuthor);
+			createUserViaApi(replyCommenter);
+
+			loginViaApi(replyViewer).then((token) => {
+				replyViewerToken = token;
+			});
+
+			loginViaApi(replyPostAuthor).then((token) => {
+				replyPostAuthorToken = token;
+			});
+
+			loginViaApi(replyCommenter).then((token) => {
+				replyCommenterToken = token;
+				replyCommenterId = userIdFromToken(token);
+			});
+
+			cy.then(() => uploadPostViaApi(replyPostAuthorToken, 'post to reply under')).then((post) => {
+				feedPost = post;
+			});
+
+			cy.then(() => followUserViaApi(replyViewerToken, userIdFromToken(replyPostAuthorToken)));
+
+			cy.then(() => addCommentViaApi(replyCommenterToken, feedPost._id, 'comment to reply to'));
+		});
+
+		after(() => {
+			cy.then(() => deletePostViaApi(replyPostAuthorToken, feedPost._id, false));
+			cy.task('deleteTestUser', replyViewer.email);
+			cy.task('deleteTestUser', replyPostAuthor.email);
+			cy.task('deleteTestUser', replyCommenter.email);
+		});
+
+		it('prefills the reply with the @username of the comment author and keeps Post disabled while only the mention is there', () => {
+			openCommentsPopup();
+
+			cy.contains('.comments-popup .comment-util-button', 'Reply').click();
+
+			cy.get('.comments-popup input[placeholder="Write a reply..."]').should('have.value', `@${replyCommenter.username} `);
+			cy.get('.comments-popup .comment .add-comment-form-submit').should('be.disabled');
+
+			cy.get('.comments-popup input[placeholder="Write a reply..."]').type('good point');
+
+			cy.get('.comments-popup .comment .add-comment-form-submit').should('be.enabled');
+		});
+
+		it('shows the posted reply with the mention as a link to the profile of the replied-to user', () => {
+			openCommentsPopup();
+
+			cy.contains('.comments-popup .comment-util-button', 'Reply').click();
+			cy.get('.comments-popup input[placeholder="Write a reply..."]').type('good point');
+			cy.get('.comments-popup .comment .add-comment-form-submit').click();
+
+			cy.contains('.comments-popup .comment-reply .comment-text', 'good point').should('be.visible');
+			cy.get('.comments-popup .comment-reply .comment-mention')
+				.should('have.text', `@${replyCommenter.username}`)
+				.and('have.attr', 'href', `/user/${replyCommenterId}`);
 		});
 	});
 

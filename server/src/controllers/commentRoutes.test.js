@@ -21,6 +21,7 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const POST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
 const COMMENT_ID = '64b7f0a1c2d3e4f5a6b7c8f1';
+const MENTIONED_ID = '64b7f0a1c2d3e4f5a6b7c8d2';
 const JWT_SECRET = 'comment-routes-test-secret';
 
 describe('comment routes', () => {
@@ -136,7 +137,13 @@ describe('comment routes', () => {
 		it('adds the comment as the user in the token, never as a user named in the body', async () => {
 			await postJson('/comments', { userPostId: POST_ID, text: 'Hi', userId: 'someone-else' }, authHeaders());
 
-			expect(commentService.addComment).toHaveBeenCalledWith({ userPostId: POST_ID, userId: USER_ID, text: 'Hi', parentCommentId: undefined });
+			expect(commentService.addComment).toHaveBeenCalledWith({
+				userPostId: POST_ID,
+				userId: USER_ID,
+				text: 'Hi',
+				parentCommentId: undefined,
+				mentionedUserId: undefined,
+			});
 		});
 
 		it('passes the parent comment id of a reply on', async () => {
@@ -147,6 +154,23 @@ describe('comment routes', () => {
 				userId: USER_ID,
 				text: 'Thanks',
 				parentCommentId: COMMENT_ID,
+				mentionedUserId: undefined,
+			});
+		});
+
+		it('passes the mentioned user id of a reply on', async () => {
+			await postJson(
+				'/comments',
+				{ userPostId: POST_ID, text: '@bob thanks', parentCommentId: COMMENT_ID, mentionedUserId: MENTIONED_ID },
+				authHeaders(),
+			);
+
+			expect(commentService.addComment).toHaveBeenCalledWith({
+				userPostId: POST_ID,
+				userId: USER_ID,
+				text: '@bob thanks',
+				parentCommentId: COMMENT_ID,
+				mentionedUserId: MENTIONED_ID,
 			});
 		});
 

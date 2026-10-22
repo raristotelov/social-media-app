@@ -50,6 +50,7 @@ describe('commentService', () => {
 				userPostId: 'post1',
 				text: 'Nice shot',
 				parentCommentId: undefined,
+				mentionedUserId: undefined,
 			});
 		});
 
@@ -60,7 +61,37 @@ describe('commentService', () => {
 
 			await addComment({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1', jwtToken: 'token123' });
 
-			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments$/), { userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1' });
+			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments$/), {
+				userPostId: 'post1',
+				text: 'Thanks',
+				parentCommentId: 'c1',
+				mentionedUserId: undefined,
+			});
+		});
+
+		it('includes the mentioned user id for a reply that mentions someone', async () => {
+			const post = jest.fn().mockResolvedValue({ _id: 'r1' });
+
+			requestFactory.mockReturnValue({ post });
+
+			await addComment({ userPostId: 'post1', text: '@bob Thanks', parentCommentId: 'c1', mentionedUserId: 'user4', jwtToken: 'token123' });
+
+			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments$/), {
+				userPostId: 'post1',
+				text: '@bob Thanks',
+				parentCommentId: 'c1',
+				mentionedUserId: 'user4',
+			});
+		});
+
+		it('sends a null mentioned user id as null', async () => {
+			const post = jest.fn().mockResolvedValue({ _id: 'r1' });
+
+			requestFactory.mockReturnValue({ post });
+
+			await addComment({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1', mentionedUserId: null, jwtToken: 'token123' });
+
+			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments$/), expect.objectContaining({ mentionedUserId: null }));
 		});
 
 		it('resolves with the saved comment', async () => {

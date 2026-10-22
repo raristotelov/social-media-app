@@ -260,6 +260,79 @@ describe('AddCommentForm', () => {
 		});
 	});
 
+	describe('initial text', () => {
+		it('fills the box with it', () => {
+			renderForm({ initialText: '@alice ' });
+
+			expect(getInput()).toHaveValue('@alice ');
+		});
+
+		it('keeps Post disabled while the box holds only the initial text', () => {
+			renderForm({ initialText: '@alice ' });
+
+			expect(getPostButton()).toBeDisabled();
+		});
+
+		it('keeps Post disabled when the initial text is left without its trailing space', () => {
+			renderForm({ initialText: '@alice ' });
+
+			userEvent.type(getInput(), '{backspace}');
+
+			expect(getPostButton()).toBeDisabled();
+		});
+
+		it('enables Post once text is added after the initial text', () => {
+			renderForm({ initialText: '@alice ' });
+
+			userEvent.type(getInput(), 'thanks');
+
+			expect(getPostButton()).toBeEnabled();
+		});
+
+		it('disables Post when the initial text is deleted', () => {
+			renderForm({ initialText: '@alice ' });
+
+			userEvent.clear(getInput());
+
+			expect(getPostButton()).toBeDisabled();
+		});
+
+		it('enables Post when the initial text is replaced by other text', () => {
+			renderForm({ initialText: '@alice ' });
+
+			userEvent.clear(getInput());
+			userEvent.type(getInput(), 'hello');
+
+			expect(getPostButton()).toBeEnabled();
+		});
+
+		it('sends no request when submitted with only the initial text', () => {
+			const { onSubmit, container } = renderForm({ initialText: '@alice ' });
+
+			fireEvent.submit(container.querySelector('form'));
+
+			expect(onSubmit).not.toHaveBeenCalled();
+		});
+
+		it('submits the initial text together with what was typed after it', async () => {
+			const { onSubmit } = renderForm({ initialText: '@alice ' });
+
+			userEvent.type(getInput(), 'thanks');
+			userEvent.click(getPostButton());
+
+			await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('@alice thanks'));
+		});
+
+		it('clears the box after a successful submit', async () => {
+			renderForm({ initialText: '@alice ' });
+
+			userEvent.type(getInput(), 'thanks');
+			userEvent.click(getPostButton());
+
+			await waitFor(() => expect(getInput()).toHaveValue(''));
+		});
+	});
+
 	describe('as a guest', () => {
 		it('sends the guest to /log-in with the current URL, hash included, when the box is clicked', () => {
 			renderForm({ user: null, entry: '/user/user2/posts#post7' });
@@ -269,12 +342,31 @@ describe('AddCommentForm', () => {
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post7' } });
 		});
 
-		it('sends the guest to /log-in with the current URL when Post is clicked', () => {
-			renderForm({ user: null, entry: '/user/user2/posts#post7' });
+		it('sends the guest to /log-in with the current URL when the form is submitted, for example by Enter', () => {
+			const { container } = renderForm({ user: null, entry: '/user/user2/posts#post7' });
 
-			userEvent.click(getPostButton());
+			fireEvent.submit(container.querySelector('form'));
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post7' } });
+		});
+
+		it('sends a user whose session ended while typing to /log-in on submit, without calling onSubmit', () => {
+			const { onSubmit, container, rerender } = renderForm({ entry: '/user/user2/posts#post7' });
+
+			userEvent.type(getInput(), 'Nice shot');
+
+			rerender(
+				<LoggedInUserContext.Provider value={{ jwtToken: null, loggedInUser: null, endSession: jest.fn() }}>
+					<MemoryRouter initialEntries={['/user/user2/posts#post7']}>
+						<AddCommentForm onSubmit={onSubmit} />
+					</MemoryRouter>
+				</LoggedInUserContext.Provider>,
+			);
+
+			fireEvent.submit(container.querySelector('form'));
+
+			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post7' } });
+			expect(onSubmit).not.toHaveBeenCalled();
 		});
 
 		it('never calls onSubmit', () => {
@@ -309,10 +401,18 @@ describe('AddCommentForm', () => {
 			expect(getInput()).toHaveAttribute('readonly');
 		});
 
-		it('keeps Post enabled so that clicking it can send the guest to log in', () => {
+		it('shows Post disabled, like an empty box for a logged-in user', () => {
 			renderForm({ user: null });
 
-			expect(getPostButton()).toBeEnabled();
+			expect(getPostButton()).toBeDisabled();
+		});
+
+		it('does not redirect when the disabled Post is clicked', () => {
+			renderForm({ user: null });
+
+			userEvent.click(getPostButton());
+
+			expect(mockNavigate).not.toHaveBeenCalled();
 		});
 	});
 

@@ -592,14 +592,15 @@ describe('ProfilePostsView', () => {
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/user/user2/posts#post2');
 		});
 
-		it('sends the guest to /log-in with the same URL when Post is clicked, adding no comment', async () => {
+		it('shows Post disabled, and clicking it adds no comment and does not redirect', async () => {
 			renderProfileRoutes({ user: null, entries: ['/user/user2/posts#post2'] });
 
 			const articles = await screen.findAllByRole('article');
 
 			userEvent.click(within(articles[1]).getByRole('button', { name: 'Post' }));
 
-			expect(await screen.findByTestId('login-from')).toHaveTextContent('/user/user2/posts#post2');
+			expect(within(articles[1]).getByRole('button', { name: 'Post' })).toBeDisabled();
+			expect(screen.queryByTestId('login-from')).not.toBeInTheDocument();
 			expect(addComment).not.toHaveBeenCalled();
 		});
 

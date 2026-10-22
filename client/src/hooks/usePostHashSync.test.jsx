@@ -300,6 +300,136 @@ describe('usePostHashSync', () => {
 		});
 	});
 
+	describe('posts taller than the visible area', () => {
+		it('makes a tall post current when its top reaches the top while scrolling down', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2']);
+
+			placePosts(postElements, { p1: [60, 560], p2: [560, 1560] });
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p1', container });
+
+			placePosts(postElements, { p1: [-440, 60], p2: [60, 1060] });
+			scrollToAndSettle(500);
+
+			expect(result.current.location.hash).toBe('#p2');
+		});
+
+		it('keeps the previous post while a tall post has not yet reached the top when scrolling down', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2']);
+
+			placePosts(postElements, { p1: [60, 560], p2: [560, 1560] });
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p1', container });
+
+			placePosts(postElements, { p1: [-140, 360], p2: [360, 1360] });
+			scrollToAndSettle(200);
+
+			expect(result.current.location.hash).toBe('#p1');
+		});
+
+		it('makes a tall post current when its bottom reaches the bottom while scrolling up', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2']);
+
+			placePosts(postElements, { p1: [-700, 300], p2: [300, 800] });
+			setScrollY(1000);
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p2', container });
+
+			placePosts(postElements, { p1: [-100, 900], p2: [900, 1400] });
+			scrollToAndSettle(500);
+
+			expect(result.current.location.hash).toBe('#p1');
+		});
+
+		it('keeps the later post while a tall post has not yet reached the bottom when scrolling up', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2']);
+
+			placePosts(postElements, { p1: [-700, 300], p2: [300, 800] });
+			setScrollY(1000);
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p2', container });
+
+			placePosts(postElements, { p1: [-300, 700], p2: [700, 1200] });
+			scrollToAndSettle(800);
+
+			expect(result.current.location.hash).toBe('#p2');
+		});
+
+		it('does not make a tall post current by its top reaching the top while scrolling up', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2']);
+
+			placePosts(postElements, { p1: [-560, 240], p2: [240, 740] });
+			setScrollY(500);
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p2', container });
+
+			placePosts(postElements, { p1: [-60, 740], p2: [740, 1240] });
+			scrollToAndSettle(0);
+
+			expect(result.current.location.hash).toBe('#p2');
+		});
+
+		it('uses the bottom above the tab bar on mobile when scrolling up', () => {
+			isMobileViewport = true;
+
+			const { container, postElements } = buildPostsContainer(['p1', 'p2']);
+
+			placePosts(postElements, { p1: [-700, 300], p2: [300, 750] });
+			setScrollY(1000);
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p2', container });
+
+			placePosts(postElements, { p1: [-250, 750], p2: [750, 1200] });
+			scrollToAndSettle(500);
+
+			expect(result.current.location.hash).toBe('#p1');
+		});
+	});
+
+	describe('after a jump where no post meets the rule', () => {
+		it('makes the first visible post current when scrolling down', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2', 'p3']);
+
+			placePosts(postElements, { p1: [60, 660], p2: [660, 1260], p3: [1260, 1860] });
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p1', container });
+
+			placePosts(postElements, { p1: [-960, -360], p2: [-300, 300], p3: [300, 900] });
+			scrollToAndSettle(2000);
+
+			expect(result.current.location.hash).toBe('#p2');
+		});
+
+		it('makes the last visible post current when scrolling up', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2', 'p3']);
+
+			placePosts(postElements, { p1: [-1260, -660], p2: [-660, -60], p3: [60, 660] });
+			setScrollY(2000);
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p3', container });
+
+			placePosts(postElements, { p1: [-300, 300], p2: [300, 900], p3: [900, 1500] });
+			scrollToAndSettle(0);
+
+			expect(result.current.location.hash).toBe('#p2');
+		});
+
+		it('picks the first visible post when the page was opened without a current post', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2']);
+
+			placePosts(postElements, { p1: [-200, 400], p2: [400, 1000] });
+			const { result } = renderSyncHook({ container });
+
+			scrollToAndSettle(200);
+
+			expect(result.current.location.hash).toBe('#p1');
+		});
+
+		it('leaves the hash alone when no post is visible', () => {
+			const { container, postElements } = buildPostsContainer(['p1', 'p2']);
+
+			placePosts(postElements, { p1: [60, 560], p2: [560, 1060] });
+			const { result } = renderSyncHook({ entry: '/user/user2/posts#p1', container });
+
+			placePosts(postElements, { p1: [-2000, -1500], p2: [-1500, -1000] });
+			scrollToAndSettle(3000);
+
+			expect(result.current.location.hash).toBe('#p1');
+		});
+	});
+
 	describe('visible area on mobile', () => {
 		it('stops the visible area above the tab bar', () => {
 			isMobileViewport = true;

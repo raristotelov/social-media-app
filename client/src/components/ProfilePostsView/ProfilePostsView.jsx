@@ -20,8 +20,10 @@ const ProfilePostsView = () => {
 	const navigate = useNavigate();
 	const location = useLocation();
 
+	const isFirstHistoryEntryRef = useRef(location.key === INITIAL_HISTORY_ENTRY_KEY);
+
 	const goBackToProfile = () => {
-		if (location.key === INITIAL_HISTORY_ENTRY_KEY) {
+		if (isFirstHistoryEntryRef.current) {
 			navigate(`/user/${userData._id}`, { replace: true });
 
 			return;

@@ -519,12 +519,13 @@ describe('UserPost', () => {
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 		});
 
-		it('sends the guest to /log-in with the same URL when Post is clicked, adding no comment', () => {
+		it('shows Post disabled, and clicking it adds no comment and does not redirect', () => {
 			renderPost({ user: null, entry: '/user/user2/posts#post1' });
 
 			userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
-			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
+			expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
+			expect(mockNavigate).not.toHaveBeenCalled();
 			expect(addComment).not.toHaveBeenCalled();
 		});
 
