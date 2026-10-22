@@ -5,7 +5,7 @@ import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
 import './SearchResults.css';
 
-const SearchResults = ({ results, isLoading, onResultClick, className = '' }) => {
+const SearchResults = ({ results, isLoading, onResultClick, className = '', showFollowersCount = true }) => {
 	const classNames = `search-results ${className}`.trim();
 
 	if (isLoading) {
@@ -36,7 +36,9 @@ const SearchResults = ({ results, isLoading, onResultClick, className = '' }) =>
 						<span className='search-result-text'>
 							<span className='search-result-username'>{user.username}</span>
 
-							<span className='search-result-followers'>{`${followersCount} ${followersCount === 1 ? 'follower' : 'followers'}`}</span>
+							{showFollowersCount ? (
+								<span className='search-result-followers'>{`${followersCount} ${followersCount === 1 ? 'follower' : 'followers'}`}</span>
+							) : null}
 						</span>
 					</Link>
 				);

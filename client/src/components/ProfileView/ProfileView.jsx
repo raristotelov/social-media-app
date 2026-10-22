@@ -4,15 +4,15 @@ import { useParams, useOutletContext } from 'react-router-dom';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import useLoginRedirect from '../../hooks/useLoginRedirect';
 import useSessionGuard from '../../hooks/useSessionGuard';
-import { addUserPost } from '../../services/userPostService';
 import { updateUserProfileData, followUser, unfollowUser } from '../../services/userService';
 import { FOLLOW_LIST_TYPES } from '../../constants/followLists';
+import { CREATE_MODES } from '../../constants/stories';
 import { resizeImage } from '../../utils/images';
 
 import ProfileHeader from '../ProfileHeader/ProfileHeader';
 import UserProfilePost from '../UserProfilePost/UserProfilePost';
 import Popup from '../Popup/Popup';
-import AddImagePostForm from '../AddImagePostForm/AddImagePostForm';
+import CreatePopup from '../CreatePopup/CreatePopup';
 import EditProfileForm from '../EditProfileForm/EditProfileForm';
 import FollowListPopup from '../FollowListPopup/FollowListPopup';
 import PlusIcon from '../icons/Plus';
@@ -26,7 +26,7 @@ const withId = (ids = [], id, shouldInclude) => {
 };
 
 const ProfileView = () => {
-	const [isAddPicturePopupOpen, setIsAddPicturePopupOpen] = useState(false);
+	const [isCreatePopupOpen, setIsCreatePopupOpen] = useState(false);
 	const [isEditProfileFormOpen, setIsEditProfileFormOpen] = useState(false);
 	const [openFollowList, setOpenFollowList] = useState(null);
 	const [optimisticIsFollowed, setOptimisticIsFollowed] = useState(null);
@@ -44,29 +44,17 @@ const ProfileView = () => {
 		setOptimisticIsFollowed(null);
 	}, [profileRequestCount]);
 
-	const openAddPictureForm = () => {
-		setIsAddPicturePopupOpen(true);
+	const openCreatePopup = () => {
+		setIsCreatePopupOpen(true);
 	};
 
-	const closeAddPictureForm = () => {
-		setIsAddPicturePopupOpen(false);
+	const closeCreatePopup = () => {
+		setIsCreatePopupOpen(false);
 	};
 
-	const addImagePostHandler = async (uploadedImage, caption) => {
-		if (uploadedImage === null) {
-			return;
-		}
-
-		await runWithSessionGuard(async () => {
-			const resizedImage = await resizeImage(uploadedImage);
-
-			const savedUserPost = await addUserPost({ image: resizedImage, caption }, jwtToken);
-
-			setUserPosts((state) => [savedUserPost, ...state]);
-			setUserData((state) => ({ ...state, posts: [...state.posts, savedUserPost] }));
-
-			closeAddPictureForm();
-		});
+	const addPostToProfile = (savedUserPost) => {
+		setUserPosts((state) => [savedUserPost, ...state]);
+		setUserData((state) => ({ ...state, posts: [...state.posts, savedUserPost] }));
 	};
 
 	const openEditProfileForm = () => {
@@ -171,7 +159,7 @@ const ProfileView = () => {
 
 			<section className='profile-posts-wrapper'>
 				{isLoggedInUserProfile ? (
-					<button className='add-post-button' onClick={openAddPictureForm}>
+					<button className='add-post-button' onClick={openCreatePopup}>
 						<PlusIcon iconColorProp='currentColor' />
 
 						<span>Upload Picture</span>
@@ -192,11 +180,7 @@ const ProfileView = () => {
 
 			{openFollowList ? <FollowListPopup userId={userId} listType={openFollowList} onClose={closeFollowList} /> : null}
 
-			{isAddPicturePopupOpen ? (
-				<Popup title='Upload Picture' onClosePopupClick={closeAddPictureForm}>
-					<AddImagePostForm addImagePostHandler={addImagePostHandler} onCancelClick={closeAddPictureForm} />
-				</Popup>
-			) : null}
+			{isCreatePopupOpen ? <CreatePopup initialMode={CREATE_MODES.POST} onClose={closeCreatePopup} onPostAdded={addPostToProfile} /> : null}
 
 			{isEditProfileFormOpen ? (
 				<Popup title='Edit Profile' onClosePopupClick={closeEditProfileForm}>

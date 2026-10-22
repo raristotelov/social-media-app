@@ -31,7 +31,7 @@ Colours live as a Figma **variable collection (`Colours`) with Light and Dark mo
 
 **`static/white` matters.** White does two jobs: the surface of a card, and the colour of content sitting on a photo or the red button. Only the first should darken. Binding both to `background/surface` turns button labels and hover counts near-black in dark mode.
 
-**Story viewer chrome is deliberately untokenised** — progress bars, poster name and close icon are fixed white because they always sit over a photograph and shouldn't change with the mode.
+**Story viewer chrome is deliberately untokenised** — progress bars, poster name and close icon are fixed white because they always sit over a photograph and shouldn't change with the mode. The unwatched part of a progress segment is white at 35%.
 
 ### Contrast
 

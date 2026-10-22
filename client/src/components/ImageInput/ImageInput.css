@@ -49,8 +49,30 @@
 	cursor: pointer;
 }
 
-.preview-wrapper.removable {
+.preview-wrapper.removable,
+.preview-wrapper.has-backdrop {
 	position: relative;
+}
+
+.preview-wrapper.has-backdrop > img {
+	position: relative;
+}
+
+.preview-backdrop {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
+.preview-wrapper .preview-backdrop img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	filter: blur(24px);
+	transform: scale(1.2);
+	cursor: default;
 }
 
 .preview-wrapper .round-image {

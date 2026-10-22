@@ -16,6 +16,10 @@
 	--feedback-error: #c62828;
 	--feedback-error-inverse: #ff6b6b;
 	--overlay-button-hover: rgba(0, 0, 0, 0.4);
+	--overlay-story-dim: rgba(0, 0, 0, 0.72);
+	--overlay-story-scrim: rgba(0, 0, 0, 0.55);
+	--overlay-story-segment-track: rgba(255, 255, 255, 0.35);
+	--story-arrow-icon: #4b4b4b;
 
 	/* MainHeader and TabBar are position: fixed, so page content must reserve this space. */
 	--header-height: 54px;
@@ -38,6 +42,10 @@
 	--feedback-error: #ff6b6b;
 	--feedback-error-inverse: #c62828;
 	--overlay-button-hover: rgba(0, 0, 0, 0.4);
+	--overlay-story-dim: rgba(0, 0, 0, 0.72);
+	--overlay-story-scrim: rgba(0, 0, 0, 0.55);
+	--overlay-story-segment-track: rgba(255, 255, 255, 0.35);
+	--story-arrow-icon: #4b4b4b;
 }
 
 body {

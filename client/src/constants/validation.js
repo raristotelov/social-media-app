@@ -19,5 +19,6 @@ export const RESIZED_IMAGE_BACKGROUND = '#ffffff';
 export const UPLOAD_FIELDS = Object.freeze({
 	POST_IMAGE: 'image',
 	POST_CAPTION: 'caption',
+	STORY_IMAGE: 'image',
 	PROFILE_PICTURE: 'profilePicture',
 });

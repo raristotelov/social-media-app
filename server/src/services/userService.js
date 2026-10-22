@@ -7,6 +7,7 @@ const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { asFieldError } = require('../utils/fieldErrors');
+const { createUserNotFoundError } = require('../utils/notFoundErrors');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 
@@ -40,8 +41,6 @@ const getNeccessaryUserData = (user) => {
 		jwt: signAuthToken(user),
 	};
 };
-
-const createUserNotFoundError = () => new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
 
 const assertValidUserIds = (userIds) => {
 	if (!userIds.every((userId) => mongoose.isObjectIdOrHexString(userId))) {

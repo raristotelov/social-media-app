@@ -7,6 +7,7 @@ import { isUnauthenticatedError } from '../../utils/errors';
 
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 import PageLoadError from '../PageLoadError/PageLoadError';
+import StoriesTray from '../StoriesTray/StoriesTray';
 import UserPost from '../UserPost/UserPost';
 
 import './FeedView.css';
@@ -76,15 +77,21 @@ const FeedView = () => {
 	if (!posts.length) {
 		return (
 			<section className='feed-empty'>
-				<h1 className='feed-empty-title'>Your feed is empty</h1>
+				<StoriesTray />
 
-				<p className='feed-empty-description'>Follow people to see their posts here</p>
+				<div className='feed-empty-message'>
+					<h1 className='feed-empty-title'>Your feed is empty</h1>
+
+					<p className='feed-empty-description'>Follow people to see their posts here</p>
+				</div>
 			</section>
 		);
 	}
 
 	return (
 		<section className='feed-wrapper'>
+			<StoriesTray />
+
 			<div className='feed-posts'>
 				{posts.map((post) => (
 					<UserPost key={post._id} userPostData={post} author={post.userId} onPostChange={updatePost} />

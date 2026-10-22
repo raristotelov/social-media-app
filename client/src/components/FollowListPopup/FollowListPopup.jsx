@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowers, getFollowing } from '../../services/userService';
+import { getStoryViewers } from '../../services/storyService';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';
 import { FOLLOW_LIST_TYPES, FOLLOW_LIST_TITLES } from '../../constants/followLists';
 
@@ -13,9 +14,10 @@ import './FollowListPopup.css';
 const FOLLOW_LIST_LOADERS = Object.freeze({
 	[FOLLOW_LIST_TYPES.FOLLOWERS]: getFollowers,
 	[FOLLOW_LIST_TYPES.FOLLOWING]: getFollowing,
+	[FOLLOW_LIST_TYPES.VIEWERS]: getStoryViewers,
 });
 
-const FollowListPopup = ({ userId, listType, onClose }) => {
+const FollowListPopup = ({ userId, storyId, listType, onClose }) => {
 	const [users, setUsers] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [hasLoadFailed, setHasLoadFailed] = useState(false);
@@ -29,7 +31,7 @@ const FollowListPopup = ({ userId, listType, onClose }) => {
 		setIsLoading(true);
 		setHasLoadFailed(false);
 
-		FOLLOW_LIST_LOADERS[listType]({ userId, jwtToken })
+		FOLLOW_LIST_LOADERS[listType]({ userId, storyId, jwtToken })
 			.then((result) => {
 				if (isCurrentRequest) {
 					setUsers(result);
@@ -49,14 +51,21 @@ const FollowListPopup = ({ userId, listType, onClose }) => {
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [userId, listType, jwtToken, reloadCount]);
+	}, [userId, storyId, listType, jwtToken, reloadCount]);
 
 	const retryLoad = () => {
 		setReloadCount((count) => count + 1);
 	};
 
+	const isViewersList = listType === FOLLOW_LIST_TYPES.VIEWERS;
+
 	return (
-		<Popup title={FOLLOW_LIST_TITLES[listType]} className='follow-list-popup' onClosePopupClick={onClose}>
+		<Popup
+			title={FOLLOW_LIST_TITLES[listType]}
+			className={isViewersList ? 'follow-list-popup story-viewers-popup' : 'follow-list-popup'}
+			bodyClassName={isViewersList ? 'bottom-sheet' : undefined}
+			onClosePopupClick={onClose}
+		>
 			{hasLoadFailed && !isLoading ? (
 				<p className='follow-list-error' role='alert'>
 					<span>{LOAD_ERROR_MESSAGES.FOLLOW_LIST.MESSAGE}</span>
@@ -68,7 +77,13 @@ const FollowListPopup = ({ userId, listType, onClose }) => {
 					</button>
 				</p>
 			) : (
-				<SearchResults results={users} isLoading={isLoading} onResultClick={onClose} className='follow-list-results' />
+				<SearchResults
+					results={users}
+					isLoading={isLoading}
+					onResultClick={onClose}
+					className='follow-list-results'
+					showFollowersCount={false}
+				/>
 			)}
 		</Popup>
 	);

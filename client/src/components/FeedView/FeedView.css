@@ -1,15 +1,14 @@
 .feed-wrapper {
-	--feed-stories-space: 184px;
-
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 500px;
-	padding: calc(var(--header-height) + var(--feed-stories-space)) 0 60px;
+	padding: calc(var(--header-height) + 46px) 0 60px;
 }
 
 .feed-posts {
 	width: 100%;
 	max-width: 500px;
+	margin-top: 19px;
 
 	display: flex;
 	flex-direction: column;
@@ -20,15 +19,23 @@
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 500px;
-	padding: calc(var(--header-height) + 267px) 0 60px;
+	padding: calc(var(--header-height) + 93px) 0 60px;
+
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+
+	font-family: 'Mada';
+	text-align: center;
+}
+
+.feed-empty-message {
+	margin-top: 56px;
 
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: 8px;
-
-	font-family: 'Mada';
-	text-align: center;
 }
 
 .feed-empty-title {
@@ -56,20 +63,24 @@
 
 @media (max-width: 599px) {
 	.feed-wrapper {
-		--feed-stories-space: 118px;
-
 		max-width: none;
-		padding-bottom: var(--tab-bar-height);
+		padding: var(--header-height) 0 var(--tab-bar-height);
 	}
 
 	.feed-posts {
 		max-width: none;
+		margin-top: 0;
 		gap: 8px;
 	}
 
 	.feed-empty {
 		max-width: none;
-		padding: calc(var(--header-height) + 255px) 16px var(--tab-bar-height);
+		padding: var(--header-height) 0 var(--tab-bar-height);
+	}
+
+	.feed-empty-message {
+		margin-top: 137px;
+		padding: 0 16px;
 		gap: 6px;
 	}
 
