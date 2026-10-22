@@ -6,8 +6,8 @@ import { RequestError } from '../../services/requester';
 
 import AddImagePostForm from './AddImagePostForm';
 
-const renderAddImagePostForm = (addImagePostHandler, onCancelClick) =>
-	render(<AddImagePostForm addImagePostHandler={addImagePostHandler} onCancelClick={onCancelClick} />);
+const renderAddImagePostForm = (submitHandler, onCancelClick, mode) =>
+	render(<AddImagePostForm submitHandler={submitHandler} onCancelClick={onCancelClick} mode={mode} />);
 
 const buildImage = (name = 'photo.png', type = 'image/png') => new File(['(image)'], name, { type });
 
@@ -37,13 +37,13 @@ describe('AddImagePostForm', () => {
 	});
 
 	it('shows "Please choose a picture" and does not submit when no picture is chosen', () => {
-		const addImagePostHandler = jest.fn();
-		renderAddImagePostForm(addImagePostHandler, jest.fn());
+		const submitHandler = jest.fn();
+		renderAddImagePostForm(submitHandler, jest.fn());
 
-		userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+		userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
 		expect(screen.getByText('Please choose a picture')).toBeInTheDocument();
-		expect(addImagePostHandler).not.toHaveBeenCalled();
+		expect(submitHandler).not.toHaveBeenCalled();
 	});
 
 	it('renders the image input with the 90px icon and 20px label the form asks for', () => {
@@ -79,35 +79,142 @@ describe('AddImagePostForm', () => {
 		expect(screen.getByPlaceholderText('Write a caption...')).toHaveAttribute('maxlength', '1000');
 	});
 
+	describe('the Share button', () => {
+		it('is labelled Share, not Submit, in the default mode', () => {
+			renderAddImagePostForm(jest.fn(), jest.fn());
+
+			expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
+		});
+
+		it('is labelled Share in post mode', () => {
+			renderAddImagePostForm(jest.fn(), jest.fn(), 'post');
+
+			expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+		});
+
+		it('is labelled Share in story mode', () => {
+			renderAddImagePostForm(jest.fn(), jest.fn(), 'story');
+
+			expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
+		});
+	});
+
+	describe('post mode', () => {
+		it('shows the caption field by default', () => {
+			renderAddImagePostForm(jest.fn(), jest.fn());
+
+			expect(screen.getByPlaceholderText('Write a caption...')).toBeInTheDocument();
+		});
+
+		it('shows the caption field when the mode is post', () => {
+			renderAddImagePostForm(jest.fn(), jest.fn(), 'post');
+
+			expect(screen.getByPlaceholderText('Write a caption...')).toBeInTheDocument();
+		});
+
+		it('does not put a blurred copy behind the preview', () => {
+			const { container } = renderAddImagePostForm(jest.fn(), jest.fn(), 'post');
+
+			chooseImage(container);
+
+			expect(container.querySelector('.preview-backdrop')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('story mode', () => {
+		it('has no caption field', () => {
+			renderAddImagePostForm(jest.fn(), jest.fn(), 'story');
+
+			expect(screen.queryByPlaceholderText('Write a caption...')).not.toBeInTheDocument();
+		});
+
+		it('puts a blurred copy of the picture behind the preview once one is chosen', () => {
+			const { container } = renderAddImagePostForm(jest.fn(), jest.fn(), 'story');
+
+			chooseImage(container);
+
+			expect(container.querySelector('.preview-backdrop img')).toHaveAttribute('src', 'blob:preview');
+		});
+
+		it('hands the chosen picture to the handler', async () => {
+			const submitHandler = jest.fn().mockResolvedValue(undefined);
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn(), 'story');
+			const image = chooseImage(container);
+
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+			await waitFor(() => expect(submitHandler).toHaveBeenCalledWith(image, ''));
+		});
+
+		it('asks for a picture and sends nothing when none is chosen', () => {
+			const submitHandler = jest.fn();
+			renderAddImagePostForm(submitHandler, jest.fn(), 'story');
+
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+			expect(screen.getByText('Please choose a picture')).toBeInTheDocument();
+			expect(submitHandler).not.toHaveBeenCalled();
+		});
+
+		it('shows the fallback message when the handler fails', async () => {
+			const { container } = renderAddImagePostForm(jest.fn().mockRejectedValue(buildRequestError()), jest.fn(), 'story');
+
+			chooseImage(container);
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+			expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't upload the picture. Try again.");
+		});
+	});
+
+	describe('switching mode', () => {
+		it('keeps the chosen picture and the typed caption when the mode changes', () => {
+			const { container, rerender } = renderAddImagePostForm(jest.fn(), jest.fn(), 'post');
+
+			chooseImage(container);
+			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
+
+			rerender(<AddImagePostForm submitHandler={jest.fn()} onCancelClick={jest.fn()} mode='story' />);
+
+			expect(container.querySelector('.preview-wrapper img[alt="preview"]')).toHaveAttribute('src', 'blob:preview');
+
+			rerender(<AddImagePostForm submitHandler={jest.fn()} onCancelClick={jest.fn()} mode='post' />);
+
+			expect(screen.getByPlaceholderText('Write a caption...')).toHaveValue('Sunset');
+			expect(container.querySelector('.preview-wrapper img[alt="preview"]')).toHaveAttribute('src', 'blob:preview');
+		});
+	});
+
 	describe('submitting', () => {
 		it('passes the chosen picture and caption to the handler', async () => {
-			const addImagePostHandler = jest.fn().mockResolvedValue(undefined);
-			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const submitHandler = jest.fn().mockResolvedValue(undefined);
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn());
 			const image = chooseImage(container);
 
 			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-			await waitFor(() => expect(addImagePostHandler).toHaveBeenCalledWith(image, 'Sunset'));
+			await waitFor(() => expect(submitHandler).toHaveBeenCalledWith(image, 'Sunset'));
 		});
 
-		it('enables Submit before anything is sent', () => {
+		it('enables Share before anything is sent', () => {
 			renderAddImagePostForm(jest.fn(), jest.fn());
 
-			expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+			expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled();
 		});
 
-		it('disables Submit while the request is in flight', async () => {
+		it('disables Share while the request is in flight', async () => {
 			const request = buildDeferred();
 			const { container } = renderAddImagePostForm(jest.fn().mockReturnValue(request.promise), jest.fn());
 
 			chooseImage(container);
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-			expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
+			expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled();
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 		});
 
 		it('keeps Cancel enabled while the request is in flight', async () => {
@@ -115,47 +222,47 @@ describe('AddImagePostForm', () => {
 			const { container } = renderAddImagePostForm(jest.fn().mockReturnValue(request.promise), jest.fn());
 
 			chooseImage(container);
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
 			expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 		});
 
-		it('sends one request when Submit is double-clicked', async () => {
+		it('sends one request when Share is double-clicked', async () => {
 			const request = buildDeferred();
-			const addImagePostHandler = jest.fn().mockReturnValue(request.promise);
-			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const submitHandler = jest.fn().mockReturnValue(request.promise);
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn());
 
 			chooseImage(container);
-			userEvent.dblClick(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.dblClick(screen.getByRole('button', { name: 'Share' }));
 
-			expect(addImagePostHandler).toHaveBeenCalledTimes(1);
+			expect(submitHandler).toHaveBeenCalledTimes(1);
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 		});
 
 		it('sends one request when the form is submitted twice while the first is in flight (e.g. Enter key)', async () => {
 			const request = buildDeferred();
-			const addImagePostHandler = jest.fn().mockReturnValue(request.promise);
-			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const submitHandler = jest.fn().mockReturnValue(request.promise);
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn());
 
 			chooseImage(container);
 			fireEvent.submit(container.querySelector('form'));
 			fireEvent.submit(container.querySelector('form'));
 
-			expect(addImagePostHandler).toHaveBeenCalledTimes(1);
+			expect(submitHandler).toHaveBeenCalledTimes(1);
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 		});
 
 		it('sends one request when the form is submitted twice synchronously before React re-renders, and allows a new submit once it settles', async () => {
 			const request = buildDeferred();
-			const addImagePostHandler = jest.fn().mockReturnValue(request.promise);
-			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const submitHandler = jest.fn().mockReturnValue(request.promise);
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn());
 			const form = container.querySelector('form');
 
 			chooseImage(container);
@@ -164,41 +271,41 @@ describe('AddImagePostForm', () => {
 				form.requestSubmit();
 			});
 
-			expect(addImagePostHandler).toHaveBeenCalledTimes(1);
+			expect(submitHandler).toHaveBeenCalledTimes(1);
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 
 			act(() => {
 				form.requestSubmit();
 			});
 
-			expect(addImagePostHandler).toHaveBeenCalledTimes(2);
+			expect(submitHandler).toHaveBeenCalledTimes(2);
 
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 		});
 
 		it('allows submitting again after a failed request', async () => {
-			const addImagePostHandler = jest.fn().mockRejectedValueOnce(buildRequestError()).mockResolvedValueOnce(undefined);
-			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const submitHandler = jest.fn().mockRejectedValueOnce(buildRequestError()).mockResolvedValueOnce(undefined);
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn());
 
 			chooseImage(container);
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-			await waitFor(() => expect(addImagePostHandler).toHaveBeenCalledTimes(2));
+			await waitFor(() => expect(submitHandler).toHaveBeenCalledTimes(2));
 		});
 
-		it('does not send a request when no picture is chosen, and keeps Submit enabled', () => {
-			const addImagePostHandler = jest.fn();
-			renderAddImagePostForm(addImagePostHandler, jest.fn());
+		it('does not send a request when no picture is chosen, and keeps Share enabled', () => {
+			const submitHandler = jest.fn();
+			renderAddImagePostForm(submitHandler, jest.fn());
 
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-			expect(addImagePostHandler).not.toHaveBeenCalled();
-			expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+			expect(submitHandler).not.toHaveBeenCalled();
+			expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled();
 		});
 	});
 
@@ -221,14 +328,14 @@ describe('AddImagePostForm', () => {
 			expect(screen.getByText('This image is over 10 MB')).toBeInTheDocument();
 		});
 
-		it('sends nothing for a rejected file, even when Submit is clicked', () => {
-			const addImagePostHandler = jest.fn();
-			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+		it('sends nothing for a rejected file, even when Share is clicked', () => {
+			const submitHandler = jest.fn();
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn());
 
 			chooseImage(container, buildImage('notes.txt', 'text/plain'));
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-			expect(addImagePostHandler).not.toHaveBeenCalled();
+			expect(submitHandler).not.toHaveBeenCalled();
 		});
 
 		it('clears the message once a valid picture is chosen', () => {
@@ -243,13 +350,13 @@ describe('AddImagePostForm', () => {
 
 	describe('server errors', () => {
 		const submitWithError = async (error) => {
-			const addImagePostHandler = jest.fn().mockRejectedValue(error);
-			const view = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const submitHandler = jest.fn().mockRejectedValue(error);
+			const view = renderAddImagePostForm(submitHandler, jest.fn());
 
 			chooseImage(view.container);
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 
 			return view;
 		};
@@ -318,12 +425,12 @@ describe('AddImagePostForm', () => {
 		});
 
 		it('keeps the form on screen, with the chosen caption, after a failure', async () => {
-			const addImagePostHandler = jest.fn().mockRejectedValue(buildRequestError());
-			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const submitHandler = jest.fn().mockRejectedValue(buildRequestError());
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn());
 
 			chooseImage(container);
 			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 			await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
 
 			expect(screen.getByPlaceholderText('Write a caption...')).toHaveValue('Sunset');
@@ -345,19 +452,19 @@ describe('AddImagePostForm', () => {
 
 		it('clears the previous error when submitting again', async () => {
 			const request = buildDeferred();
-			const addImagePostHandler = jest.fn().mockRejectedValueOnce(buildRequestError()).mockReturnValueOnce(request.promise);
-			const { container } = renderAddImagePostForm(addImagePostHandler, jest.fn());
+			const submitHandler = jest.fn().mockRejectedValueOnce(buildRequestError()).mockReturnValueOnce(request.promise);
+			const { container } = renderAddImagePostForm(submitHandler, jest.fn());
 
 			chooseImage(container);
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 			await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
 
-			userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
 			request.resolve();
-			await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled());
 		});
 	});
 });

@@ -5,10 +5,12 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowers, getFollowing } from '../../services/userService';
+import { getStoryViewers } from '../../services/storyService';
 
 import FollowListPopup from './FollowListPopup';
 
 jest.mock('../../services/userService');
+jest.mock('../../services/storyService');
 
 const buildRow = (overrides = {}) => ({
 	_id: 'user1',
@@ -19,11 +21,11 @@ const buildRow = (overrides = {}) => ({
 
 const CurrentPath = () => <p data-testid='current-path'>{useLocation().pathname}</p>;
 
-const renderPopup = ({ loggedInUser = null, userId = 'owner', listType = 'followers', onClose = jest.fn() } = {}) => {
+const renderPopup = ({ loggedInUser = null, userId = 'owner', storyId, listType = 'followers', onClose = jest.fn() } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser }}>
 			<MemoryRouter initialEntries={['/user/owner']}>
-				<FollowListPopup userId={userId} listType={listType} onClose={onClose} />
+				<FollowListPopup userId={userId} storyId={storyId} listType={listType} onClose={onClose} />
 
 				<CurrentPath />
 			</MemoryRouter>
@@ -74,6 +76,71 @@ describe('FollowListPopup', () => {
 		});
 	});
 
+	describe('the viewers list of a story', () => {
+		beforeEach(() => {
+			getStoryViewers.mockResolvedValue([
+				buildRow({ _id: 'viewer1', username: 'alice', profilePicture: { imageUrl: 'https://example.com/alice.jpg' } }),
+				buildRow({ _id: 'viewer2', username: 'bob' }),
+			]);
+		});
+
+		it('is titled "Viewers"', async () => {
+			renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			expect(await screen.findByRole('heading', { name: 'Viewers' })).toBeInTheDocument();
+			await screen.findByText('alice');
+		});
+
+		it('loads the viewers of the given story with the token', async () => {
+			renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			await screen.findByText('alice');
+
+			expect(getStoryViewers).toHaveBeenCalledTimes(1);
+			expect(getStoryViewers).toHaveBeenCalledWith(expect.objectContaining({ storyId: 'story1', jwtToken: 'token123' }));
+			expect(getFollowers).not.toHaveBeenCalled();
+			expect(getFollowing).not.toHaveBeenCalled();
+		});
+
+		it('lists each viewer by photo and username only', async () => {
+			const { container } = renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			await screen.findByText('alice');
+
+			expect(getRowUsernames(container)).toEqual(['alice', 'bob']);
+			expect(container.querySelector('img.search-result-avatar')).toHaveAttribute('src', 'https://example.com/alice.jpg');
+			expect(container.querySelector('.search-result-followers')).not.toBeInTheDocument();
+		});
+
+		it('shows "No users found" when nobody has seen the story', async () => {
+			getStoryViewers.mockResolvedValue([]);
+
+			renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			expect(await screen.findByText('No users found')).toBeInTheDocument();
+		});
+
+		it('offers a retry when the viewers fail to load', async () => {
+			getStoryViewers.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
+
+			renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+			expect(await screen.findByText('alice')).toBeInTheDocument();
+			expect(getStoryViewers).toHaveBeenCalledTimes(2);
+		});
+
+		it('calls onClose from the close button', async () => {
+			const { onClose } = renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			await screen.findByText('alice');
+			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	describe('loading the list', () => {
 		it('shows a spinner while the request is in flight', () => {
 			getFollowers.mockReturnValue(new Promise(() => {}));
@@ -119,18 +186,29 @@ describe('FollowListPopup', () => {
 			expect(screen.getByRole('link', { name: /johndoe/ })).toHaveAttribute('href', '/user/user2');
 		});
 
-		it('shows "1 follower" in the singular and "N followers" in the plural', async () => {
+		it('shows only the photo and username on a followers row, without a follower count', async () => {
 			getFollowers.mockResolvedValue([
 				buildRow({ _id: 'user1', username: 'janedoe', followersCount: 1 }),
 				buildRow({ _id: 'user2', username: 'johndoe', followersCount: 3 }),
-				buildRow({ _id: 'user3', username: 'nofollowers', followersCount: 0 }),
 			]);
 
-			renderPopup();
+			const { container } = renderPopup({ listType: 'followers' });
 
-			expect(await screen.findByText('1 follower')).toBeInTheDocument();
-			expect(screen.getByText('3 followers')).toBeInTheDocument();
-			expect(screen.getByText('0 followers')).toBeInTheDocument();
+			await screen.findByText('janedoe');
+
+			expect(container.querySelector('.search-result-followers')).not.toBeInTheDocument();
+			expect(screen.queryByText(/follower\b|followers\b/)).not.toBeInTheDocument();
+		});
+
+		it('shows only the photo and username on a following row, without a follower count', async () => {
+			getFollowing.mockResolvedValue([buildRow({ _id: 'user3', username: 'followedone', followersCount: 5 })]);
+
+			const { container } = renderPopup({ listType: 'following' });
+
+			await screen.findByText('followedone');
+
+			expect(container.querySelector('.search-result-followers')).not.toBeInTheDocument();
+			expect(screen.queryByText('5 followers')).not.toBeInTheDocument();
 		});
 
 		it('shows the rows in the order the server returned, which already has the logged-in user first', async () => {

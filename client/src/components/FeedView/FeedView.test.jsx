@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowedUsersPosts, likeUserPost } from '../../services/userPostService';
 import { addComment } from '../../services/commentService';
+import { getStoryTray } from '../../services/storyService';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -13,6 +14,7 @@ import FeedView from './FeedView';
 
 jest.mock('../../services/userPostService');
 jest.mock('../../services/commentService');
+jest.mock('../../services/storyService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', following: ['user2', 'user3'] };
 
@@ -59,6 +61,81 @@ const getRenderedPostIds = () => Array.from(document.querySelectorAll('article.u
 describe('FeedView', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
+		getStoryTray.mockResolvedValue([]);
+	});
+
+	describe('the stories tray', () => {
+		const trayEntries = [
+			{ user: { _id: 'user1', username: 'johndoe' }, isOwn: true, isWatched: true },
+			{ user: { _id: 'user2', username: 'alice' }, isOwn: false, isWatched: false },
+		];
+
+		it('is shown above the posts', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getStoryTray.mockResolvedValue(trayEntries);
+			renderFeed();
+
+			const tray = await screen.findByRole('region', { name: 'Stories' });
+			const firstPost = (await screen.findAllByRole('article'))[0];
+
+			expect(tray.compareDocumentPosition(firstPost) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		});
+
+		it('loads the tray with the token', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			renderFeed();
+
+			await screen.findAllByRole('article');
+
+			await waitFor(() => expect(getStoryTray).toHaveBeenCalledWith({ jwtToken: 'token123' }));
+		});
+
+		it('shows the people with an active story', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getStoryTray.mockResolvedValue(trayEntries);
+			renderFeed();
+
+			expect(await screen.findByRole('button', { name: "View alice's story" })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'View your story' })).toBeInTheDocument();
+		});
+
+		it('is shown on the empty feed too, so someone who follows nobody can post a story', async () => {
+			getFollowedUsersPosts.mockResolvedValue([]);
+			renderFeed();
+
+			expect(await screen.findByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
+			expect(await screen.findByRole('button', { name: 'Add to your story' })).toBeInTheDocument();
+		});
+
+		it('lets someone with an empty feed open the Create popup on the Story tab', async () => {
+			getFollowedUsersPosts.mockResolvedValue([]);
+			renderFeed();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Add to your story' }));
+
+			expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
+		});
+
+		it('is not shown while the feed fails to load', async () => {
+			getFollowedUsersPosts.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			renderFeed();
+
+			await screen.findByText("Couldn't load your feed");
+
+			expect(screen.queryByRole('region', { name: 'Stories' })).not.toBeInTheDocument();
+		});
+
+		it('leaves the posts and shows no error when the tray fails to load', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getStoryTray.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			renderFeed();
+
+			expect(await screen.findAllByRole('article')).toHaveLength(3);
+			await waitFor(() => expect(getStoryTray).toHaveBeenCalled());
+
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			expect(screen.queryByRole('button', { name: 'Add to your story' })).not.toBeInTheDocument();
+		});
 	});
 
 	describe('loading the feed', () => {

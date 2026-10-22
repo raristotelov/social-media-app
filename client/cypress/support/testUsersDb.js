@@ -9,6 +9,8 @@ const SERVER_ROOT = path.resolve(__dirname, '../../../server');
 const UserModel = require(path.join(SERVER_ROOT, 'src/models/userModel'));
 const UserPostModel = require(path.join(SERVER_ROOT, 'src/models/userPostModel'));
 const CommentModel = require(path.join(SERVER_ROOT, 'src/models/commentModel'));
+const StoryModel = require(path.join(SERVER_ROOT, 'src/models/storyModel'));
+const StoryViewModel = require(path.join(SERVER_ROOT, 'src/models/storyViewModel'));
 
 // Take mongoose from a model rather than requiring it here. The models resolve
 // mongoose from server/node_modules, so requiring it from client/node_modules would
@@ -127,16 +129,19 @@ const destroyImagesById = async (imageIdentifiers) => {
 // other people's records.
 const removeUsersById = async (testUserIds) => {
 	if (!testUserIds.length) {
-		return { users: 0, posts: 0, comments: 0 };
+		return { users: 0, posts: 0, comments: 0, stories: 0, storyViews: 0 };
 	}
 
-	// Profile pictures live on the user and post images on their posts, so images are
-	// collected from both.
+	// Profile pictures live on the user, post images on their posts and story images on
+	// their stories, so images are collected from all three.
 	const testUserPosts = await UserPostModel.find({ userId: { $in: testUserIds } }).select({ _id: 1, imageIdentifier: 1 });
 	const testUserPostIds = testUserPosts.map((post) => post._id);
+	const testUserStories = await StoryModel.find({ userId: { $in: testUserIds } }).select({ _id: 1, imageIdentifier: 1 });
+	const testUserStoryIds = testUserStories.map((story) => story._id);
 	const testUsersWithPictures = await UserModel.find({ _id: { $in: testUserIds } }).select({ _id: 1, profilePicture: 1 });
 	const testUserImageIdentifiers = [
 		...testUserPosts.map((post) => post.imageIdentifier),
+		...testUserStories.map((story) => story.imageIdentifier),
 		...testUsersWithPictures.map((user) => user.profilePicture?.imageIdentifier),
 	];
 
@@ -157,6 +162,12 @@ const removeUsersById = async (testUserIds) => {
 
 	const deletedPosts = await UserPostModel.deleteMany({ _id: { $in: testUserPostIds } });
 
+	// Views of the test users' stories, plus views a test user left on anyone's story.
+	const deletedStoryViews = await StoryViewModel.deleteMany({
+		$or: [{ storyId: { $in: testUserStoryIds } }, { viewerId: { $in: testUserIds } }],
+	});
+	const deletedStories = await StoryModel.deleteMany({ _id: { $in: testUserStoryIds } });
+
 	await UserPostModel.updateMany({ likes: { $in: testUserIds } }, { $pull: { likes: { $in: testUserIds } } });
 	await CommentModel.updateMany({ likes: { $in: testUserIds } }, { $pull: { likes: { $in: testUserIds } } });
 	await UserModel.updateMany(
@@ -170,6 +181,8 @@ const removeUsersById = async (testUserIds) => {
 		users: deletedUsers.deletedCount,
 		posts: deletedPosts.deletedCount,
 		comments: deletedComments.deletedCount,
+		stories: deletedStories.deletedCount,
+		storyViews: deletedStoryViews.deletedCount,
 	};
 };
 

@@ -15,12 +15,12 @@ describe('post upload errors', () => {
 
 	const openUploadPopup = () => {
 		cy.get('.add-post-button').click();
-		cy.contains('.popup-title', 'Upload Picture').should('be.visible');
+		cy.contains('.create-popup [role="tab"][aria-selected="true"]', 'Post').should('be.visible');
 	};
 
 	const fileInput = () => cy.get('#add-image-post-form input[type="file"]');
 
-	const submitButton = () => cy.get('#add-image-post-form').contains('button', 'Submit');
+	const submitButton = () => cy.get('#add-image-post-form').contains('button', 'Share');
 
 	const pictureError = () => cy.get('#add-image-post-form .add-image-post-image-wrapper .field-error');
 
@@ -82,7 +82,7 @@ describe('post upload errors', () => {
 			cy.get('@uploadRequest.all').should('have.length', 0);
 		});
 
-		it('sends nothing when Submit is clicked after a rejected file, and asks for a picture', () => {
+		it('sends nothing when Share is clicked after a rejected file, and asks for a picture', () => {
 			fileInput().selectFile(
 				{ contents: Cypress.Buffer.from('just some text'), fileName: 'notes.txt', mimeType: 'text/plain' },
 				{ force: true },
@@ -214,7 +214,7 @@ describe('post upload errors', () => {
 			fileInput().selectFile(FIXTURE_IMAGE, { force: true });
 		});
 
-		it('disables Submit until the response arrives, then enables it again', () => {
+		it('disables Share until the response arrives, then enables it again', () => {
 			submitButton().should('not.be.disabled').click();
 
 			submitButton().should('be.disabled');
@@ -230,7 +230,7 @@ describe('post upload errors', () => {
 			cy.get('#add-image-post-form').contains('button', 'Cancel').should('not.be.disabled');
 		});
 
-		it('sends one request when Submit is double-clicked', () => {
+		it('sends one request when Share is double-clicked', () => {
 			submitButton().dblclick();
 
 			cy.wait('@uploadRequest');

@@ -82,6 +82,29 @@ describe('SearchResults', () => {
 			expect(screen.getByText('0 followers')).toBeInTheDocument();
 		});
 
+		it('shows the follower count by default, as search results do', () => {
+			const { container } = renderSearchResults({ results: [buildUser({ followersCount: 4 })] });
+
+			expect(container.querySelector('.search-result-followers')).toHaveTextContent('4 followers');
+		});
+
+		it('leaves the follower count out when showFollowersCount is false', () => {
+			const { container } = renderSearchResults({ results: [buildUser({ followersCount: 4 })], showFollowersCount: false });
+
+			expect(container.querySelector('.search-result-followers')).not.toBeInTheDocument();
+			expect(screen.queryByText('4 followers')).not.toBeInTheDocument();
+		});
+
+		it('still shows the username and photo when the follower count is left out', () => {
+			const { container } = renderSearchResults({
+				results: [buildUser({ profilePicture: { imageUrl: 'https://example.com/jane.jpg' } })],
+				showFollowersCount: false,
+			});
+
+			expect(screen.getByText('janedoe')).toBeInTheDocument();
+			expect(container.querySelector('img.search-result-avatar')).toHaveAttribute('src', 'https://example.com/jane.jpg');
+		});
+
 		it('calls onResultClick when a row is clicked', () => {
 			const onResultClick = jest.fn();
 
