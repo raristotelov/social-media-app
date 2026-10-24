@@ -1,6 +1,6 @@
 # Follow Suggestions
 
-Status: In Development
+Status: Complete
 
 Ticket #14. Suggestions of people to follow on the feed (`/user-feed`). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 
@@ -53,6 +53,7 @@ Ticket #14. Suggestions of people to follow on the feed (`/user-feed`). Tokens: 
 - Shown once, after the 5th post; with fewer than 5 posts, after the last post.
 - Hidden when there are no suggestions.
 - ✕ beside the "Suggested for you" heading dismisses the carousel for 7 days, stored on the server against the account (all devices).
+- If saving the dismissal fails, the carousel still hides, with no error, and returns on the next visit.
 
 ## Empty feed
 

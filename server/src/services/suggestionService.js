@@ -68,14 +68,12 @@ const getNewPool = ({ excludedIds, poolSize }) => {
 
 const compareMostFollowed = (a, b) => b.followersCount - a.followersCount || String(a._id).localeCompare(String(b._id));
 
-const getMutualFollowersById = async (candidates) => {
+const getMutualFollowersById = async (mutualPool) => {
 	const mutualFollowerIdsByKey = new Map();
 
-	candidates
-		.filter((candidate) => candidate.group === SUGGESTION_GROUPS.MUTUAL)
-		.forEach((candidate) => {
-			candidate.mutualFollowerIds.forEach((mutualFollowerId) => mutualFollowerIdsByKey.set(String(mutualFollowerId), mutualFollowerId));
-		});
+	mutualPool.forEach((candidate) => {
+		candidate.mutualFollowerIds.forEach((mutualFollowerId) => mutualFollowerIdsByKey.set(String(mutualFollowerId), mutualFollowerId));
+	});
 
 	if (!mutualFollowerIdsByKey.size) {
 		return new Map();
@@ -89,7 +87,34 @@ const getMutualFollowersById = async (candidates) => {
 	return new Map(mutualFollowers.map((mutualFollower) => [String(mutualFollower._id), mutualFollower]));
 };
 
-const toSuggestionData = (candidate, mutualFollowersById) => {
+const withMostFollowedMutualFollower = (candidate, mutualFollowersById) => {
+	const [mostFollowedMutualFollower] = candidate.mutualFollowerIds
+		.map((mutualFollowerId) => mutualFollowersById.get(String(mutualFollowerId)))
+		.filter(Boolean)
+		.sort(compareMostFollowed);
+
+	if (!mostFollowedMutualFollower) {
+		return null;
+	}
+
+	return {
+		...candidate,
+		followedBy: { _id: mostFollowedMutualFollower._id, username: mostFollowedMutualFollower.username },
+		moreMutualCount: candidate.mutualCount - 1,
+	};
+};
+
+const resolveMutualPool = async (mutualPool) => {
+	if (!mutualPool.length) {
+		return [];
+	}
+
+	const mutualFollowersById = await getMutualFollowersById(mutualPool);
+
+	return mutualPool.map((candidate) => withMostFollowedMutualFollower(candidate, mutualFollowersById)).filter(Boolean);
+};
+
+const toSuggestionData = (candidate) => {
 	const suggestionData = {
 		_id: candidate._id,
 		username: candidate.username,
@@ -101,20 +126,7 @@ const toSuggestionData = (candidate, mutualFollowersById) => {
 		return suggestionData;
 	}
 
-	const [mostFollowedMutualFollower] = candidate.mutualFollowerIds
-		.map((mutualFollowerId) => mutualFollowersById.get(String(mutualFollowerId)))
-		.filter(Boolean)
-		.sort(compareMostFollowed);
-
-	if (!mostFollowedMutualFollower) {
-		return { ...suggestionData, group: SUGGESTION_GROUPS.POPULAR };
-	}
-
-	return {
-		...suggestionData,
-		followedBy: { _id: mostFollowedMutualFollower._id, username: mostFollowedMutualFollower.username },
-		moreMutualCount: candidate.mutualCount - 1,
-	};
+	return { ...suggestionData, followedBy: candidate.followedBy, moreMutualCount: candidate.moreMutualCount };
 };
 
 const isCarouselDismissed = (user) => Boolean(user.suggestionsCarouselDismissedUntil) && user.suggestionsCarouselDismissedUntil > new Date();
@@ -148,9 +160,11 @@ const getSuggestions = async ({ userId, placement }) => {
 			mix[SUGGESTION_GROUPS.NEW] ? getNewPool({ excludedIds, poolSize }) : [],
 		]);
 
+		const resolvedMutualPool = await resolveMutualPool(mutualPool);
+
 		const { suggestions, reserve } = selectSuggestions({
 			pools: {
-				[SUGGESTION_GROUPS.MUTUAL]: mutualPool,
+				[SUGGESTION_GROUPS.MUTUAL]: resolvedMutualPool,
 				[SUGGESTION_GROUPS.POPULAR]: popularPool,
 				[SUGGESTION_GROUPS.NEW]: newPool,
 			},
@@ -159,11 +173,9 @@ const getSuggestions = async ({ userId, placement }) => {
 			reserveSize,
 		});
 
-		const mutualFollowersById = await getMutualFollowersById([...suggestions, ...reserve]);
-
 		return {
-			suggestions: suggestions.map((candidate) => toSuggestionData(candidate, mutualFollowersById)),
-			reserve: reserve.map((candidate) => toSuggestionData(candidate, mutualFollowersById)),
+			suggestions: suggestions.map(toSuggestionData),
+			reserve: reserve.map(toSuggestionData),
 			isCarouselDismissed: false,
 		};
 	} catch (error) {

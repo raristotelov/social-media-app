@@ -7,6 +7,7 @@ import {
 	followUserViaApi,
 	getFollowingViaApi,
 	getSuggestionsViaApi,
+	dismissSuggestionsCarouselViaApi,
 	userIdFromToken,
 } from '../../support/api';
 
@@ -28,16 +29,29 @@ const expectNoHorizontalScroll = () => {
 
 describe('follow suggestions on the feed', () => {
 	const author = buildTestUser();
+	const coAuthor = buildTestUser();
 	const targets = Array.from({ length: 10 }, () => buildTestUser());
-	const [firstTarget, secondTarget, thirdTarget, fourthTarget] = targets;
+	const [firstTarget, secondTarget, thirdTarget, fourthTarget, fifthTarget, sixthTarget, seventhTarget] = targets;
 	const readerViewer = buildTestUser();
 	const sidebarViewer = buildTestUser();
+	const reloadViewer = buildTestUser();
 	const carouselViewer = buildTestUser();
 	const dismissViewer = buildTestUser();
+	const dismissedViewer = buildTestUser();
 	const failingViewer = buildTestUser();
 	const sidebarPostsViewer = buildTestUser();
 	const carouselPostsViewer = buildTestUser();
-	const viewers = [readerViewer, sidebarViewer, carouselViewer, dismissViewer, failingViewer, sidebarPostsViewer, carouselPostsViewer];
+	const viewers = [
+		readerViewer,
+		sidebarViewer,
+		reloadViewer,
+		carouselViewer,
+		dismissViewer,
+		dismissedViewer,
+		failingViewer,
+		sidebarPostsViewer,
+		carouselPostsViewer,
+	];
 
 	const tokens = {};
 
@@ -58,6 +72,7 @@ describe('follow suggestions on the feed', () => {
 
 	before(() => {
 		createAccount(author);
+		createAccount(coAuthor);
 		targets.forEach(createAccount);
 		viewers.forEach(createAccount);
 
@@ -67,11 +82,20 @@ describe('follow suggestions on the feed', () => {
 		cy.then(() => {
 			targets.forEach((target) => followUserViaApi(tokenOf(author), idOf(target)));
 			viewers.forEach((viewer) => followUserViaApi(tokenOf(viewer), idOf(author)));
+			viewers.forEach((viewer) => followUserViaApi(tokenOf(viewer), idOf(coAuthor)));
+			followUserViaApi(tokenOf(coAuthor), idOf(author));
+			followUserViaApi(tokenOf(coAuthor), idOf(firstTarget));
+			followUserViaApi(tokenOf(fifthTarget), idOf(secondTarget));
+			followUserViaApi(tokenOf(sixthTarget), idOf(secondTarget));
+			followUserViaApi(tokenOf(seventhTarget), idOf(secondTarget));
+			followUserViaApi(tokenOf(fifthTarget), idOf(thirdTarget));
+			followUserViaApi(tokenOf(sixthTarget), idOf(thirdTarget));
+			followUserViaApi(tokenOf(fifthTarget), idOf(fourthTarget));
 		});
 	});
 
 	after(() => {
-		[author, ...targets, ...viewers].forEach((user) => cy.task('deleteTestUser', user.email));
+		[author, coAuthor, ...targets, ...viewers].forEach((user) => cy.task('deleteTestUser', user.email));
 	});
 
 	describe('the desktop sidebar', () => {
@@ -157,7 +181,14 @@ describe('follow suggestions on the feed', () => {
 
 		it('keeps the followed user out of the sidebar after a reload', () => {
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(sidebarViewer));
+			cy.intercept('POST', '**/users/*/follow/*').as('follow');
+			visitAsUser('/user-feed', tokenOf(reloadViewer));
+
+			sidebarRow(firstTarget).find('button').click();
+			cy.wait('@follow');
+			cy.contains(SIDEBAR_SELECTOR, firstTarget.username).should('not.exist');
+
+			cy.reload();
 
 			cy.get(SIDEBAR_SELECTOR).should('be.visible');
 			cy.contains(SIDEBAR_SELECTOR, firstTarget.username).should('not.exist');
@@ -275,16 +306,17 @@ describe('follow suggestions on the feed', () => {
 		});
 
 		it('stays dismissed at another viewport, while the desktop sidebar is unaffected', () => {
+			cy.then(() => dismissSuggestionsCarouselViaApi(tokenOf(dismissedViewer)));
 			cy.viewport(768, 1024);
 			cy.intercept({ method: 'GET', pathname: '/suggestions', query: { placement: 'carousel' } }).as('carouselRequest');
-			visitAsUser('/user-feed', tokenOf(dismissViewer));
+			visitAsUser('/user-feed', tokenOf(dismissedViewer));
 
 			cy.wait('@carouselRequest');
 			cy.get('.user-post').should('be.visible');
 			cy.get(CAROUSEL_SELECTOR).should('not.exist');
 
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(dismissViewer));
+			visitAsUser('/user-feed', tokenOf(dismissedViewer));
 
 			cy.get(SIDEBAR_SELECTOR).should('be.visible');
 		});

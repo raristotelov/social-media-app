@@ -260,25 +260,26 @@ describe('suggestionService', () => {
 				expect(suggestions[0].followedBy.username).toBe('alice');
 			});
 
-			it('looks the mutual followers up once, for the listed and reserve suggestions only', async () => {
+			it('looks the mutual followers up once, for every candidate in the mutual pool, including ones that are not selected', async () => {
 				pools.mutual = [
-					buildCandidate(10, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 }),
-					buildCandidate(11, { mutualFollowerIds: [FOLLOWED_B], mutualCount: 1 }),
+					...buildCandidates(10, 11, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 }),
+					buildCandidate(30, { mutualFollowerIds: [FOLLOWED_B], mutualCount: 1 }),
 				];
 				pools.mutualFollowers = [
 					{ _id: FOLLOWED_A, username: 'alice', followersCount: 1 },
 					{ _id: FOLLOWED_B, username: 'bob', followersCount: 1 },
 				];
 
-				await getSuggestions({ userId: ME, placement: 'sidebar' });
+				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
 
 				const lookups = UserModel.aggregate.mock.calls.filter(([pipeline]) => getPoolName(pipeline) === 'mutualFollowers');
 
+				expect(getListedIds([...suggestions, ...reserve])).not.toContain(buildId(30).toString());
 				expect(lookups).toHaveLength(1);
 				expect(lookups[0][0][0].$match._id.$in.map(String).sort()).toEqual([FOLLOWED_A, FOLLOWED_B].map(String).sort());
 			});
 
-			it('does not look mutual followers up when no suggestion is a mutual', async () => {
+			it('does not look mutual followers up when the mutual pool is empty', async () => {
 				pools.popular = buildCandidates(10, 8);
 
 				await getSuggestions({ userId: ME, placement: 'sidebar' });
@@ -286,14 +287,37 @@ describe('suggestionService', () => {
 				expect(getPipeline('mutualFollowers')).toBeUndefined();
 			});
 
-			it('falls back to the most-followed group when none of the mutual followers can be found', async () => {
-				pools.mutual = [buildCandidate(10, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 })];
+			it('drops a mutual candidate whose mutual followers cannot be found, instead of relabelling it', async () => {
+				const unresolved = buildCandidate(10, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 });
+
+				pools.mutual = [unresolved];
 				pools.mutualFollowers = [];
+				pools.popular = buildCandidates(200, 10);
 
-				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
 
-				expect(suggestions[0].group).toBe('popular');
-				expect(suggestions[0].followedBy).toBeUndefined();
+				expect(getListedIds([...suggestions, ...reserve])).not.toContain(unresolved._id.toString());
+				expect([...suggestions, ...reserve].some((suggestion) => suggestion.group === 'mutual')).toBe(false);
+			});
+
+			it('keeps suggestions and reserve in mutual, most-followed, new order when a mutual candidate is dropped between mutual rows', async () => {
+				pools.mutual = [
+					buildCandidate(100, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 }),
+					buildCandidate(101, { mutualFollowerIds: [buildId(9)], mutualCount: 1 }),
+					buildCandidate(102, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 }),
+					buildCandidate(103, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 }),
+					buildCandidate(104, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 }),
+				];
+				pools.mutualFollowers = [{ _id: FOLLOWED_A, username: 'alice', followersCount: 3 }];
+				pools.popular = buildCandidates(200, 10);
+				pools.new = buildCandidates(300, 10);
+
+				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				expect(suggestions.map((suggestion) => suggestion.group)).toEqual(['mutual', 'mutual', 'popular', 'popular', 'new']);
+				expect(getListedIds(suggestions)).toEqual([100, 102, 200, 201, 300].map((value) => buildId(value).toString()));
+				expect(reserve.map((suggestion) => suggestion.group)).toEqual(['mutual', 'mutual', 'popular', 'popular', 'popular']);
+				expect(getListedIds(reserve)).toEqual([103, 104, 202, 203, 204].map((value) => buildId(value).toString()));
 			});
 		});
 

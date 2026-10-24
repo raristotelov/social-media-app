@@ -4,8 +4,13 @@ const TEST_EMAIL_PREFIX = 'cypress+';
 const TEST_EMAIL_DOMAIN = '@test.local';
 const TEST_USERNAME_PREFIX = 'cypress_';
 
+let buildCount = 0;
+
 const buildTestUser = (overrides = {}) => {
-	const unique = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+	buildCount += 1;
+
+	const randomSuffix = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+	const unique = `${Date.now()}${buildCount}${randomSuffix}`;
 
 	return {
 		email: `${TEST_EMAIL_PREFIX}${unique}${TEST_EMAIL_DOMAIN}`,

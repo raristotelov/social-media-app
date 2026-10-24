@@ -151,6 +151,9 @@ export const getSuggestionsViaApi = (jwtToken, placement) =>
 		.request({ method: 'GET', url: `${serverUrl}/suggestions`, qs: { placement }, headers: authHeaders(jwtToken) })
 		.then((response) => response.body);
 
+export const dismissSuggestionsCarouselViaApi = (jwtToken) =>
+	cy.request({ method: 'POST', url: `${serverUrl}/suggestions/carousel/dismiss`, headers: authHeaders(jwtToken) });
+
 export const setThemeViaApi = (jwtToken, theme) =>
 	cy.request({
 		method: 'PATCH',
