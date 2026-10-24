@@ -12,6 +12,7 @@ import {
 
 const SIDEBAR_SELECTOR = '.suggestions-sidebar';
 const CAROUSEL_SELECTOR = '.suggestions-carousel';
+const TARGET_POST_CAPTION = 'post of the suggested user';
 const WIDTHS = [
 	[1440, 900],
 	[768, 1024],
@@ -34,7 +35,9 @@ describe('follow suggestions on the feed', () => {
 	const carouselViewer = buildTestUser();
 	const dismissViewer = buildTestUser();
 	const failingViewer = buildTestUser();
-	const viewers = [readerViewer, sidebarViewer, carouselViewer, dismissViewer, failingViewer];
+	const sidebarPostsViewer = buildTestUser();
+	const carouselPostsViewer = buildTestUser();
+	const viewers = [readerViewer, sidebarViewer, carouselViewer, dismissViewer, failingViewer, sidebarPostsViewer, carouselPostsViewer];
 
 	const tokens = {};
 
@@ -59,6 +62,7 @@ describe('follow suggestions on the feed', () => {
 		viewers.forEach(createAccount);
 
 		cy.then(() => uploadPostViaApi(tokenOf(author), 'post the suggestions sit beside'));
+		cy.then(() => uploadPostViaApi(tokenOf(firstTarget), TARGET_POST_CAPTION));
 
 		cy.then(() => {
 			targets.forEach((target) => followUserViaApi(tokenOf(author), idOf(target)));
@@ -135,6 +139,22 @@ describe('follow suggestions on the feed', () => {
 			});
 		});
 
+		it("does not add the followed user's post to the feed until the page is reloaded", () => {
+			cy.viewport(1440, 900);
+			visitAsUser('/user-feed', tokenOf(sidebarPostsViewer));
+
+			cy.get('.user-post').should('have.length', 1);
+			sidebarRow(firstTarget).find('button').click();
+
+			cy.contains(SIDEBAR_SELECTOR, firstTarget.username).should('not.exist');
+			cy.get('.user-post').should('have.length', 1);
+			cy.contains('.user-post', TARGET_POST_CAPTION).should('not.exist');
+
+			cy.reload();
+
+			cy.contains('.user-post', TARGET_POST_CAPTION).should('be.visible');
+		});
+
 		it('keeps the followed user out of the sidebar after a reload', () => {
 			cy.viewport(1440, 900);
 			visitAsUser('/user-feed', tokenOf(sidebarViewer));
@@ -200,6 +220,22 @@ describe('follow suggestions on the feed', () => {
 			cy.contains(CAROUSEL_SELECTOR, firstTarget.username).should('not.exist');
 			cy.get(`${CAROUSEL_SELECTOR} .suggestion-card`).should('have.length', 10);
 			cy.get(`${CAROUSEL_SELECTOR} .suggestion-card`).eq(0).should('contain.text', secondTarget.username);
+		});
+
+		it("does not add the followed user's post to the feed until the page is reloaded", () => {
+			cy.viewport(390, 844);
+			visitAsUser('/user-feed', tokenOf(carouselPostsViewer));
+
+			cy.get('.user-post').should('have.length', 1);
+			carouselCard(firstTarget).find('button').click();
+
+			cy.contains(CAROUSEL_SELECTOR, firstTarget.username).should('not.exist');
+			cy.get('.user-post').should('have.length', 1);
+			cy.contains('.user-post', TARGET_POST_CAPTION).should('not.exist');
+
+			cy.reload();
+
+			cy.contains('.user-post', TARGET_POST_CAPTION).should('be.visible');
 		});
 
 		it('puts the card back and shows the follow toast when the follow fails', () => {

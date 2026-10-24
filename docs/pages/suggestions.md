@@ -34,10 +34,12 @@ Ticket #14. Suggestions of people to follow on the feed (`/user-feed`). Tokens: 
 - Mutual: "Followed by X", or "Followed by X + N more". X is the most-followed of the people you follow who follow them.
 - Most-followed: "Popular on {APP_NAME}".
 - New: "New to {APP_NAME}".
+- Carousel card: at most 2 lines, then "…".
 
 ## Following
 
 - Follow takes effect immediately; the user leaves the list and the next suggestion fills the gap, so the list keeps its size.
+- Following from the sidebar or carousel doesn't reload the feed; their posts show from the next visit.
 - Follow fails: toast "Couldn't follow this user. Try again.", the button goes back to Follow. Unfollow (empty feed) fails: toast "Couldn't unfollow this user. Try again.". The profile's Follow / Unfollow button uses the same toasts.
 - The photo and username open the user's profile.
 

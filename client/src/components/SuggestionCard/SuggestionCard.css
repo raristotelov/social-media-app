@@ -50,6 +50,12 @@
 	font-size: 11px;
 	color: var(--text-secondary);
 	overflow-wrap: anywhere;
+
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow: hidden;
 }
 
 .button-classname.suggestion-card-follow-button {

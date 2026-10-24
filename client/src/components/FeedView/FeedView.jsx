@@ -33,6 +33,12 @@ const FeedView = () => {
 	const { entries: trayEntries, isLoaded: isTrayLoaded, reload: reloadTray } = useStoryTray();
 	const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
 
+	const jwtTokenRef = useRef(jwtToken);
+
+	useEffect(() => {
+		jwtTokenRef.current = jwtToken;
+	}, [jwtToken]);
+
 	useEffect(() => {
 		let isCurrentRequest = true;
 
@@ -40,7 +46,7 @@ const FeedView = () => {
 			setIsLoading(true);
 		}
 
-		getFollowedUsersPosts({ jwtToken })
+		getFollowedUsersPosts({ jwtToken: jwtTokenRef.current })
 			.then((result) => {
 				if (!isCurrentRequest) {
 					return;
@@ -79,7 +85,7 @@ const FeedView = () => {
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [jwtToken, endSession, reloadCount]);
+	}, [endSession, reloadCount]);
 
 	const reloadPosts = useCallback(() => {
 		setReloadCount((count) => count + 1);
