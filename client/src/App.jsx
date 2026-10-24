@@ -6,6 +6,7 @@ import useLocalStorage from './hooks/useLocalStorage';
 import LoggedInUserContext from './contexts/LoggedInUserContext';
 import { getUsersProfileData } from './services/userService';
 import { ERROR_CODES } from './constants/errorCodes';
+import { APP_NAME } from './constants/app';
 import { getErrorCode } from './utils/errors';
 
 import MainHeader from './components/Header/MainHeader';
@@ -44,6 +45,10 @@ function App() {
 		setJwtToken(null);
 		navigate('/log-in');
 	}, [setJwtToken, navigate]);
+
+	useEffect(() => {
+		document.title = APP_NAME;
+	}, []);
 
 	useEffect(() => {
 		const theme = loggedInUser?.theme || storedTheme || getOperatingSystemTheme();

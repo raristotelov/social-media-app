@@ -64,6 +64,8 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Reply (#11) | Form message | Couldn't post your reply. Try again. |
 | Open a user's stories (#13) | Toast | Couldn't load stories. Try again. |
 | Delete story (#13) | Toast | Couldn't delete your story. Try again. |
+| Follow — profile button and suggestions (#14) | Toast | Couldn't follow this user. Try again. |
+| Unfollow — profile button and empty-feed suggestions (#14) | Toast | Couldn't unfollow this user. Try again. |
 
 ## Load errors
 
@@ -72,4 +74,4 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Profile (full page) | Couldn't load this profile / Check your connection and try again. / Retry |
 | Feed (full page) (#11) | Couldn't load your feed / Check your connection and try again. / Retry |
 | Comments (inline) | Couldn't load comments · Try again |
-| Followers / following popup (inline) | Couldn't load this list · Try again |
+| Followers / following / story viewers popup (inline) (#13) | Couldn't load this list · Try again |
