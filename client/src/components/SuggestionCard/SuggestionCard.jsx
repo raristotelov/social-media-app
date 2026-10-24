@@ -23,7 +23,7 @@ const SuggestionCard = ({ suggestion, onFollowClick }) => {
 			<Button
 				type='button'
 				className='suggestion-card-follow-button'
-				variant='secondary'
+				variant='primary'
 				label='Follow'
 				aria-label={`Follow ${username}`}
 				onClick={() => onFollowClick(userId)}

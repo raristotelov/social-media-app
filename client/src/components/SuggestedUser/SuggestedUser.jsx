@@ -34,7 +34,7 @@ const SuggestedUser = ({ suggestion, actionStyle, isFollowed = false, onFollowCl
 				<Button
 					type='button'
 					className='suggested-user-follow-button'
-					variant='secondary'
+					variant={isFollowed ? 'secondary' : 'primary'}
 					label={actionLabel}
 					aria-label={`${actionLabel} ${username}`}
 					onClick={handleActionClick}

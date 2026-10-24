@@ -1041,7 +1041,7 @@ describe('ProfileView errors', () => {
 	describe('follow and unfollow failures', () => {
 		const profile = { _id: 'user2', username: 'janedoe', posts: [], followers: [], following: [] };
 
-		it('stay silent when following fails: no toast, no form error, profile still shown', async () => {
+		it('shows the follow toast when following fails, with no form error and the profile still shown', async () => {
 			getUsersProfileData.mockResolvedValue([profile]);
 			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
@@ -1049,13 +1049,14 @@ describe('ProfileView errors', () => {
 
 			userEvent.click(await screen.findByRole('button', { name: 'Follow' }));
 
-			await waitFor(() => expect(followUser).toHaveBeenCalledTimes(1));
-			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+			expect(await within(screen.getByRole('alert')).findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
+			expect(followUser).toHaveBeenCalledTimes(1);
+			expect(document.querySelector('.form-error')).not.toBeInTheDocument();
 			expect(screen.getByText('janedoe')).toBeInTheDocument();
 			expect(endSession).not.toHaveBeenCalled();
 		});
 
-		it('stay silent when unfollowing fails: no toast, no form error, profile still shown', async () => {
+		it('shows the unfollow toast when unfollowing fails, with no form error and the profile still shown', async () => {
 			getUsersProfileData.mockResolvedValue([profile]);
 			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
@@ -1063,10 +1064,33 @@ describe('ProfileView errors', () => {
 
 			userEvent.click(await screen.findByRole('button', { name: 'Unfollow' }));
 
-			await waitFor(() => expect(unfollowUser).toHaveBeenCalledTimes(1));
-			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+			expect(await within(screen.getByRole('alert')).findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
+			expect(unfollowUser).toHaveBeenCalledTimes(1);
+			expect(document.querySelector('.form-error')).not.toBeInTheDocument();
 			expect(screen.getByText('janedoe')).toBeInTheDocument();
 			expect(endSession).not.toHaveBeenCalled();
+		});
+
+		it('shows the follow toast when following fails with an error that is not a RequestError', async () => {
+			getUsersProfileData.mockResolvedValue([profile]);
+			followUser.mockRejectedValue(new Error('network down'));
+
+			renderProfile();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Follow' }));
+
+			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
+		});
+
+		it('shows the unfollow toast when unfollowing fails with an error that is not a RequestError', async () => {
+			getUsersProfileData.mockResolvedValue([profile]);
+			unfollowUser.mockRejectedValue(new Error('network down'));
+
+			renderProfile({ loggedInUser: { ...otherUser, following: ['user2'] } });
+
+			userEvent.click(await screen.findByRole('button', { name: 'Unfollow' }));
+
+			expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
 		});
 
 		it('ends the session when following fails with UNAUTHENTICATED', async () => {
@@ -1186,17 +1210,32 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			expect(getUsersProfileData).toHaveBeenCalledTimes(1);
 		});
 
-		it('shows no error and does not end the session when the request fails', async () => {
+		it('reverts to Follow with the old count and shows the follow toast when the request fails', async () => {
 			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { updateLoggedInUser, endSession } = await renderProfile();
 
 			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
 
-			await waitFor(() => expect(followUser).toHaveBeenCalledTimes(1));
-			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
+			expect(getFollowersCountText()).toBe('0followers');
 			expect(document.querySelector('.form-error')).not.toBeInTheDocument();
 			expect(updateLoggedInUser).not.toHaveBeenCalled();
 			expect(endSession).not.toHaveBeenCalled();
+		});
+
+		it('lets the user follow again after a failure', async () => {
+			followUser
+				.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 })
+				.mockResolvedValueOnce({ user: viewerFollowingProfile, jwt: 'j' });
+			const { updateLoggedInUser } = await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await screen.findByText("Couldn't follow this user. Try again.");
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+
+			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledTimes(1));
+			expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument();
 		});
 
 		it('ends the session when the request fails with UNAUTHENTICATED', async () => {
@@ -1243,14 +1282,16 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToUnfollow: 'user2' });
 		});
 
-		it('shows no error and does not end the session when the request fails', async () => {
+		it('reverts to Unfollow with the old count and shows the unfollow toast when the request fails', async () => {
 			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			const { endSession } = await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
+			const { updateLoggedInUser, endSession } = await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
 
 			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
 
-			await waitFor(() => expect(unfollowUser).toHaveBeenCalledTimes(1));
-			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+			expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument();
+			expect(getFollowersCountText()).toBe('1follower');
+			expect(updateLoggedInUser).not.toHaveBeenCalled();
 			expect(endSession).not.toHaveBeenCalled();
 		});
 
@@ -1299,6 +1340,23 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			expect(updateLoggedInUser).toHaveBeenCalledTimes(1);
 			expect(updateLoggedInUser).not.toHaveBeenCalledWith(followResponse);
 			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
+		});
+
+		it('shows the toast for an earlier click that fails, but leaves the latest click deciding the button and the count', async () => {
+			const followRequest = buildDeferred();
+
+			followUser.mockReturnValue(followRequest.promise);
+			unfollowUser.mockReturnValue(buildDeferred().promise);
+			await renderProfile();
+
+			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+
+			followRequest.reject({ code: 'INTERNAL_ERROR', status: 500 });
+
+			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
+			expect(getFollowersCountText()).toBe('0followers');
 		});
 
 		it('ignores a stale response that returns before the latest one', async () => {
