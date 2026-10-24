@@ -9,7 +9,9 @@ import ProfileLayout from './components/ProfileLayout/ProfileLayout';
 import ProfileView from './components/ProfileView/ProfileView';
 import ProfilePostsView from './components/ProfilePostsView/ProfilePostsView';
 import FeedView from './components/FeedView/FeedView';
+import PopularPostsLayout from './components/PopularPostsLayout/PopularPostsLayout';
 import PopularPostsView from './components/PopularPostsView/PopularPostsView';
+import PopularPostsPostsView from './components/PopularPostsPostsView/PopularPostsPostsView';
 
 import './index.css';
 
@@ -27,7 +29,11 @@ const Router = () => {
 
 				<Route path='/user-feed' element={jwtToken ? <FeedView /> : <Navigate to='/log-in' replace state={{ from: '/user-feed' }} />} />
 
-				<Route path='/popular-posts' element={<PopularPostsView />} />
+				<Route path='/popular-posts' element={<PopularPostsLayout />}>
+					<Route index element={<PopularPostsView />} />
+
+					<Route path='posts' element={<PopularPostsPostsView />} />
+				</Route>
 
 				<Route path='/user/:userId' element={<ProfileLayout />}>
 					<Route index element={<ProfileView />} />

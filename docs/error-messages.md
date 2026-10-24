@@ -8,7 +8,7 @@ Every error code the server sends and the copy the client shows for it. The clie
 
 | Code | Status | Where | Copy |
 | --- | --- | --- | --- |
-| `UNAUTHENTICATED` | 401 | Any authenticated route, missing / invalid / expired token; also the feed route when the token's user no longer exists (#11) | — (session ends) |
+| `UNAUTHENTICATED` | 401 | Any authenticated route, missing / invalid / expired token; also the feed and popular routes when the token's user no longer exists (#11, #3) | — (session ends) |
 | `WRONG_CREDENTIALS` | 401 | Log in | Wrong email or password |
 | `EMAIL_REQUIRED` | 400 | field `email` | Email is required |
 | `EMAIL_INVALID` | 400 | field `email` | Please provide a valid email address |
@@ -25,7 +25,7 @@ Every error code the server sends and the copy the client shows for it. The clie
 | `IMAGE_TYPE_INVALID` | 400 | image field, post and story upload and profile update (#15, #13) | Choose a JPEG, PNG or WebP image |
 | `IMAGE_TOO_LARGE` | 413 | image field, upload over 10 MB (#15) | This image is over 10 MB |
 | `USER_NOT_FOUND` | 404 | Profile load, profile update, follow / unfollow, unknown or malformed user id | — (blank page until #29) |
-| `POST_NOT_FOUND` | 404 | Post edit / delete; like, unlike, add comment and load comments on a missing or malformed post (#11) | This post no longer exists |
+| `POST_NOT_FOUND` | 404 | Post edit / delete; like, unlike, add comment and load comments on a missing or malformed post (#11); popular posts view shared link to a deleted post (#3) | This post no longer exists |
 | `POST_FORBIDDEN` | 403 | Post edit / delete on someone else's post | You can only change your own posts |
 | `COMMENT_TEXT_REQUIRED` | 400 | Add comment and reply, empty text (#11) | Comment can't be empty |
 | `COMMENT_NOT_FOUND` | 404 | Like, unlike or reply on a deleted or malformed comment; reply to a comment that is on another post or is itself a reply (#11) | This comment no longer exists |
@@ -75,3 +75,5 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Feed (full page) (#11) | Couldn't load your feed / Check your connection and try again. / Retry |
 | Comments (inline) | Couldn't load comments · Try again |
 | Followers / following / story viewers popup (inline) (#13) | Couldn't load this list · Try again |
+| Popular (full page) (#3) | Couldn't load popular posts / Check your connection and try again. / Retry |
+| Popular, next batch (inline) (#3) | Couldn't load more posts · Try again |

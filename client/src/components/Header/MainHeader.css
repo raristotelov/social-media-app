@@ -65,6 +65,25 @@
 	}
 }
 
+.navigation-links-guest {
+	gap: 56px;
+}
+
+.navigation-auth-actions {
+	display: flex;
+	gap: 36px;
+}
+
+@media (min-width: 600px) and (max-width: 1279px) {
+	.navigation-links-guest {
+		gap: 40px;
+	}
+
+	.navigation-auth-actions {
+		gap: 24px;
+	}
+}
+
 .navigation-links a {
 	text-decoration: none;
 }

@@ -46,7 +46,7 @@
 	color: var(--text-primary);
 }
 
-.posts-bar-username {
+.posts-bar-subtitle {
 	max-width: 100%;
 
 	overflow: hidden;
