@@ -146,6 +146,14 @@ export const getStoryViewersViaApi = (jwtToken, storyId, failOnStatusCode = true
 export const deleteStoryViaApi = (jwtToken, storyId, failOnStatusCode = true) =>
 	cy.request({ method: 'DELETE', url: `${serverUrl}/stories/${storyId}`, headers: authHeaders(jwtToken), failOnStatusCode });
 
+export const getSuggestionsViaApi = (jwtToken, placement) =>
+	cy
+		.request({ method: 'GET', url: `${serverUrl}/suggestions`, qs: { placement }, headers: authHeaders(jwtToken) })
+		.then((response) => response.body);
+
+export const dismissSuggestionsCarouselViaApi = (jwtToken) =>
+	cy.request({ method: 'POST', url: `${serverUrl}/suggestions/carousel/dismiss`, headers: authHeaders(jwtToken) });
+
 export const setThemeViaApi = (jwtToken, theme) =>
 	cy.request({
 		method: 'PATCH',

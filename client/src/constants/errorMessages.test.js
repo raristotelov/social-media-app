@@ -52,6 +52,8 @@ describe('ACTION_FALLBACK_MESSAGES', () => {
 		['ADD_REPLY', "Couldn't post your reply. Try again."],
 		['LOAD_STORIES', "Couldn't load stories. Try again."],
 		['DELETE_STORY', "Couldn't delete your story. Try again."],
+		['FOLLOW_USER', "Couldn't follow this user. Try again."],
+		['UNFOLLOW_USER', "Couldn't unfollow this user. Try again."],
 	])('has the documented copy for %s', (action, copy) => {
 		expect(ACTION_FALLBACK_MESSAGES[action]).toBe(copy);
 	});

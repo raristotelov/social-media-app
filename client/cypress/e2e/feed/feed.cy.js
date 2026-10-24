@@ -44,7 +44,7 @@ describe('feed', () => {
 	});
 
 	describe('for a user who follows nobody', () => {
-		it('shows only the empty state', () => {
+		it('shows the empty state and no posts', () => {
 			visitAsUser('/user-feed', viewerToken);
 
 			cy.contains('.feed-empty h1', 'Your feed is empty').should('be.visible');

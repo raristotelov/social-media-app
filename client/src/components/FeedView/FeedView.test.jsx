@@ -7,6 +7,9 @@ import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowedUsersPosts, likeUserPost } from '../../services/userPostService';
 import { addComment } from '../../services/commentService';
 import { getStoryTray } from '../../services/storyService';
+import { dismissSuggestionsCarousel, getSuggestions } from '../../services/suggestionService';
+import { followUser, unfollowUser } from '../../services/userService';
+import { DESKTOP_MEDIA_QUERY } from '../../constants/layout';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -15,8 +18,28 @@ import FeedView from './FeedView';
 jest.mock('../../services/userPostService');
 jest.mock('../../services/commentService');
 jest.mock('../../services/storyService');
+jest.mock('../../services/suggestionService');
+jest.mock('../../services/userService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', following: ['user2', 'user3'] };
+
+const buildSuggestion = (id, group = 'popular') => ({ _id: id, username: `name-${id}`, group });
+
+const EMPTY_SUGGESTIONS = { suggestions: [], reserve: [], isCarouselDismissed: false };
+
+const setViewport = (isDesktop) => {
+	window.matchMedia = jest.fn((query) => ({
+		matches: isDesktop && query === DESKTOP_MEDIA_QUERY,
+		addEventListener: jest.fn(),
+		removeEventListener: jest.fn(),
+	}));
+};
+
+const mockSuggestionsByPlacement = (resultsByPlacement) => {
+	getSuggestions.mockImplementation(async ({ placement }) => resultsByPlacement[placement] ?? EMPTY_SUGGESTIONS);
+};
+
+const getRequestedPlacements = () => getSuggestions.mock.calls.map(([{ placement }]) => placement);
 
 const buildPost = (id, username, overrides = {}) => ({
 	_id: id,
@@ -42,26 +65,41 @@ const buildDeferred = () => {
 	return deferred;
 };
 
-const renderFeed = ({ user = loggedInUser, endSession = jest.fn() } = {}) => {
-	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: user, endSession }}>
-			<ToastProvider>
-				<MemoryRouter initialEntries={['/user-feed']}>
-					<FeedView />
-				</MemoryRouter>
-			</ToastProvider>
-		</LoggedInUserContext.Provider>,
-	);
+const buildFeedTree = ({ user, endSession, jwtToken = 'token123', updateLoggedInUser = jest.fn() }) => (
+	<LoggedInUserContext.Provider value={{ jwtToken, loggedInUser: user, updateLoggedInUser, endSession }}>
+		<ToastProvider>
+			<MemoryRouter initialEntries={['/user-feed']}>
+				<FeedView />
+			</MemoryRouter>
+		</ToastProvider>
+	</LoggedInUserContext.Provider>
+);
 
-	return { ...rendered, endSession };
+const renderFeed = ({ user = loggedInUser, endSession = jest.fn() } = {}) => {
+	const rendered = render(buildFeedTree({ user, endSession }));
+
+	const rerenderWithToken = (jwtToken) => rendered.rerender(buildFeedTree({ user, endSession, jwtToken }));
+
+	return { ...rendered, endSession, rerenderWithToken };
 };
 
 const getRenderedPostIds = () => Array.from(document.querySelectorAll('article.user-post')).map((article) => article.id);
 
 describe('FeedView', () => {
+	const originalMatchMedia = window.matchMedia;
+
 	beforeEach(() => {
 		jest.resetAllMocks();
 		getStoryTray.mockResolvedValue([]);
+		getSuggestions.mockResolvedValue(EMPTY_SUGGESTIONS);
+		followUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		unfollowUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		dismissSuggestionsCarousel.mockResolvedValue(undefined);
+		setViewport(false);
+	});
+
+	afterAll(() => {
+		window.matchMedia = originalMatchMedia;
 	});
 
 	describe('the stories tray', () => {
@@ -466,6 +504,523 @@ describe('FeedView', () => {
 
 			await screen.findAllByRole('article');
 			expect(screen.queryByRole('button', { name: 'Post actions' })).not.toBeInTheDocument();
+		});
+	});
+
+	describe('suggestions on desktop', () => {
+		const sidebarSuggestions = ['s1', 's2', 's3', 's4', 's5'].map((id) => buildSuggestion(id));
+
+		beforeEach(() => {
+			setViewport(true);
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			mockSuggestionsByPlacement({ sidebar: { suggestions: sidebarSuggestions, reserve: [], isCarouselDismissed: false } });
+		});
+
+		it('shows the suggestions sidebar beside the posts', async () => {
+			renderFeed();
+
+			const sidebar = await screen.findByRole('complementary', { name: 'Suggested for you' });
+
+			expect(within(sidebar).getAllByRole('button', { name: /^Follow / })).toHaveLength(5);
+			expect(await screen.findAllByRole('article')).toHaveLength(3);
+		});
+
+		it('requests only the sidebar placement', async () => {
+			renderFeed();
+
+			await screen.findByRole('complementary');
+
+			expect(getRequestedPlacements()).toEqual(['sidebar']);
+		});
+
+		it('shows no carousel', async () => {
+			renderFeed();
+
+			await screen.findByRole('complementary');
+
+			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
+		});
+
+		it('keeps the sidebar out of the way while the posts are loading', async () => {
+			getFollowedUsersPosts.mockReturnValue(new Promise(() => {}));
+			renderFeed();
+
+			await screen.findByRole('region', { name: 'Stories' });
+
+			expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+			expect(getSuggestions).not.toHaveBeenCalled();
+		});
+
+		it('shows no sidebar when it has no suggestions', async () => {
+			mockSuggestionsByPlacement({});
+			renderFeed();
+
+			await screen.findAllByRole('article');
+			await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
+
+			expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+		});
+
+		it('shows no sidebar and no error when the suggestions fail to load', async () => {
+			getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			renderFeed();
+
+			expect(await screen.findAllByRole('article')).toHaveLength(3);
+			await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
+
+			expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+		});
+
+		it('removes a followed user from the sidebar without reloading the feed', async () => {
+			renderFeed();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Follow name-s1' }));
+
+			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-s1' })).not.toBeInTheDocument());
+			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
+			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToFollow: 's1' });
+		});
+
+		it('does not refetch the feed when the token changes after a sidebar follow', async () => {
+			const { rerenderWithToken } = renderFeed();
+
+			await screen.findAllByRole('article');
+			userEvent.click(await screen.findByRole('button', { name: 'Follow name-s1' }));
+			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-s1' })).not.toBeInTheDocument());
+
+			rerenderWithToken('new.jwt');
+
+			await screen.findAllByRole('article');
+			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
+			expect(getRenderedPostIds()).toEqual(['post3', 'post2', 'post1']);
+			expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('suggestions on tablet and mobile', () => {
+		const carouselSuggestions = ['c1', 'c2', 'c3'].map((id) => buildSuggestion(id));
+		const sixPosts = ['post6', 'post5', 'post4', 'post3', 'post2', 'post1'].map((id) => buildPost(id, 'janedoe'));
+
+		const getFeedChildKinds = () =>
+			Array.from(document.querySelector('.feed-posts').children).map((child) => (child.tagName === 'ARTICLE' ? child.id : 'carousel'));
+
+		beforeEach(() => {
+			mockSuggestionsByPlacement({ carousel: { suggestions: carouselSuggestions, reserve: [], isCarouselDismissed: false } });
+		});
+
+		it('inserts the carousel after the 5th post', async () => {
+			getFollowedUsersPosts.mockResolvedValue(sixPosts);
+			renderFeed();
+
+			await screen.findByRole('region', { name: 'Suggested for you' });
+
+			expect(getFeedChildKinds()).toEqual(['post6', 'post5', 'post4', 'post3', 'post2', 'carousel', 'post1']);
+		});
+
+		it('inserts the carousel after the last post when there are fewer than 5', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			renderFeed();
+
+			await screen.findByRole('region', { name: 'Suggested for you' });
+
+			expect(getFeedChildKinds()).toEqual(['post3', 'post2', 'post1', 'carousel']);
+		});
+
+		it('inserts the carousel after the 5th post when there are exactly 5', async () => {
+			getFollowedUsersPosts.mockResolvedValue(sixPosts.slice(0, 5));
+			renderFeed();
+
+			await screen.findByRole('region', { name: 'Suggested for you' });
+
+			expect(getFeedChildKinds()).toEqual(['post6', 'post5', 'post4', 'post3', 'post2', 'carousel']);
+		});
+
+		it('shows the carousel once only', async () => {
+			getFollowedUsersPosts.mockResolvedValue(sixPosts);
+			renderFeed();
+
+			await screen.findByRole('region', { name: 'Suggested for you' });
+
+			expect(screen.getAllByRole('region', { name: 'Suggested for you' })).toHaveLength(1);
+		});
+
+		it('requests only the carousel placement and shows no sidebar', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			renderFeed();
+
+			await screen.findByRole('region', { name: 'Suggested for you' });
+
+			expect(getRequestedPlacements()).toEqual(['carousel']);
+			expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+		});
+
+		it('is hidden when there are no suggestions', async () => {
+			mockSuggestionsByPlacement({});
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			renderFeed();
+
+			await screen.findAllByRole('article');
+			await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
+
+			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
+			expect(getRenderedPostIds()).toEqual(['post3', 'post2', 'post1']);
+		});
+
+		it('is hidden when it was dismissed on the server', async () => {
+			mockSuggestionsByPlacement({ carousel: { suggestions: [], reserve: [], isCarouselDismissed: true } });
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			renderFeed();
+
+			await screen.findAllByRole('article');
+			await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
+
+			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
+		});
+
+		it('is hidden, with no error and no toast, when the suggestions fail to load', async () => {
+			getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			renderFeed();
+
+			expect(await screen.findAllByRole('article')).toHaveLength(3);
+			await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
+
+			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+		});
+
+		it('is dismissed with the ✕, which tells the server', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			renderFeed();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
+
+			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
+			await waitFor(() => expect(dismissSuggestionsCarousel).toHaveBeenCalledWith({ jwtToken: 'token123' }));
+			expect(getRenderedPostIds()).toEqual(['post3', 'post2', 'post1']);
+		});
+
+		it('removes a followed card without reloading the feed', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			renderFeed();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Follow name-c1' }));
+
+			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-c1' })).not.toBeInTheDocument());
+			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not refetch the feed when the token changes after a carousel follow', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			const { rerenderWithToken } = renderFeed();
+
+			await screen.findAllByRole('article');
+			userEvent.click(await screen.findByRole('button', { name: 'Follow name-c1' }));
+			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-c1' })).not.toBeInTheDocument());
+
+			rerenderWithToken('new.jwt');
+
+			await screen.findAllByRole('article');
+			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
+			expect(getRenderedPostIds()).toEqual(['post3', 'post2', 'post1']);
+			expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
+		});
+
+		it('shows the posts and the carousel after a failed first load is retried', async () => {
+			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPosts);
+			renderFeed();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+			expect(await screen.findByRole('region', { name: 'Suggested for you' })).toBeInTheDocument();
+			expect(getFeedChildKinds()).toEqual(['post3', 'post2', 'post1', 'carousel']);
+		});
+	});
+
+	describe('the empty feed with suggestions', () => {
+		const listSuggestions = [
+			...['p1', 'p2', 'p3', 'p4', 'p5'].map((id) => buildSuggestion(id, 'popular')),
+			...['n1', 'n2', 'n3'].map((id) => buildSuggestion(id, 'new')),
+		];
+
+		const getSuggestionsList = () => screen.findByRole('region', { name: 'Suggested for you' });
+
+		beforeEach(() => {
+			getFollowedUsersPosts.mockResolvedValue([]);
+			mockSuggestionsByPlacement({ 'empty-feed': { suggestions: listSuggestions, reserve: [], isCarouselDismissed: false } });
+		});
+
+		it('shows the message, the stories tray and the list of 8', async () => {
+			renderFeed();
+
+			expect(await screen.findByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
+			expect(await screen.findByRole('button', { name: 'Add to your story' })).toBeInTheDocument();
+
+			const list = await getSuggestionsList();
+
+			expect(within(list).getAllByRole('button')).toHaveLength(8);
+		});
+
+		it('shows only "Your story" in the tray when following nobody', async () => {
+			getStoryTray.mockResolvedValue([{ user: { _id: 'user1', username: 'johndoe' }, isOwn: true, isWatched: true }]);
+			renderFeed({ user: { ...loggedInUser, following: [] } });
+
+			await screen.findByRole('button', { name: 'View your story' });
+
+			const tray = screen.getByRole('region', { name: 'Stories' });
+
+			expect(Array.from(tray.querySelectorAll('.story-circle-label')).map((label) => label.textContent)).toEqual(['Your story']);
+		});
+
+		it('shows the list under the message', async () => {
+			renderFeed();
+
+			const heading = await screen.findByRole('heading', { name: 'Your feed is empty' });
+			const list = await getSuggestionsList();
+
+			expect(heading.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		});
+
+		it('shows it whenever there are no posts, even for someone who follows people who have not posted', async () => {
+			renderFeed({ user: { ...loggedInUser, following: ['user2', 'user3'] } });
+
+			expect(await screen.findByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
+			expect(await getSuggestionsList()).toBeInTheDocument();
+		});
+
+		it('requests only the empty-feed placement', async () => {
+			renderFeed();
+
+			await getSuggestionsList();
+
+			expect(getRequestedPlacements()).toEqual(['empty-feed']);
+		});
+
+		it.each([
+			['desktop', true],
+			['tablet and mobile', false],
+		])('shows no sidebar and no carousel on %s', async (_name, isDesktop) => {
+			setViewport(isDesktop);
+			renderFeed();
+
+			await getSuggestionsList();
+
+			expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Dismiss suggestions' })).not.toBeInTheDocument();
+			expect(screen.getAllByRole('region', { name: 'Suggested for you' })).toHaveLength(1);
+		});
+
+		it('shows only the message when the list fails to load', async () => {
+			getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			renderFeed();
+
+			expect(await screen.findByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
+			await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
+
+			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			expect(screen.queryByText("Couldn't load your feed")).not.toBeInTheDocument();
+		});
+
+		it('shows only the message when there is nobody to suggest', async () => {
+			mockSuggestionsByPlacement({});
+			renderFeed();
+
+			expect(await screen.findByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
+			await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
+
+			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
+		});
+
+		it('shows the list after a failed first load is retried and finds no posts', async () => {
+			getFollowedUsersPosts.mockReset();
+			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce([]);
+			renderFeed();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+			expect(await getSuggestionsList()).toBeInTheDocument();
+		});
+
+		describe('following from the list', () => {
+			const followedPosts = [buildPost('fresh1', 'name-p1')];
+
+			it('turns the button into Unfollow and loads the followed user posts below the list', async () => {
+				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				renderFeed();
+
+				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+
+				expect(await screen.findByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+
+				const list = await getSuggestionsList();
+				const posts = await screen.findAllByRole('article');
+
+				expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2);
+				expect(posts).toHaveLength(1);
+				expect(list.compareDocumentPosition(posts[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+			});
+
+			it('reloads the posts with the latest token after the token changed', async () => {
+				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				const { rerenderWithToken } = renderFeed();
+
+				await screen.findByRole('button', { name: 'Follow name-p1' });
+				rerenderWithToken('new.jwt');
+				expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
+
+				userEvent.click(screen.getByRole('button', { name: 'Follow name-p1' }));
+
+				await screen.findAllByRole('article');
+				expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2);
+				expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'new.jwt' });
+			});
+
+			it('keeps the message and the full list of 8 on screen after posts appear', async () => {
+				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				renderFeed();
+
+				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await screen.findAllByRole('article');
+
+				expect(screen.getByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
+				expect(within(await getSuggestionsList()).getAllByRole('button')).toHaveLength(8);
+			});
+
+			it('shows no sidebar or carousel once the posts appear', async () => {
+				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				renderFeed();
+
+				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await screen.findAllByRole('article');
+
+				expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+				expect(screen.getAllByRole('region', { name: 'Suggested for you' })).toHaveLength(1);
+				expect(getRequestedPlacements()).toEqual(['empty-feed']);
+			});
+
+			it('reloads the posts quietly: no spinner and no flash of the list while they load', async () => {
+				const reload = buildDeferred();
+
+				getFollowedUsersPosts.mockResolvedValueOnce([]).mockReturnValueOnce(reload.promise);
+				renderFeed();
+
+				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2));
+
+				expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
+				expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+
+				reload.resolve(followedPosts);
+				await screen.findAllByRole('article');
+			});
+
+			it('keeps the list and shows no error when the quiet reload fails', async () => {
+				getFollowedUsersPosts.mockResolvedValueOnce([]).mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
+				renderFeed();
+
+				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2));
+
+				expect(screen.queryByText("Couldn't load your feed")).not.toBeInTheDocument();
+				expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+				expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+				expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			});
+
+			it('ends the session when the quiet reload fails with UNAUTHENTICATED', async () => {
+				getFollowedUsersPosts.mockResolvedValueOnce([]).mockRejectedValueOnce({ code: 'UNAUTHENTICATED', status: 401 });
+				const { endSession } = renderFeed();
+
+				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+
+				await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
+			});
+
+			it('goes back to Follow with the follow toast when the follow fails, and loads no posts', async () => {
+				followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+				renderFeed();
+
+				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+
+				expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
+				expect(screen.getByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();
+				expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
+			});
+		});
+
+		describe('unfollowing from the list', () => {
+			const followedPosts = [buildPost('fresh1', 'name-p1')];
+
+			const followFirstUser = async () => {
+				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				const rendered = renderFeed();
+
+				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await screen.findAllByRole('article');
+
+				return rendered;
+			};
+
+			it('turns the button back into Follow and sends the unfollow request', async () => {
+				await followFirstUser();
+				getFollowedUsersPosts.mockResolvedValueOnce([]);
+
+				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+
+				expect(await screen.findByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();
+				expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToUnfollow: 'p1' });
+			});
+
+			it('reloads the posts once more after the unfollow', async () => {
+				await followFirstUser();
+				getFollowedUsersPosts.mockResolvedValueOnce([]);
+
+				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+
+				await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(3));
+				await waitFor(() => expect(screen.queryByRole('article')).not.toBeInTheDocument());
+			});
+
+			it('removes their posts and keeps the message and the list', async () => {
+				await followFirstUser();
+				getFollowedUsersPosts.mockResolvedValueOnce([]);
+
+				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+
+				await waitFor(() => expect(screen.queryByRole('article')).not.toBeInTheDocument());
+				expect(screen.getByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
+				expect(within(await getSuggestionsList()).getAllByRole('button')).toHaveLength(8);
+			});
+
+			it('goes back to Unfollow with the unfollow toast when the unfollow fails, keeping their posts', async () => {
+				await followFirstUser();
+				unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+
+				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+
+				expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
+				expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+				expect(screen.getAllByRole('article')).toHaveLength(1);
+			});
+		});
+
+		it('shows the normal feed on the next visit', async () => {
+			getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce([buildPost('fresh1', 'name-p1')]);
+			const { unmount } = renderFeed();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await screen.findAllByRole('article');
+			unmount();
+
+			getFollowedUsersPosts.mockResolvedValue([buildPost('fresh1', 'name-p1')]);
+			mockSuggestionsByPlacement({});
+			renderFeed();
+
+			expect(await screen.findAllByRole('article')).toHaveLength(1);
+			expect(screen.queryByText('Your feed is empty')).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Unfollow name-p1' })).not.toBeInTheDocument();
 		});
 	});
 });

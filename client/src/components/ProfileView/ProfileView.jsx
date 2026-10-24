@@ -2,11 +2,14 @@ import { useState, useEffect, useContext, useRef } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import ToastContext from '../../contexts/ToastContext';
 import useLoginRedirect from '../../hooks/useLoginRedirect';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { updateUserProfileData, followUser, unfollowUser } from '../../services/userService';
+import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 import { FOLLOW_LIST_TYPES } from '../../constants/followLists';
 import { CREATE_MODES } from '../../constants/stories';
+import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
 import { resizeImage } from '../../utils/images';
 
 import ProfileHeader from '../ProfileHeader/ProfileHeader';
@@ -35,6 +38,7 @@ const ProfileView = () => {
 	const { userData, setUserData, userPosts, setUserPosts, isLoggedInUserProfile, profileRequestCount, onEditPostClick, onDeletePostClick } =
 		useOutletContext();
 	const { jwtToken, loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
+	const { showToast } = useContext(ToastContext);
 	const { endSessionIfUnauthenticated, runWithSessionGuard } = useSessionGuard();
 	const redirectToLogin = useLoginRedirect();
 
@@ -93,7 +97,7 @@ const ProfileView = () => {
 		setUserData((state) => ({ ...state, followers: withId(state.followers, loggedInUser._id, isFollowed) }));
 	};
 
-	const sendFollowRequest = async (isFollowed, sendRequest) => {
+	const sendFollowRequest = async (isFollowed, sendRequest, fallbackMessage) => {
 		latestFollowRequestId.current += 1;
 
 		const requestId = latestFollowRequestId.current;
@@ -107,7 +111,17 @@ const ProfileView = () => {
 				updateLoggedInUser(updatedUserData);
 			}
 		} catch (error) {
-			endSessionIfUnauthenticated(error);
+			if (isUnauthenticatedError(error)) {
+				endSessionIfUnauthenticated(error);
+
+				return;
+			}
+
+			showToast(getErrorMessage(error, fallbackMessage));
+
+			if (requestId === latestFollowRequestId.current) {
+				showFollowStateOptimistically(!isFollowed);
+			}
 		}
 	};
 
@@ -118,22 +132,28 @@ const ProfileView = () => {
 			return;
 		}
 
-		await sendFollowRequest(true, () =>
-			followUser({
-				userId: loggedInUser?._id,
-				jwtToken,
-				userIdToFollow,
-			}),
+		await sendFollowRequest(
+			true,
+			() =>
+				followUser({
+					userId: loggedInUser?._id,
+					jwtToken,
+					userIdToFollow,
+				}),
+			ACTION_FALLBACK_MESSAGES.FOLLOW_USER,
 		);
 	};
 
 	const onUnfollowUserHandler = async (userIdToUnfollow) => {
-		await sendFollowRequest(false, () =>
-			unfollowUser({
-				userId: loggedInUser?._id,
-				jwtToken,
-				userIdToUnfollow,
-			}),
+		await sendFollowRequest(
+			false,
+			() =>
+				unfollowUser({
+					userId: loggedInUser?._id,
+					jwtToken,
+					userIdToUnfollow,
+				}),
+			ACTION_FALLBACK_MESSAGES.UNFOLLOW_USER,
 		);
 	};
 
