@@ -1,0 +1,25 @@
+.suggestions-sidebar {
+	grid-column: 2;
+	grid-row: 1 / span 2;
+	box-sizing: border-box;
+	width: 320px;
+	padding: 16px;
+
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+
+	background-color: var(--background-surface);
+	border: 1px solid var(--border-card);
+	border-radius: 12px;
+}
+
+.suggestions-sidebar-heading {
+	margin: 0;
+	padding-bottom: 8px;
+
+	font-family: 'Mada';
+	font-size: 14px;
+	font-weight: bold;
+	color: var(--text-primary);
+}

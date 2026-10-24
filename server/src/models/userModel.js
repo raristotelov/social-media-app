@@ -57,6 +57,9 @@ const UserSchema = new mongoose.Schema({
 			ref: 'User',
 		},
 	],
+	suggestionsCarouselDismissedUntil: {
+		type: Date,
+	},
 });
 
 const model = mongoose.model('User', UserSchema);

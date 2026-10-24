@@ -1,6 +1,6 @@
 # Follow Suggestions
 
-Status: In Design
+Status: In Development
 
 Ticket #14. Suggestions of people to follow on the feed (`/user-feed`). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 
