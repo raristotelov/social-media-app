@@ -43,6 +43,32 @@ describe('MobileTopBar', () => {
 		});
 	});
 
+	describe('on the popular posts view', () => {
+		it.each([['/popular-posts/posts'], ['/popular-posts/posts/']])('renders nothing at %s, because the Posts bar replaces it', (path) => {
+			const { container } = renderTopBarAt(path);
+
+			expect(container).toBeEmptyDOMElement();
+		});
+
+		it('renders nothing for a guest either', () => {
+			const { container } = renderTopBarAt('/popular-posts/posts', null);
+
+			expect(container).toBeEmptyDOMElement();
+		});
+
+		it('still renders the top bar on the popular grid', () => {
+			renderTopBarAt('/popular-posts', null);
+
+			expect(screen.getByRole('link')).toHaveAttribute('href', '/');
+		});
+
+		it.each([['/popular-posts/postsx'], ['/popular-posts/posts/extra'], ['/other/posts']])('still renders the top bar at %s', (path) => {
+			renderTopBarAt(path);
+
+			expect(screen.getByRole('link')).toHaveAttribute('href', '/');
+		});
+	});
+
 	describe('elsewhere', () => {
 		it.each([['/user-feed'], ['/popular-posts'], ['/user/user2'], ['/user/user1']])('renders the top bar at %s', (path) => {
 			renderTopBarAt(path);

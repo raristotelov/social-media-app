@@ -76,6 +76,21 @@ describe('LOAD_ERROR_MESSAGES', () => {
 		});
 	});
 
+	it('has the documented popular posts load error copy', () => {
+		expect(LOAD_ERROR_MESSAGES.POPULAR).toEqual({
+			HEADING: "Couldn't load popular posts",
+			DESCRIPTION: 'Check your connection and try again.',
+			RETRY_LABEL: 'Retry',
+		});
+	});
+
+	it('has the documented inline next batch load error copy', () => {
+		expect(LOAD_ERROR_MESSAGES.POPULAR_NEXT_BATCH).toEqual({
+			MESSAGE: "Couldn't load more posts",
+			RETRY_LABEL: 'Try again',
+		});
+	});
+
 	it('has the documented inline comments load error copy', () => {
 		expect(LOAD_ERROR_MESSAGES.COMMENTS).toEqual({
 			MESSAGE: "Couldn't load comments",

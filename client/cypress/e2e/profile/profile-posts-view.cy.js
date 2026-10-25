@@ -117,7 +117,7 @@ describe('profile posts view', () => {
 			cy.get('.profile-post-link').eq(1).click();
 
 			cy.contains('.posts-bar .posts-bar-heading', 'Posts').should('be.visible');
-			cy.contains('.posts-bar .posts-bar-username', gridAuthor.username).should('be.visible');
+			cy.contains('.posts-bar .posts-bar-subtitle', gridAuthor.username).should('be.visible');
 
 			cy.get('.posts-bar-back').then(($back) => $back[0].click());
 
@@ -155,7 +155,7 @@ describe('profile posts view', () => {
 			cy.visit(`${gridPath()}/posts#${gridPosts[1]._id}`);
 
 			cy.get('.user-post').should('have.length', 3);
-			cy.contains('.posts-bar .posts-bar-username', gridAuthor.username).should('be.visible');
+			cy.contains('.posts-bar .posts-bar-subtitle', gridAuthor.username).should('be.visible');
 		});
 	});
 

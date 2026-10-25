@@ -8,6 +8,12 @@ const buildComment = (overrides = {}) => ({
 });
 
 describe('CommentModel', () => {
+	describe('indexes', () => {
+		it('indexes comments by post and creation time, for counting the comments of a post up to a moment', () => {
+			expect(CommentModel.schema.indexes()).toContainEqual([{ userPostId: 1, createdAt: 1 }, expect.any(Object)]);
+		});
+	});
+
 	describe('mentionedUserId', () => {
 		it('defaults to null', () => {
 			const comment = new CommentModel(buildComment());
