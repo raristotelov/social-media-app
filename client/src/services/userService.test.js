@@ -1,9 +1,34 @@
 import { requestFactory } from './requester';
-import { getUsersProfileData, getFollowers, getFollowing, updateUserProfileData } from './userService';
+import { changePassword, getUsersProfileData, getFollowers, getFollowing, updateUserProfileData } from './userService';
 
 jest.mock('./requester');
 
 describe('userService', () => {
+	describe('changePassword', () => {
+		let patch;
+
+		beforeEach(() => {
+			patch = jest.fn().mockResolvedValue({});
+			requestFactory.mockReturnValue({ patch });
+		});
+
+		it('patches the password endpoint with only the current and new password, authenticated by the token', async () => {
+			await changePassword({ jwtToken: 'token123', currentPassword: 'oldPassword1', newPassword: 'newPassword1' });
+
+			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(patch).toHaveBeenCalledWith(expect.stringMatching(/\/users\/password$/), {
+				currentPassword: 'oldPassword1',
+				newPassword: 'newPassword1',
+			});
+		});
+
+		it('rejects with the request error so the form can show it', async () => {
+			patch.mockRejectedValue({ code: 'CURRENT_PASSWORD_WRONG', status: 400 });
+
+			await expect(changePassword({ jwtToken: 'token123', currentPassword: 'a', newPassword: 'b' })).rejects.toMatchObject({ status: 400 });
+		});
+	});
+
 	describe('getUsersProfileData', () => {
 		let get;
 

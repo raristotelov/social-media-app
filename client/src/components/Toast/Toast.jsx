@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { TOAST_DURATION_MS } from '../../constants/toast';
+import { TOAST_DURATION_MS, TOAST_TYPES } from '../../constants/toast';
 
 import AlertIcon from '../icons/Alert';
+import CheckIcon from '../icons/Check';
 import CloseToastIcon from '../icons/CloseToast';
 
 import './Toast.css';
 
-const Toast = ({ message, onDismiss }) => {
+const Toast = ({ message, type = TOAST_TYPES.ERROR, onDismiss }) => {
 	const [isPaused, setIsPaused] = useState(false);
 	const remainingTimeRef = useRef(TOAST_DURATION_MS);
+	const isSuccess = type === TOAST_TYPES.SUCCESS;
 
 	useEffect(() => {
 		if (isPaused) {
@@ -30,9 +32,7 @@ const Toast = ({ message, onDismiss }) => {
 
 	return (
 		<div className='toast' onMouseEnter={pauseTimer} onMouseLeave={resumeTimer} onFocus={pauseTimer} onBlur={resumeTimer}>
-			<span className='toast-icon'>
-				<AlertIcon />
-			</span>
+			<span className={isSuccess ? 'toast-icon toast-icon-success' : 'toast-icon'}>{isSuccess ? <CheckIcon /> : <AlertIcon />}</span>
 
 			<p className='toast-message'>{message}</p>
 

@@ -75,3 +75,26 @@ export const validateSignUp = ({ email, username, password, repeatPassword }) =>
 
 	return { fields, formError };
 };
+
+export const validateChangePassword = ({ currentPassword, newPassword, confirmPassword }) => {
+	const fields = {};
+	let formError = '';
+
+	if (!currentPassword) {
+		fields.currentPassword = [ERROR_MESSAGES[ERROR_CODES.PASSWORD_REQUIRED]];
+	}
+
+	const newPasswordErrors = getPasswordErrors(newPassword);
+
+	if (newPasswordErrors.length) {
+		fields.newPassword = newPasswordErrors;
+	}
+
+	if (!confirmPassword) {
+		formError = VALIDATION_MESSAGES.REPEAT_PASSWORD_REQUIRED;
+	} else if (newPassword && newPassword !== confirmPassword) {
+		formError = VALIDATION_MESSAGES.PASSWORDS_DO_NOT_MATCH;
+	}
+
+	return { fields, formError };
+};

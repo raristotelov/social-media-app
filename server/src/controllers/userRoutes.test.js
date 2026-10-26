@@ -1,5 +1,6 @@
 jest.mock('../services', () => ({
 	userService: {
+		changePassword: jest.fn(),
 		updateUserProfileData: jest.fn(),
 		followUser: jest.fn(),
 		unfollowUser: jest.fn(),
@@ -62,6 +63,7 @@ describe('user routes', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
 		consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+		userService.changePassword.mockResolvedValue(undefined);
 		userService.updateUserProfileData.mockResolvedValue({ user: { _id: USER_ID }, jwt: 'token' });
 		userService.followUser.mockResolvedValue({ user: { _id: USER_ID }, jwt: 'token' });
 		userService.unfollowUser.mockResolvedValue({ user: { _id: USER_ID }, jwt: 'token' });
@@ -73,6 +75,65 @@ describe('user routes', () => {
 
 	afterEach(() => {
 		consoleErrorSpy.mockRestore();
+	});
+
+	describe('PATCH /users/password', () => {
+		const body = { currentPassword: 'oldPassword1', newPassword: 'newPassword1' };
+
+		const patchPassword = (headers, payload = body) =>
+			fetch(`${baseUrl}/users/password`, {
+				method: 'PATCH',
+				headers: { ...headers, 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload),
+			});
+
+		it('answers 401 without a token and never calls the service', async () => {
+			const response = await patchPassword({});
+
+			expect(response.status).toBe(401);
+			expect(userService.changePassword).not.toHaveBeenCalled();
+		});
+
+		it('answers 401 for an invalid token and never calls the service', async () => {
+			const response = await patchPassword({ 'X-Authorization': 'not.a.valid.token' });
+
+			expect(response.status).toBe(401);
+			expect(userService.changePassword).not.toHaveBeenCalled();
+		});
+
+		it('answers 204 with an empty body and passes the token user and the passwords to the service', async () => {
+			const response = await patchPassword(authHeaders());
+
+			expect(response.status).toBe(204);
+			await expect(response.text()).resolves.toBe('');
+			expect(userService.changePassword).toHaveBeenCalledWith(USER_ID, body);
+		});
+
+		it('uses the user from the token, never one supplied in the body', async () => {
+			await patchPassword(authHeaders(), { ...body, userId: OTHER_USER_ID, _id: OTHER_USER_ID });
+
+			expect(userService.changePassword.mock.calls[0][0]).toBe(USER_ID);
+		});
+
+		it('relays a 400 with the field errors from the service', async () => {
+			userService.changePassword.mockRejectedValue(AppError.fromFields({ currentPassword: ERROR_CODES.CURRENT_PASSWORD_WRONG }, 400));
+
+			const response = await patchPassword(authHeaders());
+
+			expect(response.status).toBe(400);
+			await expect(response.json()).resolves.toMatchObject({
+				code: ERROR_CODES.CURRENT_PASSWORD_WRONG,
+				fields: { currentPassword: ERROR_CODES.CURRENT_PASSWORD_WRONG },
+			});
+		});
+
+		it('relays a 500 from the service', async () => {
+			userService.changePassword.mockRejectedValue(new AppError('Could not change password', 500));
+
+			const response = await patchPassword(authHeaders());
+
+			expect(response.status).toBe(500);
+		});
 	});
 
 	describe('PATCH /users/update/:userId', () => {

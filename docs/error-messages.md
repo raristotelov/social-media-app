@@ -19,6 +19,8 @@ Every error code the server sends and the copy the client shows for it. The clie
 | `PASSWORD_TOO_SHORT` | 400 | field `password` | Password must be at least 8 characters |
 | `PASSWORD_TOO_LONG` | 400 | field `password` | Password must be at most 72 bytes |
 | `PASSWORD_NOT_EDITABLE` | 400 | field `password`, profile update | Password cannot be changed from the profile form |
+| `CURRENT_PASSWORD_WRONG` | 400 | field `currentPassword`, change password (#24) | Current password is incorrect |
+| `PASSWORD_UNCHANGED` | 400 | field `newPassword`, change password (#24) | New password must be different from the current one |
 | `BIO_TOO_LONG` | 400 | field `bio` | Bio must be at most 150 characters |
 | `CAPTION_INVALID` | 400 | field `caption` | Caption must be text |
 | `CAPTION_TOO_LONG` | 400 | field `caption`, post upload and caption edit (#11) | Caption must be at most 1000 characters |
@@ -45,6 +47,7 @@ Checked before any request; no server code.
 | --- | --- |
 | Sign up, repeat password empty | Please repeat your password |
 | Sign up, passwords differ (form message) | Passwords do not match |
+| Change password, confirm empty / differs (form message) (#24) | Please repeat your password / Passwords do not match |
 | Upload Picture, no picture chosen | Please choose a picture |
 
 ## Action fallbacks
@@ -56,6 +59,7 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Log in | Form message | Couldn't log in. Try again. |
 | Sign up | Form message | Couldn't sign up. Try again. |
 | Save profile | Form message | Couldn't save your profile. Try again. |
+| Change password (#24) | Form message | Couldn't change your password. Try again. |
 | Edit caption | Form message | Couldn't save the caption. Try again. |
 | Upload picture | Form message | Couldn't upload the picture. Try again. |
 | Delete post | Toast | Couldn't delete the post. Try again. |

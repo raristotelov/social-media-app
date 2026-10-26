@@ -6,6 +6,7 @@ import useUserSearch from '../../hooks/useUserSearch';
 
 import Logo from '../Logo/Logo';
 import AccountMenu from '../AccountMenu/AccountMenu';
+import ChangePasswordPopup from '../ChangePasswordPopup/ChangePasswordPopup';
 import SearchResults from '../SearchResults/SearchResults';
 import MenuIcon from '../icons/Menu';
 import SearchIcon from '../icons/Search';
@@ -33,6 +34,7 @@ const MobileTopBar = ({ logoutHandler }) => {
 	const { loggedInUser } = useContext(LoggedInUserContext);
 	const { pathname } = useLocation();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
+	const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 	const [isSearching, setIsSearching] = useState(false);
 
 	const searchFieldRef = useRef(null);
@@ -108,9 +110,12 @@ const MobileTopBar = ({ logoutHandler }) => {
 				isOpen={isMenuOpen}
 				onClose={() => setIsMenuOpen(false)}
 				logoutHandler={logoutHandler}
+				onChangePasswordClick={() => setIsChangePasswordOpen(true)}
 				className='account-menu-sheet'
 				isBottomSheet
 			/>
+
+			{isChangePasswordOpen ? <ChangePasswordPopup onClose={() => setIsChangePasswordOpen(false)} /> : null}
 		</div>
 	);
 };

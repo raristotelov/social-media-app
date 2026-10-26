@@ -35,6 +35,35 @@ describe('AccountMenu', () => {
 		expect(screen.getByText('Log out')).toBeInTheDocument();
 	});
 
+	it('places the Change password row between Dark mode and Log out', () => {
+		renderAccountMenu(true, { onChangePasswordClick: jest.fn() });
+
+		const rowLabels = screen.getAllByText(/^(Profile|Dark mode|Change password|Log out)$/).map((row) => row.textContent);
+
+		expect(rowLabels).toEqual(['Profile', 'Dark mode', 'Change password', 'Log out']);
+	});
+
+	it('closes the menu and calls onChangePasswordClick when Change password is clicked', () => {
+		const onClose = jest.fn();
+		const onChangePasswordClick = jest.fn();
+		renderAccountMenu(true, { onClose, onChangePasswordClick });
+
+		userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+
+		expect(onClose).toHaveBeenCalledTimes(1);
+		expect(onChangePasswordClick).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not log out or toggle the theme when Change password is clicked', () => {
+		const logoutHandler = jest.fn();
+		renderAccountMenu(true, { logoutHandler, onChangePasswordClick: jest.fn() });
+
+		userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+
+		expect(logoutHandler).not.toHaveBeenCalled();
+		expect(updateUserProfileData).not.toHaveBeenCalled();
+	});
+
 	it('renders nothing when isOpen is false', () => {
 		const { container } = renderAccountMenu(false);
 

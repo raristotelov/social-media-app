@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import ToastContext from '../../contexts/ToastContext';
 import { getUsersProfileData } from '../../services/userService';
 
 import MainHeader from './MainHeader';
@@ -196,6 +197,42 @@ describe('MainHeader', () => {
 			renderMainHeader(null, jest.fn(), [], '/log-in');
 
 			expect(screen.getByRole('link', { name: 'Log in' })).toHaveClass('navigation-item-active');
+		});
+	});
+
+	describe('Change password', () => {
+		const renderLoggedInHeader = () => {
+			getUsersProfileData.mockResolvedValue([]);
+
+			return render(
+				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: { _id: 'user1', username: 'johndoe', following: [] } }}>
+					<ToastContext.Provider value={{ showToast: jest.fn(), dismissToast: jest.fn() }}>
+						<MemoryRouter>
+							<MainHeader logoutHandler={jest.fn()} />
+						</MemoryRouter>
+					</ToastContext.Provider>
+				</LoggedInUserContext.Provider>,
+			);
+		};
+
+		it('opens the Change Password popup from the account menu and closes the menu', () => {
+			renderLoggedInHeader();
+
+			userEvent.click(screen.getByRole('button', { name: /johndoe/ }));
+			userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+
+			expect(screen.getByRole('heading', { name: 'Change Password' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
+		});
+
+		it('closes the popup again with Cancel', () => {
+			renderLoggedInHeader();
+
+			userEvent.click(screen.getByRole('button', { name: /johndoe/ }));
+			userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+			expect(screen.queryByRole('heading', { name: 'Change Password' })).not.toBeInTheDocument();
 		});
 	});
 

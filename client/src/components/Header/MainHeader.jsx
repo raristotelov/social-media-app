@@ -8,6 +8,7 @@ import { POPULAR_POSTS_PATH, POPULAR_POSTS_VIEW_PATH } from '../../constants/pop
 import Logo from '../Logo/Logo';
 import SearchInput from '../SearchInput/SearchInput';
 import AccountMenu from '../AccountMenu/AccountMenu';
+import ChangePasswordPopup from '../ChangePasswordPopup/ChangePasswordPopup';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
 import ArrowDown from '../icons/ArrowDown';
 import FlameIcon from '../icons/Flame';
@@ -17,6 +18,7 @@ import './MainHeader.css';
 
 const MainHeader = ({ logoutHandler }) => {
 	const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+	const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
 	const location = useLocation();
 	const currentPath = location.pathname;
@@ -100,11 +102,18 @@ const MainHeader = ({ logoutHandler }) => {
 								<ArrowDown iconColorProp='currentColor' />
 							</button>
 
-							<AccountMenu isOpen={isAccountMenuOpen} onClose={() => setIsAccountMenuOpen(false)} logoutHandler={logoutHandler} />
+							<AccountMenu
+								isOpen={isAccountMenuOpen}
+								onClose={() => setIsAccountMenuOpen(false)}
+								logoutHandler={logoutHandler}
+								onChangePasswordClick={() => setIsChangePasswordOpen(true)}
+							/>
 						</div>
 					) : null}
 				</div>
 			</header>
+
+			{isChangePasswordOpen ? <ChangePasswordPopup onClose={() => setIsChangePasswordOpen(false)} /> : null}
 		</div>
 	);
 };

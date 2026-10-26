@@ -14,7 +14,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 | --- | --- | --- |
 | Own profile (`isLoggedInUserProfile`) | Edit Profile button; Upload Picture tile first in grid | Built |
 | Own profile | Post actions (three dots) on each tile | Built |
-| Own profile, mobile | Top bar account-menu icon opens bottom sheet: Profile, Dark mode, Log out | Built |
+| Own profile, mobile | Top bar account-menu icon opens bottom sheet: Profile, Dark mode, Change password ([change-password.md](./change-password.md), #24), Log out | Built |
 | Another user (logged in) | Follow / Unfollow button instead of Edit Profile (Unfollow if already following); no Upload tile; no post actions | Built |
 | Guest | Same layout as another user; readable without an account. Follow sends guest to `/log-in`, returns to the profile after login | Built |
 | Anyone, unknown or malformed user id | The 404 page (today the page stays blank) | To build (#29) |

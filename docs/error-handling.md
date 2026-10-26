@@ -35,7 +35,7 @@ Every code, its status and the copy the client shows: [error-messages.md](./erro
 
 ## Toast
 
-- Component `Toast` ([556:1892](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=556-1892)): `text/primary` fill, 12px radius, 12/16 padding; alert icon in `feedback/error-inverse`; message 15px `background/surface`; close ×.
+- Component `Toast` ([556:1892](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=556-1892)): `text/primary` fill, 12px radius, 12/16 padding; alert icon in `feedback/error-inverse`; message 15px `background/surface`; close ×. Variant Type=Success ([682:3196](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=682-3196), #24): check icon in `feedback/success-inverse`, otherwise the same.
 - Desktop / tablet: bottom centre. Mobile: full width with 16px margins, 8px above the tab bar.
 - Dismissed by the × or automatically after 5 seconds; the timer pauses while hovered or focused.
 - An action raised from a popup (delete confirmation) closes the popup, then shows the toast.

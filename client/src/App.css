@@ -11,6 +11,13 @@
 @font-face {
 	font-family: 'Mada';
 	src: url('../public/Fonts/Mada/Mada-Regular.ttf') format('truetype');
+	font-weight: 400;
+}
+
+@font-face {
+	font-family: 'Mada';
+	src: url('../public/Fonts/Mada/Mada-Bold.ttf') format('truetype');
+	font-weight: 700;
 }
 
 body {

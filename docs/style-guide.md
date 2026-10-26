@@ -20,6 +20,7 @@ Colours live as a Figma **variable collection (`Colours`) with Light and Dark mo
 | `brand/red` | `#F64D4D` | `#F64D4D` | Identity and interactive accents — unchanged in dark |
 | `feedback/error` | `#C62828` | `#FF6B6B` | Validation messages and the border of an input in error |
 | `feedback/error-inverse` | `#FF6B6B` | `#C62828` | Error accent on the inverted toast (`text/primary` background) |
+| `feedback/success-inverse` | `#66BB6A` | `#2E7D32` | Success accent on the inverted toast (#24) — ≈3.7:1 on `#4B4B4B`, ≈4.5:1 on `#F0F0F0` |
 | `static/white` | `#FFFFFF` | `#FFFFFF` | Content **on** a colour or photo — button labels, tile hover counts |
 | `avatar/placeholder-disc` | `#E8E8E8` | `#2A2A2A` | No-profile-picture disc |
 | `avatar/placeholder-figure` | `#9A9A9A` | `#5A5A5A` | No-profile-picture silhouette |

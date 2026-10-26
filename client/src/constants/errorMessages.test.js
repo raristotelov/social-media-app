@@ -13,6 +13,8 @@ describe('ERROR_MESSAGES', () => {
 		['PASSWORD_TOO_SHORT', 'Password must be at least 8 characters'],
 		['PASSWORD_TOO_LONG', 'Password must be at most 72 bytes'],
 		['PASSWORD_NOT_EDITABLE', 'Password cannot be changed from the profile form'],
+		['CURRENT_PASSWORD_WRONG', 'Current password is incorrect'],
+		['PASSWORD_UNCHANGED', 'New password must be different from the current one'],
 		['BIO_TOO_LONG', 'Bio must be at most 150 characters'],
 		['CAPTION_INVALID', 'Caption must be text'],
 		['CAPTION_TOO_LONG', 'Caption must be at most 1000 characters'],
@@ -35,7 +37,7 @@ describe('ERROR_MESSAGES', () => {
 	);
 
 	it('has copy for exactly the codes the spec documents, and no other', () => {
-		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(20);
+		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(22);
 	});
 });
 
@@ -44,6 +46,7 @@ describe('ACTION_FALLBACK_MESSAGES', () => {
 		['LOG_IN', "Couldn't log in. Try again."],
 		['SIGN_UP', "Couldn't sign up. Try again."],
 		['SAVE_PROFILE', "Couldn't save your profile. Try again."],
+		['CHANGE_PASSWORD', "Couldn't change your password. Try again."],
 		['EDIT_CAPTION', "Couldn't save the caption. Try again."],
 		['UPLOAD_PICTURE', "Couldn't upload the picture. Try again."],
 		['DELETE_POST', "Couldn't delete the post. Try again."],
