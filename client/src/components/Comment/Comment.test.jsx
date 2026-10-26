@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { likeComment, unlikeComment, addComment } from '../../services/commentService';
+import { likeComment, unlikeComment, addComment, getCommentLikes } from '../../services/commentService';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -45,20 +45,21 @@ const renderComment = ({
 	comment = baseComment,
 	user = loggedInUser,
 	onReload = jest.fn().mockResolvedValue(undefined),
+	onCloseComments = jest.fn(),
 	entry = '/user/user2/posts#post1',
 	endSession = jest.fn(),
 } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: user, endSession }}>
+		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, endSession }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={[entry]}>
-					<Comment comment={comment} userPostId='post1' onReload={onReload} />
+					<Comment comment={comment} userPostId='post1' onReload={onReload} onCloseComments={onCloseComments} />
 				</MemoryRouter>
 			</ToastProvider>
 		</LoggedInUserContext.Provider>,
 	);
 
-	return { ...rendered, onReload, endSession };
+	return { ...rendered, onReload, onCloseComments, endSession };
 };
 
 const getReplyTexts = (container) => Array.from(container.querySelectorAll('.comment-reply .comment-text')).map((element) => element.textContent);
@@ -111,6 +112,151 @@ describe('Comment', () => {
 
 			expect(screen.getByText('Great photo')).toBeInTheDocument();
 			expect(screen.queryByRole('link')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('the likes list', () => {
+		const likers = [
+			{ _id: 'user9', username: 'newestliker' },
+			{ _id: 'user8', username: 'olderliker' },
+		];
+
+		const likedComment = { ...baseComment, likes: ['user8', 'user9'] };
+
+		it('shows "0 likes" as plain text, not a button', () => {
+			renderComment();
+
+			expect(screen.getByText('0 likes')).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: '0 likes' })).not.toBeInTheDocument();
+		});
+
+		it('does nothing when "0 likes" is clicked', () => {
+			renderComment();
+
+			userEvent.click(screen.getByText('0 likes'));
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(getCommentLikes).not.toHaveBeenCalled();
+		});
+
+		it('makes "1 like" a button', () => {
+			renderComment({ comment: { ...baseComment, likes: ['user9'] } });
+
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+		});
+
+		it('makes "N likes" a button from two likes up', () => {
+			renderComment({ comment: likedComment });
+
+			expect(screen.getByRole('button', { name: '2 likes' })).toBeInTheDocument();
+		});
+
+		it('stays closed, and loads nothing, until the count is clicked', () => {
+			renderComment({ comment: likedComment });
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(getCommentLikes).not.toHaveBeenCalled();
+		});
+
+		it('opens the popup titled "Likes" and loads the likes of this comment when the count is clicked', async () => {
+			getCommentLikes.mockResolvedValue(likers);
+			renderComment({ comment: likedComment });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+
+			expect(screen.getByRole('heading', { name: 'Likes' })).toBeInTheDocument();
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(screen.getByText('olderliker')).toBeInTheDocument();
+			expect(getCommentLikes).toHaveBeenCalledTimes(1);
+			expect(getCommentLikes).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'c1', jwtToken: 'token123' }));
+		});
+
+		it('does not toggle the like when the count is clicked', async () => {
+			getCommentLikes.mockResolvedValue(likers);
+			renderComment({ comment: likedComment });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await screen.findByText('newestliker');
+
+			expect(likeComment).not.toHaveBeenCalled();
+			expect(unlikeComment).not.toHaveBeenCalled();
+		});
+
+		it('keeps the heart a separate control that still likes the comment', async () => {
+			likeComment.mockResolvedValue({ _id: 'c1', likes: ['user8', 'user9', 'user1'] });
+			renderComment({ comment: likedComment });
+
+			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(getCommentLikes).not.toHaveBeenCalled();
+		});
+
+		it('closes when its Close button is clicked, without calling onCloseComments', async () => {
+			getCommentLikes.mockResolvedValue(likers);
+			const { onCloseComments } = renderComment({ comment: likedComment });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await screen.findByText('newestliker');
+			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(onCloseComments).not.toHaveBeenCalled();
+		});
+
+		it('calls onCloseComments, so the comments popup closes too, when an account is clicked', async () => {
+			getCommentLikes.mockResolvedValue(likers);
+			const { onCloseComments } = renderComment({ comment: likedComment });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			userEvent.click(await screen.findByRole('link', { name: /olderliker/ }));
+
+			expect(onCloseComments).toHaveBeenCalledTimes(1);
+		});
+
+		it('links each account to its profile', async () => {
+			getCommentLikes.mockResolvedValue(likers);
+			renderComment({ comment: likedComment });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+
+			expect(await screen.findByRole('link', { name: /newestliker/ })).toHaveAttribute('href', '/user/user9');
+			expect(screen.getByRole('link', { name: /olderliker/ })).toHaveAttribute('href', '/user/user8');
+		});
+
+		it('opens the likes of a reply, with the reply id, and closes the comments when an account is clicked', async () => {
+			getCommentLikes.mockResolvedValue(likers);
+			const reply = { _id: 'r1', text: 'a liked reply', likes: ['user9'], userId: { _id: 'user4', username: 'bob' } };
+			const { onCloseComments } = renderComment({ comment: { ...baseComment, replies: [reply] } });
+
+			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			userEvent.click(screen.getByRole('button', { name: '1 like' }));
+			userEvent.click(await screen.findByRole('link', { name: /newestliker/ }));
+
+			expect(getCommentLikes).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'r1' }));
+			expect(onCloseComments).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows the inline load error with a retry', async () => {
+			getCommentLikes.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(likers);
+			renderComment({ comment: likedComment });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(getCommentLikes).toHaveBeenCalledTimes(2);
+		});
+
+		it('is open to a guest: the count is a button and the list opens without redirecting', async () => {
+			getCommentLikes.mockResolvedValue(likers);
+			renderComment({ user: null, comment: likedComment });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(mockNavigate).not.toHaveBeenCalled();
 		});
 	});
 

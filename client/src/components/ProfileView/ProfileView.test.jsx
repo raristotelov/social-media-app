@@ -1503,7 +1503,7 @@ describe('ProfileView followers and following popup', () => {
 		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
 		await screen.findByText('firstfollower');
 
-		const usernames = Array.from(document.querySelectorAll('.follow-list-results .search-result-username')).map((row) => row.textContent);
+		const usernames = Array.from(document.querySelectorAll('.user-list-results .search-result-username')).map((row) => row.textContent);
 
 		expect(usernames).toEqual(['secondfollower', 'firstfollower']);
 	});

@@ -1,6 +1,12 @@
+import useBottomSheetDrag from '../../hooks/useBottomSheetDrag';
+
+import BottomSheetHandle from '../BottomSheetHandle/BottomSheetHandle';
+
 import './PostActionsMenu.css';
 
 const PostActionsMenu = ({ onEditClick, onDeleteClick, onClose }) => {
+	const bottomSheetDragProps = useBottomSheetDrag(onClose);
+
 	const closeOnScrimPress = (event) => {
 		if (event.target === event.currentTarget) {
 			onClose();
@@ -9,7 +15,9 @@ const PostActionsMenu = ({ onEditClick, onDeleteClick, onClose }) => {
 
 	return (
 		<div className='post-actions-scrim' onMouseDown={closeOnScrimPress}>
-			<div className='account-menu post-actions-menu bottom-sheet'>
+			<div className='account-menu post-actions-menu bottom-sheet' {...bottomSheetDragProps}>
+				<BottomSheetHandle />
+
 				<button type='button' className='account-menu-row' onClick={onEditClick}>
 					<span>Edit</span>
 				</button>

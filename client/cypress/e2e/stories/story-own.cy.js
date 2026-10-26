@@ -94,16 +94,16 @@ describe('your own stories: Seen by', () => {
 
 		cy.contains('.story-viewer-seen-by', 'Seen by 1').click();
 
-		cy.contains('.follow-list-popup .popup-title', 'Viewers').should('be.visible');
+		cy.contains('.user-list-popup .popup-title', 'Viewers').should('be.visible');
 		cy.get('.story-viewer').should('have.class', 'story-viewer-paused');
-		cy.get('.follow-list-popup .search-result').should('have.length', 1);
-		cy.contains('.follow-list-popup .search-result', viewer.username).find('.search-result-avatar').should('be.visible');
-		cy.contains('.follow-list-popup .search-result', owner.username).should('not.exist');
-		cy.get('.follow-list-popup .search-result-followers').should('not.exist');
+		cy.get('.user-list-popup .search-result').should('have.length', 1);
+		cy.contains('.user-list-popup .search-result', viewer.username).find('.search-result-avatar').should('be.visible');
+		cy.contains('.user-list-popup .search-result', owner.username).should('not.exist');
+		cy.get('.user-list-popup .search-result-followers').should('not.exist');
 
-		cy.get('.follow-list-popup .popup-close').click();
+		cy.get('.user-list-popup .popup-close').click();
 
-		cy.get('.follow-list-popup').should('not.exist');
+		cy.get('.user-list-popup').should('not.exist');
 		cy.get('.story-viewer').should('not.have.class', 'story-viewer-paused');
 		cy.get('.story-viewer').should('be.visible');
 	});
@@ -115,8 +115,8 @@ describe('your own stories: Seen by', () => {
 
 		cy.contains('.story-viewer-seen-by', 'Seen by 1').click();
 
-		cy.contains('.follow-list-popup .popup-title', 'Viewers').should('be.visible');
-		expectPopupAtBottomOfScreen('.follow-list-popup', 390);
+		cy.contains('.user-list-popup .popup-title', 'Viewers').should('be.visible');
+		expectPopupAtBottomOfScreen('.user-list-popup', 390);
 		cy.get('.story-viewer').should('be.visible');
 	});
 
@@ -127,7 +127,7 @@ describe('your own stories: Seen by', () => {
 
 		cy.contains('.story-viewer-seen-by', 'Seen by 1').click();
 
-		cy.get('.follow-list-popup .popup-body').then(($body) => {
+		cy.get('.user-list-popup .popup-body').then(($body) => {
 			const bounds = $body[0].getBoundingClientRect();
 
 			expect(bounds.left).to.be.greaterThan(0);

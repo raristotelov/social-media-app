@@ -1,10 +1,10 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { getComments, addComment, likeComment, unlikeComment } from '../../services/commentService';
+import { getComments, addComment, likeComment, unlikeComment, getCommentLikes } from '../../services/commentService';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -938,6 +938,108 @@ describe('CommentsPopup', () => {
 			const replyTexts = Array.from(document.querySelectorAll('.comment-reply .comment-text')).map((element) => element.textContent);
 
 			expect(replyTexts).toEqual(['oldest reply', 'newest reply']);
+		});
+	});
+
+	describe('the likes list of a comment', () => {
+		const likers = [
+			{ _id: 'user9', username: 'newestliker' },
+			{ _id: 'user8', username: 'olderliker' },
+		];
+
+		const openLikes = async () => {
+			getComments.mockResolvedValue(topComments);
+			getCommentLikes.mockResolvedValue(likers);
+
+			const rendered = renderPopup();
+
+			await screen.findByText('Most liked comment');
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await screen.findByText('newestliker');
+
+			return rendered;
+		};
+
+		it('opens over the comments popup, which stays rendered underneath', async () => {
+			await openLikes();
+
+			expect(screen.getByRole('heading', { name: 'Likes' })).toBeInTheDocument();
+			expect(screen.getByRole('heading', { name: 'Comments' })).toBeInTheDocument();
+			expect(screen.getByText('Newest comment')).toBeInTheDocument();
+		});
+
+		it('loads the likes of the clicked comment', async () => {
+			await openLikes();
+
+			expect(getCommentLikes).toHaveBeenCalledTimes(1);
+			expect(getCommentLikes).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'c1', jwtToken: 'token123' }));
+		});
+
+		it('shows a comment with no likes as plain text, so only comments with likes open a list', async () => {
+			getComments.mockResolvedValue(topComments);
+			renderPopup();
+
+			await screen.findByText('Most liked comment');
+
+			expect(screen.getByText('0 likes')).toBeInTheDocument();
+			expect(screen.getAllByRole('button', { name: /\blikes?$/ })).toHaveLength(1);
+		});
+
+		it('closes only the likes popup with its Close button and returns to the comments, which are not reloaded', async () => {
+			const { onClose } = await openLikes();
+
+			userEvent.click(within(screen.getByRole('heading', { name: 'Likes' }).closest('.popup-body')).getByRole('button', { name: 'Close' }));
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(screen.getByText('Most liked comment')).toBeInTheDocument();
+			expect(onClose).not.toHaveBeenCalled();
+			expect(getComments).toHaveBeenCalledTimes(1);
+		});
+
+		it('closes only the likes popup on Escape', async () => {
+			const { onClose } = await openLikes();
+
+			userEvent.keyboard('{Escape}');
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(screen.getByRole('heading', { name: 'Comments' })).toBeInTheDocument();
+			expect(onClose).not.toHaveBeenCalled();
+		});
+
+		it('closes the comments popup on Escape once the likes popup is gone', async () => {
+			const { onClose } = await openLikes();
+
+			userEvent.keyboard('{Escape}');
+			userEvent.keyboard('{Escape}');
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('closes the comments popup as well when an account is clicked', async () => {
+			const { onClose } = await openLikes();
+
+			userEvent.click(screen.getByRole('link', { name: /olderliker/ }));
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('links the accounts to their profiles', async () => {
+			await openLikes();
+
+			expect(screen.getByRole('link', { name: /newestliker/ })).toHaveAttribute('href', '/user/user9');
+			expect(screen.getByRole('link', { name: /olderliker/ })).toHaveAttribute('href', '/user/user8');
+		});
+
+		it('is open to a guest', async () => {
+			getComments.mockResolvedValue(topComments);
+			getCommentLikes.mockResolvedValue(likers);
+			renderPopup({ user: null });
+
+			await screen.findByText('Most liked comment');
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(mockNavigate).not.toHaveBeenCalled();
 		});
 	});
 });

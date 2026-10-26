@@ -116,9 +116,9 @@ describe('SearchResults', () => {
 		});
 
 		it('adds the given class name to the list', () => {
-			const { container } = renderSearchResults({ className: 'follow-list-results' });
+			const { container } = renderSearchResults({ className: 'user-list-results' });
 
-			expect(container.querySelector('.search-results.follow-list-results')).toBeInTheDocument();
+			expect(container.querySelector('.search-results.user-list-results')).toBeInTheDocument();
 		});
 	});
 

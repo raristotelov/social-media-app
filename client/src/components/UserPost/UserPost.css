@@ -104,6 +104,7 @@
 }
 
 .user-post-like-button,
+.user-post-likes-button,
 .user-post-comments-button {
 	padding: 0;
 
@@ -114,6 +115,7 @@
 	line-height: 0;
 }
 
+.user-post-likes-button,
 .user-post-comments-button {
 	font-size: 15px;
 	line-height: normal;
@@ -121,6 +123,7 @@
 }
 
 .user-post-like-button:hover,
+.user-post-likes-button:hover,
 .user-post-comments-button:hover {
 	cursor: pointer;
 	opacity: 0.7;

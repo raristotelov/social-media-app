@@ -85,6 +85,7 @@ These reflow rather than scale, and depend on it:
 
 - **Card vs modal.** A card sitting on the page gets a 1px `#DBDBDB` border; a modal gets none, because the scrim already separates it.
 - **Anchored overlays.** Account menu and search dropdown sit flush under the header and align to the control that opens them — the search dropdown matches the field width, the account menu spans the avatar-to-username width.
+- **Bottom sheets (mobile) (#5).** Comments, story viewers, delete story, account menu, post actions and delete post. Each has a 40×4 `text/muted` handle, 2px radius, centred 10px below the top edge. Dragging down from the handle or the sheet's header moves the sheet with the finger. It closes past a quarter of its height or on a quick downward flick, otherwise it springs back. The list or content below the header scrolls as normal.
 - **Nav state.** Nav items carry `State` = Default / Hover / Active. Hover is `opacity 0.6`; active items don't dim, matching the CSS. Hover is wired as a prototype interaction, so it works in Presentation mode.
 - **Empty states** are designed alongside populated ones, and kept coherent — a new account has no posts *and* no followers *and* no bio.
 - **Error states.** Toast for a failed action, full-page load error for a page's main data, inline line for one part of a page. Rules and frames in [error-handling.md](./error-handling.md), copy in [error-messages.md](./error-messages.md).

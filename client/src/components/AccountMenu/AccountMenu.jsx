@@ -2,13 +2,17 @@ import { useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import useBottomSheetDrag from '../../hooks/useBottomSheetDrag';
 import { updateUserProfileData } from '../../services/userService';
+
+import BottomSheetHandle from '../BottomSheetHandle/BottomSheetHandle';
 
 import './AccountMenu.css';
 
-const AccountMenu = ({ isOpen, onClose, logoutHandler, className = '' }) => {
+const AccountMenu = ({ isOpen, onClose, logoutHandler, className = '', isBottomSheet = false }) => {
 	const { loggedInUser, jwtToken, updateLoggedInUser } = useContext(LoggedInUserContext);
 	const menuRef = useRef(null);
+	const bottomSheetDragProps = useBottomSheetDrag(onClose);
 
 	useEffect(() => {
 		if (!isOpen) {
@@ -53,7 +57,9 @@ const AccountMenu = ({ isOpen, onClose, logoutHandler, className = '' }) => {
 	};
 
 	return (
-		<div className={`account-menu ${className}`.trim()} ref={menuRef}>
+		<div className={`account-menu ${className}`.trim()} ref={menuRef} {...(isBottomSheet ? bottomSheetDragProps : {})}>
+			{isBottomSheet ? <BottomSheetHandle /> : null}
+
 			<Link to={`/user/${loggedInUser._id}`} className='account-menu-row' onClick={onClose}>
 				<span>Profile</span>
 			</Link>

@@ -6,10 +6,12 @@ import ToastContext from '../../contexts/ToastContext';
 import useLoginRedirect from '../../hooks/useLoginRedirect';
 import { likeComment, unlikeComment, addComment } from '../../services/commentService';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
+import { USER_LIST_TYPES } from '../../constants/userLists';
 import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
 
 import AddCommentForm from '../AddCommentForm/AddCommentForm';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
+import UserListPopup from '../UserListPopup/UserListPopup';
 import HeartIcon from '../icons/Heart';
 
 import './Comment.css';
@@ -26,9 +28,10 @@ const AuthorLink = ({ authorId, className, children }) => {
 	);
 };
 
-const Comment = ({ comment, userPostId, onReload, isReply = false, parentCommentId = null }) => {
+const Comment = ({ comment, userPostId, onReload, onCloseComments, isReply = false, parentCommentId = null }) => {
 	const [showReplies, setShowReplies] = useState(false);
 	const [isReplying, setIsReplying] = useState(false);
+	const [isLikesPopupOpen, setIsLikesPopupOpen] = useState(false);
 	const isUpdatingLikeRef = useRef(false);
 
 	const { jwtToken, loggedInUser, endSession } = useContext(LoggedInUserContext);
@@ -38,6 +41,7 @@ const Comment = ({ comment, userPostId, onReload, isReply = false, parentComment
 	const author = comment.userId || {};
 	const likes = comment.likes || [];
 	const hasLikedComment = likes.includes(loggedInUser?._id);
+	const likesLabel = `${likes.length} ${likes.length === 1 ? 'like' : 'likes'}`;
 	const replies = comment.replies || [];
 
 	const replyMention = `@${author.username}`;
@@ -148,7 +152,13 @@ const Comment = ({ comment, userPostId, onReload, isReply = false, parentComment
 							/>
 						</button>
 
-						<span className='comment-util-label'>{`${likes.length} ${likes.length === 1 ? 'like' : 'likes'}`}</span>
+						{likes.length ? (
+							<button type='button' className='comment-util-label comment-util-button' onClick={() => setIsLikesPopupOpen(true)}>
+								{likesLabel}
+							</button>
+						) : (
+							<span className='comment-util-label'>{likesLabel}</span>
+						)}
 
 						<button type='button' className='comment-util-button' onClick={toggleReplyForm}>
 							Reply
@@ -181,9 +191,26 @@ const Comment = ({ comment, userPostId, onReload, isReply = false, parentComment
 					</button>
 
 					{replies.map((reply) => (
-						<Comment key={reply._id} comment={reply} userPostId={userPostId} onReload={onReload} isReply parentCommentId={comment._id} />
+						<Comment
+							key={reply._id}
+							comment={reply}
+							userPostId={userPostId}
+							onReload={onReload}
+							onCloseComments={onCloseComments}
+							isReply
+							parentCommentId={comment._id}
+						/>
 					))}
 				</div>
+			) : null}
+
+			{isLikesPopupOpen ? (
+				<UserListPopup
+					commentId={comment._id}
+					listType={USER_LIST_TYPES.COMMENT_LIKES}
+					onClose={() => setIsLikesPopupOpen(false)}
+					onAccountClick={onCloseComments}
+				/>
 			) : null}
 		</div>
 	);

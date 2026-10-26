@@ -109,6 +109,9 @@ export const likePostViaApi = (jwtToken, userPostId) =>
 		.request({ method: 'POST', url: `${serverUrl}/user-posts/like/${userPostId}`, headers: authHeaders(jwtToken) })
 		.then((response) => response.body);
 
+export const likeCommentViaApi = (jwtToken, commentId) =>
+	cy.request({ method: 'POST', url: `${serverUrl}/comments/${commentId}/like`, headers: authHeaders(jwtToken) }).then((response) => response.body);
+
 export const addCommentViaApi = (jwtToken, userPostId, text, { parentCommentId, mentionedUserId } = {}) =>
 	cy
 		.request({

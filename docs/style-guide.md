@@ -53,6 +53,7 @@ Measured against `background/page`:
 | Role | Size | Weight |
 |------|------|--------|
 | Card / popup heading | 26 | Regular |
+| List popup heading (followers, viewers, likes) | 16 | Bold |
 | Profile username (desktop, tablet) | 20 | Bold |
 | Profile username (mobile) | 16 | Bold |
 | Auth nav links (Log in / Sign up) | 18 | Bold |
@@ -81,6 +82,7 @@ Replies sit one step below comments (15→14 body, 13→12 metadata); colour sta
 - Header bottom border: 1px `#C0C0C0`
 - Profile header divider: 1px `#C0C0C0`, 32px above / 24px below, flush with the grid
 - Inset dividers inside cards: 1px `#E4E4E4`
+- List popups: 1px `#E4E4E4` under the 48px header (full width) and between rows (from the username, 68px in; none after the last row)
 - Active nav underline: 2px `#F64D4D`, flush to the bar's bottom edge
 
 ## Spacing

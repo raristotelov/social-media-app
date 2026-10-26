@@ -2,14 +2,24 @@ jest.mock('../models/userModel');
 jest.mock('../models/userPostModel');
 jest.mock('./commentService');
 jest.mock('./imageStorageService');
+jest.mock('./userRowService');
 
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
+const { getUserRowsInOrder } = require('./userRowService');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
-const { addUserPost, getFollowedUsersPosts, likeUserPost, unlikeUserPost, updateUserPostCaption, deleteUserPost } = require('./userPostService');
+const {
+	addUserPost,
+	getFollowedUsersPosts,
+	likeUserPost,
+	unlikeUserPost,
+	getUserPostLikes,
+	updateUserPostCaption,
+	deleteUserPost,
+} = require('./userPostService');
 
 const ActualUserPostModel = jest.requireActual('../models/userPostModel');
 
@@ -615,6 +625,111 @@ describe('userPostService', () => {
 				expect(update).toEqual({ $addToSet: { likes: OTHER_USER_ID } });
 				expect(update).not.toHaveProperty('$push');
 			});
+		});
+	});
+
+	describe('getUserPostLikes', () => {
+		const FIRST_LIKER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
+		const SECOND_LIKER_ID = '64b7f0a1c2d3e4f5a6b7c8d2';
+		const THIRD_LIKER_ID = '64b7f0a1c2d3e4f5a6b7c8d3';
+
+		const givenPostWithLikes = (likes) => {
+			const select = jest.fn().mockResolvedValue({ _id: POST_ID, likes });
+
+			UserPostModel.findById = jest.fn().mockReturnValue({ select });
+
+			return select;
+		};
+
+		it('reads only the likes of the post in the path', async () => {
+			const select = givenPostWithLikes([]);
+
+			getUserRowsInOrder.mockResolvedValue([]);
+
+			await getUserPostLikes({ userPostId: POST_ID });
+
+			expect(UserPostModel.findById).toHaveBeenCalledWith(POST_ID);
+			expect(select).toHaveBeenCalledWith({ likes: 1 });
+		});
+
+		it('asks for the user rows with the newest like first', async () => {
+			givenPostWithLikes([FIRST_LIKER_ID, SECOND_LIKER_ID, THIRD_LIKER_ID]);
+			getUserRowsInOrder.mockResolvedValue([]);
+
+			await getUserPostLikes({ userPostId: POST_ID });
+
+			expect(getUserRowsInOrder).toHaveBeenCalledWith([THIRD_LIKER_ID, SECOND_LIKER_ID, FIRST_LIKER_ID]);
+		});
+
+		it('does not reorder the stored likes of the post', async () => {
+			const likes = [FIRST_LIKER_ID, SECOND_LIKER_ID];
+
+			givenPostWithLikes(likes);
+			getUserRowsInOrder.mockResolvedValue([]);
+
+			await getUserPostLikes({ userPostId: POST_ID });
+
+			expect(likes).toEqual([FIRST_LIKER_ID, SECOND_LIKER_ID]);
+		});
+
+		it('resolves with the rows the user row service returns', async () => {
+			const rows = [{ _id: SECOND_LIKER_ID, username: 'second' }];
+
+			givenPostWithLikes([SECOND_LIKER_ID]);
+			getUserRowsInOrder.mockResolvedValue(rows);
+
+			await expect(getUserPostLikes({ userPostId: POST_ID })).resolves.toBe(rows);
+		});
+
+		it('resolves with an empty list for a post nobody liked', async () => {
+			givenPostWithLikes([]);
+			getUserRowsInOrder.mockResolvedValue([]);
+
+			await expect(getUserPostLikes({ userPostId: POST_ID })).resolves.toEqual([]);
+		});
+
+		it('rejects a malformed post id with a 404 POST_NOT_FOUND, without querying the database', async () => {
+			UserPostModel.findById = jest.fn();
+
+			await expect(getUserPostLikes({ userPostId: 'not-an-object-id' })).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.POST_NOT_FOUND,
+			});
+
+			expect(UserPostModel.findById).not.toHaveBeenCalled();
+			expect(getUserRowsInOrder).not.toHaveBeenCalled();
+		});
+
+		it('rejects an unknown post with a 404 POST_NOT_FOUND, not a 500', async () => {
+			UserPostModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+
+			await expect(getUserPostLikes({ userPostId: POST_ID })).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.POST_NOT_FOUND,
+			});
+
+			expect(getUserRowsInOrder).not.toHaveBeenCalled();
+		});
+
+		it('wraps a failing post lookup in a 500 AppError that keeps the cause', async () => {
+			const dbError = new Error('connection lost');
+
+			UserPostModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockRejectedValue(dbError) });
+
+			await expect(getUserPostLikes({ userPostId: POST_ID })).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not load the likes',
+				cause: dbError,
+			});
+		});
+
+		it('wraps a failing user rows query in a 500 AppError that keeps the cause', async () => {
+			const dbError = new Error('connection lost');
+
+			givenPostWithLikes([FIRST_LIKER_ID]);
+			getUserRowsInOrder.mockRejectedValue(dbError);
+
+			await expect(getUserPostLikes({ userPostId: POST_ID })).rejects.toMatchObject({ statusCode: 500, cause: dbError });
 		});
 	});
 

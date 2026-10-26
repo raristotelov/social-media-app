@@ -74,6 +74,6 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Profile (full page) | Couldn't load this profile / Check your connection and try again. / Retry |
 | Feed (full page) (#11) | Couldn't load your feed / Check your connection and try again. / Retry |
 | Comments (inline) | Couldn't load comments · Try again |
-| Followers / following / story viewers popup (inline) (#13) | Couldn't load this list · Try again |
+| Followers / following / story viewers / likes popup (inline) (#13, #5) | Couldn't load this list · Try again |
 | Popular (full page) (#3) | Couldn't load popular posts / Check your connection and try again. / Retry |
 | Popular, next batch (inline) (#3) | Couldn't load more posts · Try again |

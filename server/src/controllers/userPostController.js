@@ -44,6 +44,12 @@ router.post('/popular', readOptionalJwtToken, async (req, res) => {
 	return res.json(popularPostsData);
 });
 
+router.get('/:userPostId/likes', async (req, res) => {
+	const likes = await userPostService.getUserPostLikes({ userPostId: req.params.userPostId });
+
+	return res.json(likes);
+});
+
 router.post('/like/:userPostId', verifyJwtToken, async (req, res) => {
 	const currentlyLoggedInUserId = res.userId;
 	const userPostId = req.params.userPostId;

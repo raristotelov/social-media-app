@@ -7,7 +7,7 @@ import useLoginRedirect from '../../hooks/useLoginRedirect';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { updateUserProfileData, followUser, unfollowUser } from '../../services/userService';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
-import { FOLLOW_LIST_TYPES } from '../../constants/followLists';
+import { USER_LIST_TYPES } from '../../constants/userLists';
 import { CREATE_MODES } from '../../constants/stories';
 import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
 import { resizeImage } from '../../utils/images';
@@ -17,7 +17,7 @@ import UserProfilePost from '../UserProfilePost/UserProfilePost';
 import Popup from '../Popup/Popup';
 import CreatePopup from '../CreatePopup/CreatePopup';
 import EditProfileForm from '../EditProfileForm/EditProfileForm';
-import FollowListPopup from '../FollowListPopup/FollowListPopup';
+import UserListPopup from '../UserListPopup/UserListPopup';
 import PlusIcon from '../icons/Plus';
 
 import './ProfileView.css';
@@ -31,7 +31,7 @@ const withId = (ids = [], id, shouldInclude) => {
 const ProfileView = () => {
 	const [isCreatePopupOpen, setIsCreatePopupOpen] = useState(false);
 	const [isEditProfileFormOpen, setIsEditProfileFormOpen] = useState(false);
-	const [openFollowList, setOpenFollowList] = useState(null);
+	const [openUserList, setOpenUserList] = useState(null);
 	const [optimisticIsFollowed, setOptimisticIsFollowed] = useState(null);
 	const latestFollowRequestId = useRef(0);
 
@@ -157,8 +157,8 @@ const ProfileView = () => {
 		);
 	};
 
-	const closeFollowList = () => {
-		setOpenFollowList(null);
+	const closeUserList = () => {
+		setOpenUserList(null);
 	};
 
 	const headerLoggedInUser =
@@ -173,8 +173,8 @@ const ProfileView = () => {
 				onEditProfileClick={openEditProfileForm}
 				onFollowUserClick={followUserHandler}
 				onUnfollowUserClick={onUnfollowUserHandler}
-				onFollowersClick={() => setOpenFollowList(FOLLOW_LIST_TYPES.FOLLOWERS)}
-				onFollowingClick={() => setOpenFollowList(FOLLOW_LIST_TYPES.FOLLOWING)}
+				onFollowersClick={() => setOpenUserList(USER_LIST_TYPES.FOLLOWERS)}
+				onFollowingClick={() => setOpenUserList(USER_LIST_TYPES.FOLLOWING)}
 			/>
 
 			<section className='profile-posts-wrapper'>
@@ -198,7 +198,7 @@ const ProfileView = () => {
 				))}
 			</section>
 
-			{openFollowList ? <FollowListPopup userId={userId} listType={openFollowList} onClose={closeFollowList} /> : null}
+			{openUserList ? <UserListPopup userId={userId} listType={openUserList} onClose={closeUserList} /> : null}
 
 			{isCreatePopupOpen ? <CreatePopup initialMode={CREATE_MODES.POST} onClose={closeCreatePopup} onPostAdded={addPostToProfile} /> : null}
 

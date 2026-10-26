@@ -6,6 +6,7 @@ jest.mock('../services', () => ({
 		getCommentsForPost: jest.fn(),
 		likeComment: jest.fn(),
 		unlikeComment: jest.fn(),
+		getCommentLikes: jest.fn(),
 	},
 }));
 
@@ -67,6 +68,7 @@ describe('comment routes', () => {
 		commentService.getCommentsForPost.mockResolvedValue([{ _id: COMMENT_ID, replies: [] }]);
 		commentService.likeComment.mockResolvedValue({ _id: COMMENT_ID, likes: [USER_ID] });
 		commentService.unlikeComment.mockResolvedValue({ _id: COMMENT_ID, likes: [] });
+		commentService.getCommentLikes.mockResolvedValue([{ _id: USER_ID, username: 'realuser' }]);
 	});
 
 	afterEach(() => {
@@ -112,6 +114,53 @@ describe('comment routes', () => {
 			commentService.getCommentsForPost.mockRejectedValue(new AppError('Could not load comments', 500));
 
 			const response = await fetch(`${baseUrl}/comments/post/${POST_ID}`);
+
+			expect(response.status).toBe(500);
+			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.INTERNAL_ERROR });
+		});
+	});
+
+	describe('GET /comments/:commentId/likes', () => {
+		it('is public: answers 200 with the accounts when there is no token', async () => {
+			const response = await fetch(`${baseUrl}/comments/${COMMENT_ID}/likes`);
+
+			expect(response.status).toBe(200);
+			await expect(response.json()).resolves.toEqual([{ _id: USER_ID, username: 'realuser' }]);
+		});
+
+		it('loads the likes of the comment named in the path', async () => {
+			await fetch(`${baseUrl}/comments/${COMMENT_ID}/likes`);
+
+			expect(commentService.getCommentLikes).toHaveBeenCalledWith({ commentId: COMMENT_ID });
+		});
+
+		it('answers 200 for a guest who sends an expired or invalid token', async () => {
+			const response = await fetch(`${baseUrl}/comments/${COMMENT_ID}/likes`, { headers: { 'X-Authorization': 'not-a-token' } });
+
+			expect(response.status).toBe(200);
+		});
+
+		it('answers 200 with an empty list for a comment nobody liked', async () => {
+			commentService.getCommentLikes.mockResolvedValue([]);
+
+			const response = await fetch(`${baseUrl}/comments/${COMMENT_ID}/likes`);
+
+			await expect(response.json()).resolves.toEqual([]);
+		});
+
+		it('answers 404 COMMENT_NOT_FOUND when the comment is missing or malformed', async () => {
+			commentService.getCommentLikes.mockRejectedValue(new AppError('Comment not found', 404, { code: ERROR_CODES.COMMENT_NOT_FOUND }));
+
+			const response = await fetch(`${baseUrl}/comments/${COMMENT_ID}/likes`);
+
+			expect(response.status).toBe(404);
+			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.COMMENT_NOT_FOUND });
+		});
+
+		it('answers 500 with the generic code for an unexpected failure', async () => {
+			commentService.getCommentLikes.mockRejectedValue(new AppError('Could not load the likes', 500));
+
+			const response = await fetch(`${baseUrl}/comments/${COMMENT_ID}/likes`);
 
 			expect(response.status).toBe(500);
 			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.INTERNAL_ERROR });

@@ -25,6 +25,12 @@ router.get('/post/:userPostId', async (req, res) => {
 	return res.json(comments);
 });
 
+router.get('/:commentId/likes', async (req, res) => {
+	const likes = await commentService.getCommentLikes({ commentId: req.params.commentId });
+
+	return res.json(likes);
+});
+
 router.post('/:commentId/like', verifyJwtToken, async (req, res) => {
 	const comment = await commentService.likeComment({ commentId: req.params.commentId, userId: res.userId });
 

@@ -98,8 +98,8 @@ describe('LOAD_ERROR_MESSAGES', () => {
 		});
 	});
 
-	it('has the documented followers / following list load error copy', () => {
-		expect(LOAD_ERROR_MESSAGES.FOLLOW_LIST).toEqual({
+	it('has the documented user list load error copy', () => {
+		expect(LOAD_ERROR_MESSAGES.USER_LIST).toEqual({
 			MESSAGE: "Couldn't load this list",
 			RETRY_LABEL: 'Try again',
 		});

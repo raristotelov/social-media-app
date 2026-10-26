@@ -41,7 +41,7 @@
 		box-shadow: none;
 	}
 
-	.post-actions-menu::before {
+	.post-actions-menu .bottom-sheet-handle {
 		margin-bottom: 14px;
 	}
 

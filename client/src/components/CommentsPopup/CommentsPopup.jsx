@@ -132,14 +132,14 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 		return (
 			<div className='comments-popup-list'>
 				{comments.map((comment) => (
-					<Comment key={comment._id} comment={comment} userPostId={userPostId} onReload={reloadComments} />
+					<Comment key={comment._id} comment={comment} userPostId={userPostId} onReload={reloadComments} onCloseComments={onClose} />
 				))}
 			</div>
 		);
 	};
 
 	return (
-		<Popup title='Comments' className='comments-popup' bodyClassName='bottom-sheet' onClosePopupClick={onClose}>
+		<Popup title='Comments' className='comments-popup' isBottomSheet onClosePopupClick={onClose}>
 			<div className='comments-popup-content'>{renderComments()}</div>
 
 			<AddCommentForm onSubmit={submitComment} isDisabled={hasLoadFailed && !isLoading} className='comments-popup-form' />

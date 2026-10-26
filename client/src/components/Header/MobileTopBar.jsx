@@ -104,7 +104,13 @@ const MobileTopBar = ({ logoutHandler }) => {
 				) : null}
 			</div>
 
-			<AccountMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} logoutHandler={logoutHandler} className='account-menu-sheet' />
+			<AccountMenu
+				isOpen={isMenuOpen}
+				onClose={() => setIsMenuOpen(false)}
+				logoutHandler={logoutHandler}
+				className='account-menu-sheet'
+				isBottomSheet
+			/>
 		</div>
 	);
 };
