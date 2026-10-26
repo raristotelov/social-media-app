@@ -39,6 +39,10 @@
 	color: var(--feedback-error-inverse);
 }
 
+.toast-icon-success {
+	color: var(--feedback-success-inverse);
+}
+
 .toast-message {
 	min-width: 0;
 	margin: 0;

@@ -9,7 +9,7 @@ import BottomSheetHandle from '../BottomSheetHandle/BottomSheetHandle';
 
 import './AccountMenu.css';
 
-const AccountMenu = ({ isOpen, onClose, logoutHandler, className = '', isBottomSheet = false }) => {
+const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, className = '', isBottomSheet = false }) => {
 	const { loggedInUser, jwtToken, updateLoggedInUser } = useContext(LoggedInUserContext);
 	const menuRef = useRef(null);
 	const bottomSheetDragProps = useBottomSheetDrag(onClose);
@@ -56,6 +56,11 @@ const AccountMenu = ({ isOpen, onClose, logoutHandler, className = '', isBottomS
 		updateLoggedInUser(updatedUser);
 	};
 
+	const changePasswordClickHandler = () => {
+		onClose();
+		onChangePasswordClick();
+	};
+
 	return (
 		<div className={`account-menu ${className}`.trim()} ref={menuRef} {...(isBottomSheet ? bottomSheetDragProps : {})}>
 			{isBottomSheet ? <BottomSheetHandle /> : null}
@@ -68,6 +73,10 @@ const AccountMenu = ({ isOpen, onClose, logoutHandler, className = '', isBottomS
 				<span>Dark mode</span>
 
 				<span className={`account-menu-switch ${isDark ? 'account-menu-switch-on' : ''}`} />
+			</button>
+
+			<button type='button' className='account-menu-row' onClick={changePasswordClickHandler}>
+				<span>Change password</span>
 			</button>
 
 			<button type='button' className='account-menu-row' onClick={logoutHandler}>

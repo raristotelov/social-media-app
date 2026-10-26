@@ -8,6 +8,7 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { asFieldError } = require('../utils/fieldErrors');
 const { createUserNotFoundError } = require('../utils/notFoundErrors');
+const { getPasswordRuleErrorCode } = require('../utils/passwordRules');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const { USER_ROW_PROJECTION, getUserRowsInOrder } = require('./userRowService');
@@ -60,16 +61,10 @@ const assertUsersExist = async (userIds) => {
 
 const signUp = async ({ email, username, password }) => {
 	try {
-		if (typeof password !== 'string' || !password) {
-			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_REQUIRED }, 400);
-		}
+		const passwordErrorCode = getPasswordRuleErrorCode(password);
 
-		if (password.length < constants.MIN_PASSWORD_LENGTH) {
-			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_TOO_SHORT }, 400);
-		}
-
-		if (Buffer.byteLength(password, 'utf8') > constants.MAX_PASSWORD_BYTES) {
-			throw AppError.fromFields({ password: ERROR_CODES.PASSWORD_TOO_LONG }, 400);
+		if (passwordErrorCode) {
+			throw AppError.fromFields({ password: passwordErrorCode }, 400);
 		}
 
 		const hashedPassword = await bcrypt.hash(password, constants.SALT_ROUNDS);
@@ -119,6 +114,54 @@ const login = async ({ email, password }) => {
 		}
 
 		throw new AppError('Could not log in', 500, { cause: error });
+	}
+};
+
+const changePassword = async (userId, { currentPassword, newPassword } = {}) => {
+	try {
+		const fields = {};
+
+		if (typeof currentPassword !== 'string' || !currentPassword) {
+			fields.currentPassword = ERROR_CODES.PASSWORD_REQUIRED;
+		}
+
+		const newPasswordErrorCode = getPasswordRuleErrorCode(newPassword);
+
+		if (newPasswordErrorCode) {
+			fields.newPassword = newPasswordErrorCode;
+		}
+
+		if (Object.keys(fields).length) {
+			throw AppError.fromFields(fields, 400);
+		}
+
+		assertValidUserIds([userId]);
+
+		const user = await UserModel.findById(userId).select({ password: 1 });
+
+		if (!user) {
+			throw createUserNotFoundError();
+		}
+
+		const currentPasswordIsCorrect = await bcrypt.compare(currentPassword, user.password);
+
+		if (!currentPasswordIsCorrect) {
+			throw AppError.fromFields({ currentPassword: ERROR_CODES.CURRENT_PASSWORD_WRONG }, 400);
+		}
+
+		if (newPassword === currentPassword) {
+			throw AppError.fromFields({ newPassword: ERROR_CODES.PASSWORD_UNCHANGED }, 400);
+		}
+
+		const hashedPassword = await bcrypt.hash(newPassword, constants.SALT_ROUNDS);
+
+		await UserModel.updateOne({ _id: userId }, { password: hashedPassword });
+	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
+		throw new AppError('Could not change password', 500, { cause: error });
 	}
 };
 
@@ -359,6 +402,7 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 module.exports = {
 	signUp,
 	login,
+	changePassword,
 	getUsersProfileDataByUserIds,
 	getUsersProfileDataBySearchWord,
 	getFollowers,

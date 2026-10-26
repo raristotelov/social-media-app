@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import ToastContext from '../../contexts/ToastContext';
 import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBottomSheetEnvironment } from '../../testUtils/bottomSheet';
 
 import MobileTopBar from './MobileTopBar';
@@ -88,6 +89,39 @@ describe('MobileTopBar', () => {
 			renderTopBarAt('/user/user1');
 
 			expect(screen.getByRole('button', { name: 'Account menu' })).toBeInTheDocument();
+		});
+	});
+
+	describe('Change password', () => {
+		const renderOwnProfileTopBar = () =>
+			render(
+				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser }}>
+					<ToastContext.Provider value={{ showToast: jest.fn(), dismissToast: jest.fn() }}>
+						<MemoryRouter initialEntries={['/user/user1']}>
+							<MobileTopBar logoutHandler={jest.fn()} />
+						</MemoryRouter>
+					</ToastContext.Provider>
+				</LoggedInUserContext.Provider>,
+			);
+
+		it('opens the Change Password popup from the account menu sheet and closes the sheet', () => {
+			renderOwnProfileTopBar();
+
+			userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+			userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+
+			expect(screen.getByRole('heading', { name: 'Change Password' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
+		});
+
+		it('closes the popup again with Cancel', () => {
+			renderOwnProfileTopBar();
+
+			userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+			userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+			expect(screen.queryByRole('heading', { name: 'Change Password' })).not.toBeInTheDocument();
 		});
 	});
 

@@ -20,6 +20,12 @@ router.post('/login', async (req, res) => {
 	return res.json(userData);
 });
 
+router.patch('/password', verifyJwtToken, async (req, res) => {
+	await userService.changePassword(res.userId, req.body);
+
+	return res.sendStatus(204);
+});
+
 router.get('/', readOptionalJwtToken, async (req, res) => {
 	const userIdsString = req.query.userIds;
 	const searchWord = req.query.searchWord;

@@ -18,6 +18,7 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const {
 	login,
 	signUp,
+	changePassword,
 	updateUserProfileData,
 	followUser,
 	unfollowUser,
@@ -126,6 +127,151 @@ describe('userService', () => {
 			await expect(login({ email: 'realuser@example.com', password: 'irrelevant' })).rejects.toMatchObject({
 				statusCode: 500,
 				message: 'Could not log in',
+				cause: dbError,
+			});
+		});
+	});
+
+	describe('changePassword', () => {
+		const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
+		const validInput = { currentPassword: 'oldPassword1', newPassword: 'newPassword1' };
+
+		beforeEach(() => {
+			UserModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: USER_ID, password: 'storedHash' }) });
+			UserModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+			bcrypt.compare.mockResolvedValue(true);
+			bcrypt.hash.mockResolvedValue('newHash');
+		});
+
+		it.each([[undefined], [null], [''], [12345678], [{ $ne: null }]])(
+			'rejects a missing or non-string current password (%p) with PASSWORD_REQUIRED on currentPassword',
+			async (currentPassword) => {
+				await expect(changePassword(USER_ID, { currentPassword, newPassword: 'newPassword1' })).rejects.toMatchObject({
+					statusCode: 400,
+					fields: { currentPassword: ERROR_CODES.PASSWORD_REQUIRED },
+				});
+
+				expect(UserModel.findById).not.toHaveBeenCalled();
+				expect(UserModel.updateOne).not.toHaveBeenCalled();
+			},
+		);
+
+		it('rejects a missing new password with PASSWORD_REQUIRED on newPassword', async () => {
+			await expect(changePassword(USER_ID, { currentPassword: 'oldPassword1' })).rejects.toMatchObject({
+				statusCode: 400,
+				fields: { newPassword: ERROR_CODES.PASSWORD_REQUIRED },
+			});
+
+			expect(UserModel.updateOne).not.toHaveBeenCalled();
+		});
+
+		it('rejects a missing body with both fields required', async () => {
+			await expect(changePassword(USER_ID, undefined)).rejects.toMatchObject({
+				statusCode: 400,
+				fields: { currentPassword: ERROR_CODES.PASSWORD_REQUIRED, newPassword: ERROR_CODES.PASSWORD_REQUIRED },
+			});
+		});
+
+		it('rejects a new password shorter than MIN_PASSWORD_LENGTH with PASSWORD_TOO_SHORT', async () => {
+			await expect(changePassword(USER_ID, { currentPassword: 'oldPassword1', newPassword: 'short' })).rejects.toMatchObject({
+				statusCode: 400,
+				fields: { newPassword: ERROR_CODES.PASSWORD_TOO_SHORT },
+			});
+
+			expect(UserModel.updateOne).not.toHaveBeenCalled();
+		});
+
+		it('rejects a new password over MAX_PASSWORD_BYTES, measured in bytes, with PASSWORD_TOO_LONG', async () => {
+			const multiByteOverLimitPassword = 'é'.repeat(40);
+
+			await expect(changePassword(USER_ID, { currentPassword: 'oldPassword1', newPassword: multiByteOverLimitPassword })).rejects.toMatchObject(
+				{
+					statusCode: 400,
+					fields: { newPassword: ERROR_CODES.PASSWORD_TOO_LONG },
+				},
+			);
+
+			expect(UserModel.updateOne).not.toHaveBeenCalled();
+		});
+
+		it('reports the current and the new password errors together', async () => {
+			await expect(changePassword(USER_ID, { currentPassword: '', newPassword: 'short' })).rejects.toMatchObject({
+				fields: { currentPassword: ERROR_CODES.PASSWORD_REQUIRED, newPassword: ERROR_CODES.PASSWORD_TOO_SHORT },
+			});
+		});
+
+		it('rejects a wrong current password with CURRENT_PASSWORD_WRONG on currentPassword and changes nothing', async () => {
+			bcrypt.compare.mockResolvedValue(false);
+
+			await expect(changePassword(USER_ID, validInput)).rejects.toMatchObject({
+				statusCode: 400,
+				code: ERROR_CODES.CURRENT_PASSWORD_WRONG,
+				fields: { currentPassword: ERROR_CODES.CURRENT_PASSWORD_WRONG },
+			});
+
+			expect(bcrypt.compare).toHaveBeenCalledWith('oldPassword1', 'storedHash');
+			expect(bcrypt.hash).not.toHaveBeenCalled();
+			expect(UserModel.updateOne).not.toHaveBeenCalled();
+		});
+
+		it('rejects a new password equal to the current one with PASSWORD_UNCHANGED on newPassword and changes nothing', async () => {
+			await expect(changePassword(USER_ID, { currentPassword: 'samePassword1', newPassword: 'samePassword1' })).rejects.toMatchObject({
+				statusCode: 400,
+				code: ERROR_CODES.PASSWORD_UNCHANGED,
+				fields: { newPassword: ERROR_CODES.PASSWORD_UNCHANGED },
+			});
+
+			expect(UserModel.updateOne).not.toHaveBeenCalled();
+		});
+
+		it('reports a wrong current password before the unchanged check, so a wrong guess does not reveal the real password', async () => {
+			bcrypt.compare.mockResolvedValue(false);
+
+			await expect(changePassword(USER_ID, { currentPassword: 'samePassword1', newPassword: 'samePassword1' })).rejects.toMatchObject({
+				fields: { currentPassword: ERROR_CODES.CURRENT_PASSWORD_WRONG },
+			});
+		});
+
+		it('hashes the new password with SALT_ROUNDS and stores only the hash for the given user', async () => {
+			await changePassword(USER_ID, validInput);
+
+			expect(bcrypt.hash).toHaveBeenCalledWith('newPassword1', constants.SALT_ROUNDS);
+			expect(UserModel.updateOne).toHaveBeenCalledWith({ _id: USER_ID }, { password: 'newHash' });
+			expect(UserModel.updateOne).not.toHaveBeenCalledWith(expect.anything(), { password: 'newPassword1' });
+		});
+
+		it('resolves with nothing, so no password or hash can leak into the response', async () => {
+			await expect(changePassword(USER_ID, validInput)).resolves.toBeUndefined();
+		});
+
+		it('rejects an invalid user id with a 404 USER_NOT_FOUND without querying', async () => {
+			await expect(changePassword('not-an-object-id', validInput)).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.USER_NOT_FOUND,
+			});
+
+			expect(UserModel.findById).not.toHaveBeenCalled();
+		});
+
+		it('rejects with a 404 USER_NOT_FOUND when the user no longer exists', async () => {
+			UserModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+
+			await expect(changePassword(USER_ID, validInput)).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.USER_NOT_FOUND,
+			});
+
+			expect(UserModel.updateOne).not.toHaveBeenCalled();
+		});
+
+		it('wraps an unexpected error in a 500 AppError', async () => {
+			const dbError = new Error('connection lost');
+
+			UserModel.updateOne = jest.fn().mockRejectedValue(dbError);
+
+			await expect(changePassword(USER_ID, validInput)).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not change password',
 				cause: dbError,
 			});
 		});

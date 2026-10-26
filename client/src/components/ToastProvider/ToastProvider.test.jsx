@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useContext } from 'react';
 
 import ToastContext from '../../contexts/ToastContext';
+import { TOAST_TYPES } from '../../constants/toast';
 
 import ToastProvider from './ToastProvider';
 
@@ -20,6 +21,16 @@ const ToastTrigger = ({ message }) => {
 				Dismiss from context
 			</button>
 		</>
+	);
+};
+
+const SuccessToastTrigger = () => {
+	const { showToast } = useContext(ToastContext);
+
+	return (
+		<button type='button' onClick={() => showToast('Password changed', TOAST_TYPES.SUCCESS)}>
+			Show success
+		</button>
 	);
 };
 
@@ -68,6 +79,27 @@ describe('ToastProvider', () => {
 		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
 
 		expect(within(screen.getByRole('alert')).getByText('First failure')).toBeInTheDocument();
+	});
+
+	it('shows the error look by default, when showToast is called without a type', () => {
+		renderProvider();
+
+		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
+
+		expect(screen.getByRole('alert').querySelector('.toast-icon')).not.toHaveClass('toast-icon-success');
+	});
+
+	it('passes the type through, so a success toast gets the success look', () => {
+		render(
+			<ToastProvider>
+				<SuccessToastTrigger />
+			</ToastProvider>,
+		);
+
+		userEvent.click(screen.getByRole('button', { name: 'Show success' }));
+
+		expect(within(screen.getByRole('alert')).getByText('Password changed')).toBeInTheDocument();
+		expect(screen.getByRole('alert').querySelector('.toast-icon')).toHaveClass('toast-icon-success');
 	});
 
 	it('replaces the showing toast with a new one instead of stacking them', () => {

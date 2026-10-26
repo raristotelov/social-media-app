@@ -6,6 +6,9 @@ import { TOAST_DURATION_MS } from '../../constants/toast';
 
 import Toast from './Toast';
 
+jest.mock('../icons/Alert', () => ({ __esModule: true, default: () => <svg data-testid='alert-icon' /> }));
+jest.mock('../icons/Check', () => ({ __esModule: true, default: () => <svg data-testid='check-icon' /> }));
+
 const MESSAGE = "Couldn't delete the post. Try again.";
 
 const advance = (ms) => {
@@ -31,6 +34,42 @@ describe('Toast', () => {
 		render(<Toast message={MESSAGE} onDismiss={jest.fn()} />);
 
 		expect(screen.getByText(MESSAGE)).toBeInTheDocument();
+	});
+
+	describe('type', () => {
+		it('defaults to the error look: alert icon, no success class', () => {
+			const { container } = render(<Toast message={MESSAGE} onDismiss={jest.fn()} />);
+
+			expect(screen.getByTestId('alert-icon')).toBeInTheDocument();
+			expect(screen.queryByTestId('check-icon')).not.toBeInTheDocument();
+			expect(container.querySelector('.toast-icon')).not.toHaveClass('toast-icon-success');
+		});
+
+		it('keeps the error look for the error type', () => {
+			render(<Toast message={MESSAGE} type='error' onDismiss={jest.fn()} />);
+
+			expect(screen.getByTestId('alert-icon')).toBeInTheDocument();
+		});
+
+		it('renders the check icon with the success class for the success type', () => {
+			const { container } = render(<Toast message='Password changed' type='success' onDismiss={jest.fn()} />);
+
+			expect(screen.getByTestId('check-icon')).toBeInTheDocument();
+			expect(screen.queryByTestId('alert-icon')).not.toBeInTheDocument();
+			expect(container.querySelector('.toast-icon')).toHaveClass('toast-icon-success');
+		});
+
+		it('still shows the message and auto-dismisses after 5 seconds for the success type', () => {
+			const onDismiss = jest.fn();
+
+			render(<Toast message='Password changed' type='success' onDismiss={onDismiss} />);
+
+			expect(screen.getByText('Password changed')).toBeInTheDocument();
+
+			advance(5000);
+
+			expect(onDismiss).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	it('renders a close button', () => {

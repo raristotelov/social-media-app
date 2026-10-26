@@ -15,6 +15,12 @@ export const login = (data) => {
 	return request.post(`${serverUrl}/users/login`, data);
 };
 
+export const changePassword = ({ jwtToken, currentPassword, newPassword }) => {
+	const request = requestFactory(jwtToken);
+
+	return request.patch(`${serverUrl}/users/password`, { currentPassword, newPassword });
+};
+
 export const getUsersProfileData = ({ userIds, searchWord, jwtToken }) => {
 	const request = requestFactory(jwtToken);
 
