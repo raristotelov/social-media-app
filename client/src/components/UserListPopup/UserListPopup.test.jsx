@@ -6,11 +6,15 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowers, getFollowing } from '../../services/userService';
 import { getStoryViewers } from '../../services/storyService';
+import { getUserPostLikes } from '../../services/userPostService';
+import { getCommentLikes } from '../../services/commentService';
 
 import UserListPopup from './UserListPopup';
 
 jest.mock('../../services/userService');
 jest.mock('../../services/storyService');
+jest.mock('../../services/userPostService');
+jest.mock('../../services/commentService');
 
 const buildRow = (overrides = {}) => ({
 	_id: 'user1',
@@ -25,14 +29,26 @@ const renderPopup = ({
 	loggedInUser = null,
 	userId = 'owner',
 	storyId,
+	userPostId,
+	commentId,
 	listType = 'followers',
+	jwtToken = 'token123',
 	onClose = jest.fn(),
+	onAccountClick,
 	endSession = jest.fn(),
 } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, endSession }}>
+		<LoggedInUserContext.Provider value={{ jwtToken, loggedInUser, endSession }}>
 			<MemoryRouter initialEntries={['/user/owner']}>
-				<UserListPopup userId={userId} storyId={storyId} listType={listType} onClose={onClose} />
+				<UserListPopup
+					userId={userId}
+					storyId={storyId}
+					userPostId={userPostId}
+					commentId={commentId}
+					listType={listType}
+					onClose={onClose}
+					onAccountClick={onAccountClick}
+				/>
 
 				<CurrentPath />
 			</MemoryRouter>
@@ -172,6 +188,160 @@ describe('UserListPopup', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe.each([
+		['post-likes', 'userPostId', 'post1', getUserPostLikes, getCommentLikes],
+		['comment-likes', 'commentId', 'comment1', getCommentLikes, getUserPostLikes],
+	])('the %s list', (listType, idKey, idValue, loadLikes, otherLoadLikes) => {
+		beforeEach(() => {
+			loadLikes.mockResolvedValue([
+				buildRow({ _id: 'liker1', username: 'newestliker', profilePicture: { imageUrl: 'https://example.com/newest.jpg' } }),
+				buildRow({ _id: 'liker2', username: 'olderliker' }),
+			]);
+		});
+
+		const renderLikes = (options = {}) => renderPopup({ listType, [idKey]: idValue, ...options });
+
+		it('is titled "Likes"', async () => {
+			renderLikes();
+
+			expect(await screen.findByRole('heading', { name: 'Likes' })).toBeInTheDocument();
+			await screen.findByText('newestliker');
+		});
+
+		it('loads the likes of the given id with the token, and nothing else', async () => {
+			renderLikes();
+
+			await screen.findByText('newestliker');
+
+			expect(loadLikes).toHaveBeenCalledTimes(1);
+			expect(loadLikes).toHaveBeenCalledWith(expect.objectContaining({ [idKey]: idValue, jwtToken: 'token123' }));
+			expect(otherLoadLikes).not.toHaveBeenCalled();
+			expect(getFollowers).not.toHaveBeenCalled();
+			expect(getFollowing).not.toHaveBeenCalled();
+			expect(getStoryViewers).not.toHaveBeenCalled();
+		});
+
+		it('lists the accounts in the order the server returned them, by photo and username only', async () => {
+			const { container } = renderLikes();
+
+			await screen.findByText('newestliker');
+
+			expect(getRowUsernames(container)).toEqual(['newestliker', 'olderliker']);
+			expect(container.querySelector('img.search-result-avatar')).toHaveAttribute('src', 'https://example.com/newest.jpg');
+			expect(container.querySelector('.search-result-followers')).not.toBeInTheDocument();
+		});
+
+		it('links each account to its profile', async () => {
+			renderLikes();
+
+			await screen.findByText('newestliker');
+
+			expect(screen.getByRole('link', { name: /newestliker/ })).toHaveAttribute('href', '/user/liker1');
+			expect(screen.getByRole('link', { name: /olderliker/ })).toHaveAttribute('href', '/user/liker2');
+		});
+
+		it('shows "No likes yet", not "No users found", when the list is empty', async () => {
+			loadLikes.mockResolvedValue([]);
+
+			renderLikes();
+
+			expect(await screen.findByText('No likes yet')).toBeInTheDocument();
+			expect(screen.queryByText('No users found')).not.toBeInTheDocument();
+		});
+
+		it('loads once on open and does not request the list again', async () => {
+			renderLikes();
+
+			await screen.findByText('newestliker');
+
+			expect(loadLikes).toHaveBeenCalledTimes(1);
+		});
+
+		it('is open to guests', async () => {
+			renderLikes({ loggedInUser: null, jwtToken: null });
+
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(loadLikes).toHaveBeenCalledWith(expect.objectContaining({ [idKey]: idValue, jwtToken: null }));
+		});
+
+		it('shows the inline error with a Try again button when the likes fail to load', async () => {
+			loadLikes.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+
+			renderLikes();
+
+			const alert = await screen.findByRole('alert');
+
+			expect(within(alert).getByText("Couldn't load this list")).toBeInTheDocument();
+			expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+			expect(screen.queryByRole('link')).not.toBeInTheDocument();
+		});
+
+		it('keeps the title and close button while the error shows', async () => {
+			loadLikes.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+
+			renderLikes();
+
+			await screen.findByRole('alert');
+
+			expect(screen.getByRole('heading', { name: 'Likes' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+		});
+
+		it('requests the likes again on Try again and lists them once it succeeds', async () => {
+			loadLikes.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
+
+			renderLikes();
+
+			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(loadLikes).toHaveBeenCalledTimes(2);
+			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+		});
+
+		it('leaves the session alone when the likes fail with 401, as the list is public', async () => {
+			loadLikes.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+
+			const { endSession } = renderLikes();
+
+			await screen.findByRole('button', { name: 'Try again' });
+			expect(endSession).not.toHaveBeenCalled();
+		});
+
+		it('navigates to the profile and closes the popup when an account is clicked and there is no onAccountClick', async () => {
+			const { onClose } = renderLikes();
+
+			await screen.findByText('newestliker');
+			userEvent.click(screen.getByRole('link', { name: /olderliker/ }));
+
+			expect(screen.getByTestId('current-path')).toHaveTextContent('/user/liker2');
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('calls onAccountClick instead of onClose when an account is clicked and onAccountClick is given', async () => {
+			const onAccountClick = jest.fn();
+			const { onClose } = renderLikes({ onAccountClick });
+
+			await screen.findByText('newestliker');
+			userEvent.click(screen.getByRole('link', { name: /newestliker/ }));
+
+			expect(onAccountClick).toHaveBeenCalledTimes(1);
+			expect(onClose).not.toHaveBeenCalled();
+			expect(screen.getByTestId('current-path')).toHaveTextContent('/user/liker1');
+		});
+
+		it('calls onClose from the close button, not onAccountClick', async () => {
+			const onAccountClick = jest.fn();
+			const { onClose } = renderLikes({ onAccountClick });
+
+			await screen.findByText('newestliker');
+			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+			expect(onAccountClick).not.toHaveBeenCalled();
 		});
 	});
 

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { likeUserPost, unlikeUserPost } from '../../services/userPostService';
+import { likeUserPost, unlikeUserPost, getUserPostLikes } from '../../services/userPostService';
 import { getComments, addComment } from '../../services/commentService';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
@@ -526,6 +526,145 @@ describe('UserPost', () => {
 			userEvent.click(screen.getByRole('button', { name: '1 comment' }));
 
 			await waitFor(() => expect(onPostChange).toHaveBeenCalledWith('post1', { commentsCount: 5, previewComments: [first, third] }));
+		});
+	});
+
+	describe('the likes list', () => {
+		const likedPost = { ...basePost, likes: ['user8', 'user9'] };
+
+		const likers = [
+			{ _id: 'user9', username: 'newestliker' },
+			{ _id: 'user8', username: 'olderliker' },
+		];
+
+		it('shows "0 likes" as plain text, not a button', () => {
+			renderPost();
+
+			expect(screen.getByText('0 likes')).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: '0 likes' })).not.toBeInTheDocument();
+		});
+
+		it('does nothing when "0 likes" is clicked', () => {
+			renderPost();
+
+			userEvent.click(screen.getByText('0 likes'));
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(getUserPostLikes).not.toHaveBeenCalled();
+		});
+
+		it('makes "1 like" a button', () => {
+			renderPost({ post: { ...basePost, likes: ['user9'] } });
+
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+		});
+
+		it('makes "N likes" a button from two likes up', () => {
+			renderPost({ post: likedPost });
+
+			expect(screen.getByRole('button', { name: '2 likes' })).toBeInTheDocument();
+		});
+
+		it('stays closed, and loads nothing, until the label is clicked', () => {
+			renderPost({ post: likedPost });
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(getUserPostLikes).not.toHaveBeenCalled();
+		});
+
+		it('opens the popup titled "Likes" and loads the likes of this post when the label is clicked', async () => {
+			getUserPostLikes.mockResolvedValue(likers);
+			renderPost({ post: likedPost });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+
+			expect(screen.getByRole('heading', { name: 'Likes' })).toBeInTheDocument();
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(screen.getByText('olderliker')).toBeInTheDocument();
+			expect(getUserPostLikes).toHaveBeenCalledTimes(1);
+			expect(getUserPostLikes).toHaveBeenCalledWith(expect.objectContaining({ userPostId: 'post1', jwtToken: 'token123' }));
+		});
+
+		it('does not toggle the like when the label is clicked', async () => {
+			getUserPostLikes.mockResolvedValue(likers);
+			renderPost({ post: likedPost });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await screen.findByText('newestliker');
+
+			expect(likeUserPost).not.toHaveBeenCalled();
+			expect(unlikeUserPost).not.toHaveBeenCalled();
+		});
+
+		it('keeps the heart a separate control that still likes the post', async () => {
+			likeUserPost.mockResolvedValue({ _id: 'post1', likes: ['user8', 'user9', 'user1'] });
+			renderPost({ post: likedPost });
+
+			userEvent.click(screen.getByRole('button', { name: 'Like post' }));
+
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(1));
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+			expect(getUserPostLikes).not.toHaveBeenCalled();
+		});
+
+		it('closes when its Close button is clicked, and can be opened again', async () => {
+			getUserPostLikes.mockResolvedValue(likers);
+			renderPost({ post: likedPost });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await screen.findByText('newestliker');
+			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+		});
+
+		it('closes on Escape', async () => {
+			getUserPostLikes.mockResolvedValue(likers);
+			renderPost({ post: likedPost });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await screen.findByText('newestliker');
+			userEvent.keyboard('{Escape}');
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+		});
+
+		it('links each account to its profile and closes when one is clicked', async () => {
+			getUserPostLikes.mockResolvedValue(likers);
+			renderPost({ post: likedPost });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+
+			expect(await screen.findByRole('link', { name: /olderliker/ })).toHaveAttribute('href', '/user/user8');
+
+			userEvent.click(screen.getByRole('link', { name: /olderliker/ }));
+
+			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
+		});
+
+		it('shows the inline load error with a retry, not a toast', async () => {
+			getUserPostLikes.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(likers);
+			renderPost({ post: likedPost });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(getUserPostLikes).toHaveBeenCalledTimes(2);
+		});
+
+		it('is open to a guest: the label is a button and the list opens without redirecting', async () => {
+			getUserPostLikes.mockResolvedValue(likers);
+			renderPost({ user: null, post: likedPost });
+
+			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+
+			expect(await screen.findByText('newestliker')).toBeInTheDocument();
+			expect(mockNavigate).not.toHaveBeenCalled();
 		});
 	});
 

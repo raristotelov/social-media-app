@@ -35,6 +35,69 @@ describe('Popup', () => {
 		expect(onClosePopupClick).toHaveBeenCalledTimes(1);
 	});
 
+	describe('with a popup nested inside another', () => {
+		const renderNested = () => {
+			const onCloseOuter = jest.fn();
+			const onCloseInner = jest.fn();
+
+			const rendered = render(
+				<Popup title='Outer' onClosePopupClick={onCloseOuter}>
+					<Popup title='Inner' onClosePopupClick={onCloseInner} />
+				</Popup>,
+			);
+
+			return { ...rendered, onCloseOuter, onCloseInner };
+		};
+
+		it('closes only the top popup on Escape', () => {
+			const { onCloseOuter, onCloseInner } = renderNested();
+
+			userEvent.keyboard('{Escape}');
+
+			expect(onCloseInner).toHaveBeenCalledTimes(1);
+			expect(onCloseOuter).not.toHaveBeenCalled();
+		});
+
+		it('closes the outer popup on Escape once the inner one is gone', () => {
+			const onCloseOuter = jest.fn();
+			const { rerender } = render(
+				<Popup title='Outer' onClosePopupClick={onCloseOuter}>
+					<Popup title='Inner' onClosePopupClick={jest.fn()} />
+				</Popup>,
+			);
+
+			rerender(<Popup title='Outer' onClosePopupClick={onCloseOuter} />);
+			userEvent.keyboard('{Escape}');
+
+			expect(onCloseOuter).toHaveBeenCalledTimes(1);
+		});
+
+		it('closes the outer popup on Escape when its children are not popups', () => {
+			const onCloseOuter = jest.fn();
+
+			render(
+				<Popup onClosePopupClick={onCloseOuter}>
+					<p>Not a popup</p>
+				</Popup>,
+			);
+
+			userEvent.keyboard('{Escape}');
+
+			expect(onCloseOuter).toHaveBeenCalledTimes(1);
+		});
+
+		it('still closes the inner popup with its own close button', () => {
+			const { onCloseOuter, onCloseInner } = renderNested();
+
+			const innerClose = screen.getAllByRole('button', { name: 'Close' })[1];
+
+			userEvent.click(innerClose);
+
+			expect(onCloseInner).toHaveBeenCalledTimes(1);
+			expect(onCloseOuter).not.toHaveBeenCalled();
+		});
+	});
+
 	it('ignores other keys', () => {
 		const onClosePopupClick = jest.fn();
 		render(<Popup onClosePopupClick={onClosePopupClick} />);

@@ -1,12 +1,22 @@
 jest.mock('../models/commentModel');
 jest.mock('../models/userPostModel');
 jest.mock('../models/userModel');
+jest.mock('./userRowService');
 
 const CommentModel = require('../models/commentModel');
 const UserPostModel = require('../models/userPostModel');
 const UserModel = require('../models/userModel');
 const { ERROR_CODES } = require('../config/errorCodes');
-const { addComment, getCommentsForPost, likeComment, unlikeComment, getPreviewCommentsForPosts, deleteCommentsForPost } = require('./commentService');
+const { getUserRowsInOrder } = require('./userRowService');
+const {
+	addComment,
+	getCommentsForPost,
+	likeComment,
+	unlikeComment,
+	getCommentLikes,
+	getPreviewCommentsForPosts,
+	deleteCommentsForPost,
+} = require('./commentService');
 
 const POST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
 const COMMENT_ID = '64b7f0a1c2d3e4f5a6b7c8f1';
@@ -685,6 +695,111 @@ describe('commentService', () => {
 				message: failureMessage,
 				cause: dbError,
 			});
+		});
+	});
+
+	describe('getCommentLikes', () => {
+		const FIRST_LIKER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
+		const SECOND_LIKER_ID = '64b7f0a1c2d3e4f5a6b7c8d2';
+		const THIRD_LIKER_ID = '64b7f0a1c2d3e4f5a6b7c8d3';
+
+		const givenCommentWithLikes = (likes) => {
+			const select = jest.fn().mockResolvedValue({ _id: COMMENT_ID, likes });
+
+			CommentModel.findById = jest.fn().mockReturnValue({ select });
+
+			return select;
+		};
+
+		it('reads only the likes of the comment in the path', async () => {
+			const select = givenCommentWithLikes([]);
+
+			getUserRowsInOrder.mockResolvedValue([]);
+
+			await getCommentLikes({ commentId: COMMENT_ID });
+
+			expect(CommentModel.findById).toHaveBeenCalledWith(COMMENT_ID);
+			expect(select).toHaveBeenCalledWith({ likes: 1 });
+		});
+
+		it('asks for the user rows with the newest like first', async () => {
+			givenCommentWithLikes([FIRST_LIKER_ID, SECOND_LIKER_ID, THIRD_LIKER_ID]);
+			getUserRowsInOrder.mockResolvedValue([]);
+
+			await getCommentLikes({ commentId: COMMENT_ID });
+
+			expect(getUserRowsInOrder).toHaveBeenCalledWith([THIRD_LIKER_ID, SECOND_LIKER_ID, FIRST_LIKER_ID]);
+		});
+
+		it('does not reorder the stored likes of the comment', async () => {
+			const likes = [FIRST_LIKER_ID, SECOND_LIKER_ID];
+
+			givenCommentWithLikes(likes);
+			getUserRowsInOrder.mockResolvedValue([]);
+
+			await getCommentLikes({ commentId: COMMENT_ID });
+
+			expect(likes).toEqual([FIRST_LIKER_ID, SECOND_LIKER_ID]);
+		});
+
+		it('resolves with the rows the user row service returns', async () => {
+			const rows = [{ _id: SECOND_LIKER_ID, username: 'second' }];
+
+			givenCommentWithLikes([SECOND_LIKER_ID]);
+			getUserRowsInOrder.mockResolvedValue(rows);
+
+			await expect(getCommentLikes({ commentId: COMMENT_ID })).resolves.toBe(rows);
+		});
+
+		it('resolves with an empty list for a comment nobody liked', async () => {
+			givenCommentWithLikes([]);
+			getUserRowsInOrder.mockResolvedValue([]);
+
+			await expect(getCommentLikes({ commentId: COMMENT_ID })).resolves.toEqual([]);
+		});
+
+		it('rejects a malformed comment id with a 404 COMMENT_NOT_FOUND, without querying the database', async () => {
+			CommentModel.findById = jest.fn();
+
+			await expect(getCommentLikes({ commentId: 'not-an-object-id' })).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.COMMENT_NOT_FOUND,
+			});
+
+			expect(CommentModel.findById).not.toHaveBeenCalled();
+			expect(getUserRowsInOrder).not.toHaveBeenCalled();
+		});
+
+		it('rejects an unknown comment with a 404 COMMENT_NOT_FOUND, not a 500', async () => {
+			CommentModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+
+			await expect(getCommentLikes({ commentId: COMMENT_ID })).rejects.toMatchObject({
+				statusCode: 404,
+				code: ERROR_CODES.COMMENT_NOT_FOUND,
+			});
+
+			expect(getUserRowsInOrder).not.toHaveBeenCalled();
+		});
+
+		it('wraps a failing comment lookup in a 500 AppError that keeps the cause', async () => {
+			const dbError = new Error('connection lost');
+
+			CommentModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockRejectedValue(dbError) });
+
+			await expect(getCommentLikes({ commentId: COMMENT_ID })).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not load the likes',
+				cause: dbError,
+			});
+		});
+
+		it('wraps a failing user rows query in a 500 AppError that keeps the cause', async () => {
+			const dbError = new Error('connection lost');
+
+			givenCommentWithLikes([FIRST_LIKER_ID]);
+			getUserRowsInOrder.mockRejectedValue(dbError);
+
+			await expect(getCommentLikes({ commentId: COMMENT_ID })).rejects.toMatchObject({ statusCode: 500, cause: dbError });
 		});
 	});
 

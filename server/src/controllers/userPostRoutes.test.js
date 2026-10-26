@@ -6,6 +6,7 @@ jest.mock('../services', () => ({
 		getFollowedUsersPosts: jest.fn(),
 		likeUserPost: jest.fn(),
 		unlikeUserPost: jest.fn(),
+		getUserPostLikes: jest.fn(),
 		updateUserPostCaption: jest.fn(),
 		deleteUserPost: jest.fn(),
 	},
@@ -60,6 +61,7 @@ describe('user post routes', () => {
 		userPostService.getFollowedUsersPosts.mockResolvedValue([{ _id: POST_ID }]);
 		userPostService.likeUserPost.mockResolvedValue({ _id: POST_ID, likes: [USER_ID] });
 		userPostService.unlikeUserPost.mockResolvedValue({ _id: POST_ID, likes: [] });
+		userPostService.getUserPostLikes.mockResolvedValue([{ _id: USER_ID, username: 'realuser' }]);
 	});
 
 	afterEach(() => {
@@ -88,6 +90,53 @@ describe('user post routes', () => {
 
 			expect(userPostService.updateUserPostCaption).not.toHaveBeenCalled();
 			expect(userPostService.deleteUserPost).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('GET /user-posts/:userPostId/likes', () => {
+		it('is public: answers 200 with the accounts when there is no token', async () => {
+			const response = await fetch(`${baseUrl}/user-posts/${POST_ID}/likes`);
+
+			expect(response.status).toBe(200);
+			await expect(response.json()).resolves.toEqual([{ _id: USER_ID, username: 'realuser' }]);
+		});
+
+		it('loads the likes of the post named in the path', async () => {
+			await fetch(`${baseUrl}/user-posts/${POST_ID}/likes`);
+
+			expect(userPostService.getUserPostLikes).toHaveBeenCalledWith({ userPostId: POST_ID });
+		});
+
+		it('answers 200 for a guest who sends an expired or invalid token', async () => {
+			const response = await fetch(`${baseUrl}/user-posts/${POST_ID}/likes`, { headers: { 'X-Authorization': 'not-a-token' } });
+
+			expect(response.status).toBe(200);
+		});
+
+		it('answers 200 with an empty list for a post nobody liked', async () => {
+			userPostService.getUserPostLikes.mockResolvedValue([]);
+
+			const response = await fetch(`${baseUrl}/user-posts/${POST_ID}/likes`);
+
+			await expect(response.json()).resolves.toEqual([]);
+		});
+
+		it('answers 404 POST_NOT_FOUND when the post is missing or malformed', async () => {
+			userPostService.getUserPostLikes.mockRejectedValue(new AppError('Post not found', 404, { code: ERROR_CODES.POST_NOT_FOUND }));
+
+			const response = await fetch(`${baseUrl}/user-posts/${POST_ID}/likes`);
+
+			expect(response.status).toBe(404);
+			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.POST_NOT_FOUND });
+		});
+
+		it('answers 500 with the generic code for an unexpected failure', async () => {
+			userPostService.getUserPostLikes.mockRejectedValue(new AppError('Could not load the likes', 500));
+
+			const response = await fetch(`${baseUrl}/user-posts/${POST_ID}/likes`);
+
+			expect(response.status).toBe(500);
+			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.INTERNAL_ERROR });
 		});
 	});
 
