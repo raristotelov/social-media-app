@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { deleteStory, getStoryViewers, getUserStories, markStoryViewed } from '../../services/storyService';
+import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBottomSheetEnvironment } from '../../testUtils/bottomSheet';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -1172,6 +1173,150 @@ describe('StoryViewer', () => {
 
 			expect(screen.queryByRole('heading', { name: 'Delete story' })).not.toBeInTheDocument();
 			expect(onClose).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('swiping the bottom sheets closed', () => {
+		const getSheet = () => document.querySelector('.popup-container .popup-body');
+		const getHandle = () => document.querySelector('.popup-container .bottom-sheet-handle');
+		const openViewers = async () => {
+			userEvent.click(screen.getByRole('button', { name: 'Seen by 3' }));
+			await screen.findByRole('heading', { name: 'Viewers' });
+		};
+		const openDeleteConfirm = () => userEvent.click(screen.getByRole('button', { name: 'Delete story' }));
+
+		beforeEach(() => {
+			installBottomSheetEnvironment();
+		});
+
+		afterEach(() => {
+			restoreBottomSheetEnvironment();
+		});
+
+		describe('the viewers list', () => {
+			it('shows a drag handle', async () => {
+				await openViewer({ startIndex: 0 });
+
+				await openViewers();
+
+				expect(getSheet()).toContainElement(getHandle());
+			});
+
+			it('stays open and the story stays paused until the sheet has slid out', async () => {
+				await openViewer({ startIndex: 0 });
+				loadPhoto();
+				await openViewers();
+
+				dragDown(getHandle(), 120);
+
+				expect(screen.getByRole('heading', { name: 'Viewers' })).toBeInTheDocument();
+				expect(getViewer()).toHaveClass('story-viewer-paused');
+			});
+
+			it('closes the list and resumes the story from the same point once the sheet has slid out', async () => {
+				const { onClose } = await openViewer({ startIndex: 0 });
+
+				loadPhoto();
+				const fillBefore = document.querySelector('.story-viewer-segment-fill-active');
+				await openViewers();
+				dragDown(getHandle(), 120);
+				fireTransitionEnd(getSheet());
+
+				expect(screen.queryByRole('heading', { name: 'Viewers' })).not.toBeInTheDocument();
+				expect(getViewer()).not.toHaveClass('story-viewer-paused');
+				expect(document.querySelector('.story-viewer-segment-fill-active')).toBe(fillBefore);
+				expect(getPhotoName()).toBe('m1');
+				expect(onClose).not.toHaveBeenCalled();
+			});
+
+			it('closes the list when the Viewers title is dragged down', async () => {
+				await openViewer({ startIndex: 0 });
+				await openViewers();
+
+				dragDown(screen.getByRole('heading', { name: 'Viewers' }), 120);
+				fireTransitionEnd(getSheet());
+
+				expect(screen.queryByRole('heading', { name: 'Viewers' })).not.toBeInTheDocument();
+			});
+
+			it('stays open and paused after a short drag', async () => {
+				await openViewer({ startIndex: 0 });
+				loadPhoto();
+				await openViewers();
+
+				dragDown(getHandle(), 40);
+				fireTransitionEnd(getSheet());
+
+				expect(screen.getByRole('heading', { name: 'Viewers' })).toBeInTheDocument();
+				expect(getViewer()).toHaveClass('story-viewer-paused');
+			});
+
+			it('does not close the list when the drag starts on a viewer', async () => {
+				getStoryViewers.mockResolvedValue([{ _id: 'v1', username: 'viewer1' }]);
+				await openViewer({ startIndex: 0 });
+				await openViewers();
+
+				dragDown(await screen.findByText('viewer1'), 300);
+				fireTransitionEnd(getSheet());
+
+				expect(screen.getByRole('heading', { name: 'Viewers' })).toBeInTheDocument();
+			});
+		});
+
+		describe('the delete story confirmation', () => {
+			it('shows a drag handle', async () => {
+				await openViewer({ startIndex: 0 });
+
+				openDeleteConfirm();
+
+				expect(getSheet()).toContainElement(getHandle());
+			});
+
+			it('closes the confirmation and resumes the story without deleting it', async () => {
+				const { onClose } = await openViewer({ startIndex: 0 });
+
+				loadPhoto();
+				openDeleteConfirm();
+				dragDown(getHandle(), 120);
+				fireTransitionEnd(getSheet());
+
+				expect(screen.queryByRole('heading', { name: 'Delete story' })).not.toBeInTheDocument();
+				expect(getViewer()).not.toHaveClass('story-viewer-paused');
+				expect(deleteStory).not.toHaveBeenCalled();
+				expect(getPhotoName()).toBe('m1');
+				expect(onClose).not.toHaveBeenCalled();
+			});
+
+			it('stays open after a short drag', async () => {
+				await openViewer({ startIndex: 0 });
+				openDeleteConfirm();
+
+				dragDown(getHandle(), 40);
+				fireTransitionEnd(getSheet());
+
+				expect(screen.getByRole('heading', { name: 'Delete story' })).toBeInTheDocument();
+			});
+
+			it('does not close the confirmation when the drag starts on its message', async () => {
+				await openViewer({ startIndex: 0 });
+				openDeleteConfirm();
+
+				dragDown(screen.getByText('This story will be permanently deleted. This cannot be undone.'), 300);
+				fireTransitionEnd(getSheet());
+
+				expect(screen.getByRole('heading', { name: 'Delete story' })).toBeInTheDocument();
+			});
+		});
+
+		it('does not drag the sheets on a screen of 600px or wider', async () => {
+			installBottomSheetEnvironment({ isMobile: false });
+			await openViewer({ startIndex: 0 });
+			await openViewers();
+
+			dragDown(getHandle(), 300);
+			fireTransitionEnd(getSheet());
+
+			expect(screen.getByRole('heading', { name: 'Viewers' })).toBeInTheDocument();
 		});
 	});
 });

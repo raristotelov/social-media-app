@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getComments, addComment, likeComment, unlikeComment, getCommentLikes } from '../../services/commentService';
+import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBottomSheetEnvironment } from '../../testUtils/bottomSheet';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -780,6 +781,97 @@ describe('CommentsPopup', () => {
 			userEvent.keyboard('{esc}');
 
 			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		describe('by swiping the bottom sheet', () => {
+			const getSheet = () => document.querySelector('.comments-popup .popup-body');
+
+			beforeEach(() => {
+				installBottomSheetEnvironment();
+			});
+
+			afterEach(() => {
+				restoreBottomSheetEnvironment();
+			});
+
+			it('shows the drag handle', async () => {
+				getComments.mockResolvedValue(topComments);
+				renderPopup();
+
+				await screen.findByText('Most liked comment');
+
+				expect(getSheet()).toContainElement(document.querySelector('.bottom-sheet-handle'));
+			});
+
+			it('calls onClose after the handle is dragged down past 25% and the sheet has slid out', async () => {
+				getComments.mockResolvedValue(topComments);
+				const { onClose } = renderPopup();
+
+				await screen.findByText('Most liked comment');
+				dragDown(document.querySelector('.bottom-sheet-handle'), 120);
+
+				expect(onClose).not.toHaveBeenCalled();
+
+				fireTransitionEnd(getSheet());
+
+				expect(onClose).toHaveBeenCalledTimes(1);
+			});
+
+			it('calls onClose after the Comments title is dragged down past 25%', async () => {
+				getComments.mockResolvedValue(topComments);
+				const { onClose } = renderPopup();
+
+				await screen.findByText('Most liked comment');
+				dragDown(screen.getByRole('heading', { name: 'Comments' }), 120);
+				fireTransitionEnd(getSheet());
+
+				expect(onClose).toHaveBeenCalledTimes(1);
+			});
+
+			it('stays open when released short of 25%', async () => {
+				getComments.mockResolvedValue(topComments);
+				const { onClose } = renderPopup();
+
+				await screen.findByText('Most liked comment');
+				dragDown(document.querySelector('.bottom-sheet-handle'), 40);
+				fireTransitionEnd(getSheet());
+
+				expect(onClose).not.toHaveBeenCalled();
+				expect(getSheet().style.transform).toBe('');
+			});
+
+			it('does nothing when the drag starts on a comment', async () => {
+				getComments.mockResolvedValue(topComments);
+				const { onClose } = renderPopup();
+
+				dragDown(await screen.findByText('Most liked comment'), 300);
+				fireTransitionEnd(getSheet());
+
+				expect(getSheet().style.transform).toBe('');
+				expect(onClose).not.toHaveBeenCalled();
+			});
+
+			it('can be swiped while the comments are still loading', () => {
+				getComments.mockReturnValue(new Promise(() => {}));
+				const { onClose } = renderPopup();
+
+				dragDown(document.querySelector('.bottom-sheet-handle'), 120);
+				fireTransitionEnd(getSheet());
+
+				expect(onClose).toHaveBeenCalledTimes(1);
+			});
+
+			it('does not drag on a screen of 600px or wider', async () => {
+				installBottomSheetEnvironment({ isMobile: false });
+				getComments.mockResolvedValue(topComments);
+				const { onClose } = renderPopup();
+
+				await screen.findByText('Most liked comment');
+				dragDown(document.querySelector('.bottom-sheet-handle'), 300);
+				fireTransitionEnd(getSheet());
+
+				expect(onClose).not.toHaveBeenCalled();
+			});
 		});
 	});
 

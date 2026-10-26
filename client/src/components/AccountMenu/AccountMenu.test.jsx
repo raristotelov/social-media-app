@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { updateUserProfileData } from '../../services/userService';
+import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBottomSheetEnvironment } from '../../testUtils/bottomSheet';
 
 import AccountMenu from './AccountMenu';
 
@@ -63,5 +64,92 @@ describe('AccountMenu', () => {
 				updatedProfileData: { theme: 'dark' },
 			}),
 		);
+	});
+
+	describe('as a bottom sheet', () => {
+		const getSheet = (container) => container.querySelector('.account-menu');
+		const getHandle = (container) => container.querySelector('.bottom-sheet-handle');
+
+		beforeEach(() => {
+			installBottomSheetEnvironment();
+		});
+
+		afterEach(() => {
+			restoreBottomSheetEnvironment();
+		});
+
+		it('renders the drag handle inside the menu', () => {
+			const { container } = renderAccountMenu(true, { isBottomSheet: true });
+
+			expect(getSheet(container)).toContainElement(getHandle(container));
+		});
+
+		it('renders no handle when it is not a bottom sheet', () => {
+			const { container } = renderAccountMenu(true);
+
+			expect(getHandle(container)).not.toBeInTheDocument();
+		});
+
+		it('renders no handle while closed', () => {
+			const { container } = renderAccountMenu(false, { isBottomSheet: true });
+
+			expect(getHandle(container)).not.toBeInTheDocument();
+		});
+
+		it('slides out and then calls onClose when the handle is dragged down past 25%', () => {
+			const onClose = jest.fn();
+			const { container } = renderAccountMenu(true, { isBottomSheet: true, onClose });
+
+			dragDown(getHandle(container), 120);
+
+			expect(onClose).not.toHaveBeenCalled();
+
+			fireTransitionEnd(getSheet(container));
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('springs back and stays open on a short drag', () => {
+			const onClose = jest.fn();
+			const { container } = renderAccountMenu(true, { isBottomSheet: true, onClose });
+
+			dragDown(getHandle(container), 40);
+			fireTransitionEnd(getSheet(container));
+
+			expect(getSheet(container).style.transform).toBe('');
+			expect(onClose).not.toHaveBeenCalled();
+		});
+
+		it('does not start a drag from a row', () => {
+			const onClose = jest.fn();
+			const { container } = renderAccountMenu(true, { isBottomSheet: true, onClose });
+
+			dragDown(screen.getByRole('button', { name: 'Log out' }), 300);
+			fireTransitionEnd(getSheet(container));
+
+			expect(getSheet(container).style.transform).toBe('');
+			expect(onClose).not.toHaveBeenCalled();
+		});
+
+		it('does not drag on a screen of 600px or wider', () => {
+			installBottomSheetEnvironment({ isMobile: false });
+			const onClose = jest.fn();
+			const { container } = renderAccountMenu(true, { isBottomSheet: true, onClose });
+
+			dragDown(getHandle(container), 300);
+			fireTransitionEnd(getSheet(container));
+
+			expect(onClose).not.toHaveBeenCalled();
+		});
+
+		it('does not drag when it is not a bottom sheet', () => {
+			const onClose = jest.fn();
+			const { container } = renderAccountMenu(true, { onClose });
+
+			dragDown(screen.getByText('Profile'), 300);
+			fireTransitionEnd(getSheet(container));
+
+			expect(onClose).not.toHaveBeenCalled();
+		});
 	});
 });
