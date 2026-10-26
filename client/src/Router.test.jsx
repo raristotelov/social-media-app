@@ -32,6 +32,7 @@ jest.mock('./components/PopularPostsLayout/PopularPostsLayout', () => {
 });
 jest.mock('./components/PopularPostsView/PopularPostsView', () => () => <p>Popular posts view</p>);
 jest.mock('./components/PopularPostsPostsView/PopularPostsPostsView', () => () => <p>Popular posts posts view</p>);
+jest.mock('./components/NotFoundView/NotFoundView', () => () => <p>Not found view</p>);
 
 const LocationDisplay = () => {
 	const location = useLocation();
@@ -161,6 +162,38 @@ describe('Router', () => {
 
 			expect(screen.getByTestId('location')).toHaveTextContent(/^\/popular-posts\/posts$/);
 		});
+	});
+
+	describe('an unknown route', () => {
+		it.each([
+			['a guest', null],
+			['a logged-in user', 'token123'],
+		])('shows the 404 page to %s', (_name, jwtToken) => {
+			renderRouterAt('/no/such/page', jwtToken);
+
+			expect(screen.getByText('Not found view')).toBeInTheDocument();
+		});
+
+		it('keeps the URL as typed instead of redirecting', () => {
+			renderRouterAt('/no/such/page', null);
+
+			expect(screen.getByTestId('location')).toHaveTextContent(/^\/no\/such\/page$/);
+		});
+
+		it.each([['/popular-posts/unknown'], ['/user'], ['/user/user2/unknown']])('shows the 404 page at the near-miss path %s', (path) => {
+			renderRouterAt(path, 'token123');
+
+			expect(screen.getByText('Not found view')).toBeInTheDocument();
+		});
+
+		it.each([['/'], ['/user-feed'], ['/popular-posts'], ['/user/user2'], ['/user/user2/posts']])(
+			'does not show the 404 page at the known route %s',
+			(path) => {
+				renderRouterAt(path, 'token123');
+
+				expect(screen.queryByText('Not found view')).not.toBeInTheDocument();
+			},
+		);
 	});
 
 	describe('the profile routes', () => {

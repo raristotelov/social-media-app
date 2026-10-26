@@ -48,6 +48,13 @@ export const ACTION_FALLBACK_MESSAGES = Object.freeze({
 	UNFOLLOW_USER: "Couldn't unfollow this user. Try again.",
 });
 
+export const CRASH_MESSAGES = Object.freeze({
+	HEADING: 'Something went wrong',
+	DESCRIPTION: 'Try reloading the page.',
+	RELOAD_LABEL: 'Reload',
+	GO_HOME_LABEL: 'Go home',
+});
+
 export const LOAD_ERROR_MESSAGES = Object.freeze({
 	PROFILE: Object.freeze({
 		HEADING: "Couldn't load this profile",
@@ -63,6 +70,11 @@ export const LOAD_ERROR_MESSAGES = Object.freeze({
 		HEADING: "Couldn't load popular posts",
 		DESCRIPTION: 'Check your connection and try again.',
 		RETRY_LABEL: 'Retry',
+	}),
+	NOT_FOUND: Object.freeze({
+		HEADING: 'Page not found',
+		DESCRIPTION: 'This link may be broken, or the page may have been removed.',
+		RETRY_LABEL: 'Go home',
 	}),
 	POPULAR_NEXT_BATCH: Object.freeze({
 		MESSAGE: "Couldn't load more posts",

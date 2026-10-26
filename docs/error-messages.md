@@ -26,7 +26,7 @@ Every error code the server sends and the copy the client shows for it. The clie
 | `CAPTION_TOO_LONG` | 400 | field `caption`, post upload and caption edit (#11) | Caption must be at most 1000 characters |
 | `IMAGE_TYPE_INVALID` | 400 | image field, post and story upload and profile update (#15, #13) | Choose a JPEG, PNG or WebP image |
 | `IMAGE_TOO_LARGE` | 413 | image field, upload over 10 MB (#15) | This image is over 10 MB |
-| `USER_NOT_FOUND` | 404 | Profile load, profile update, follow / unfollow, unknown or malformed user id | — (blank page until #29) |
+| `USER_NOT_FOUND` | 404 | Profile load, profile update, follow / unfollow, unknown or malformed user id | — (404 page on profile load, #29) |
 | `POST_NOT_FOUND` | 404 | Post edit / delete; like, unlike, add comment and load comments on a missing or malformed post (#11); popular posts view shared link to a deleted post (#3) | This post no longer exists |
 | `POST_FORBIDDEN` | 403 | Post edit / delete on someone else's post | You can only change your own posts |
 | `COMMENT_TEXT_REQUIRED` | 400 | Add comment and reply, empty text (#11) | Comment can't be empty |

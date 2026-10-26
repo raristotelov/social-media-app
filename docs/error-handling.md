@@ -28,7 +28,8 @@ Every code, its status and the copy the client shows: [error-messages.md](./erro
 | One part of a loaded page (comments…) | Inline line with Try again; related inputs disabled (50% opacity) |
 | A form submit | `fields` codes under their fields; anything else as the form's own message |
 | `UNAUTHENTICATED` | Session cleared, redirect to `/log-in` — keyed on the code, not on 401, so `WRONG_CREDENTIALS` stays a form error |
-| `USER_NOT_FOUND`, crash, unknown route | Blank page area under the chrome until #29 designs the 404 and "Something went wrong" pages |
+| `USER_NOT_FOUND`, unknown route | 404 page under the chrome ([error-pages.md](./pages/error-pages.md), #29) |
+| A render error | Full-screen "Something went wrong" page from the app's error boundary (#29) |
 
 - Follow / unfollow failures stay silent (see [profile-page.md](./pages/profile-page.md)).
 - Messages use `text/primary`, never `text/secondary` (fails AA in light mode).

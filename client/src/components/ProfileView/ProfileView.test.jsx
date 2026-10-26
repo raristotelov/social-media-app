@@ -9,6 +9,7 @@ import { addUserPost, updateUserPostCaption, deleteUserPost } from '../../servic
 import { resizeImage } from '../../utils/images';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
+import NotFoundProvider from '../NotFoundProvider/NotFoundProvider';
 
 import ProfileLayout from '../ProfileLayout/ProfileLayout';
 
@@ -890,13 +891,15 @@ describe('ProfileView errors', () => {
 		const rendered = render(
 			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
 				<ToastProvider>
-					<MemoryRouter initialEntries={['/user/user2']}>
-						<Routes>
-							<Route path='/user/:userId' element={<ProfileLayout />}>
-								<Route index element={<ProfileView />} />
-							</Route>
-						</Routes>
-					</MemoryRouter>
+					<NotFoundProvider>
+						<MemoryRouter initialEntries={['/user/user2']}>
+							<Routes>
+								<Route path='/user/:userId' element={<ProfileLayout />}>
+									<Route index element={<ProfileView />} />
+								</Route>
+							</Routes>
+						</MemoryRouter>
+					</NotFoundProvider>
 				</ToastProvider>
 			</LoggedInUserContext.Provider>,
 		);
@@ -980,14 +983,14 @@ describe('ProfileView errors', () => {
 			expect(await screen.findByText('janedoe')).toBeInTheDocument();
 		});
 
-		it('renders a blank page area for USER_NOT_FOUND, with no load error and no toast', async () => {
+		it('renders the 404 page for USER_NOT_FOUND, with no load error and no toast', async () => {
 			getUsersProfileData.mockRejectedValue({ code: 'USER_NOT_FOUND', status: 404 });
 
 			const { container } = renderProfile();
 
-			await waitFor(() => expect(getUsersProfileData).toHaveBeenCalledTimes(1));
-			await waitFor(() => expect(container.querySelector('.profile-view-wrapper')).not.toBeInTheDocument());
-
+			expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Go home' })).toBeInTheDocument();
+			expect(container.querySelector('.profile-view-wrapper')).not.toBeInTheDocument();
 			expect(screen.queryByRole('heading', { name: "Couldn't load this profile" })).not.toBeInTheDocument();
 			expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 			expect(screen.getByRole('alert')).toBeEmptyDOMElement();

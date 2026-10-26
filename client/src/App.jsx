@@ -13,6 +13,7 @@ import MainHeader from './components/Header/MainHeader';
 import MobileTopBar from './components/Header/MobileTopBar';
 import TabBar from './components/TabBar/TabBar';
 import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner';
+import NotFoundProvider from './components/NotFoundProvider/NotFoundProvider';
 import Router from './Router';
 
 import './App.css';
@@ -147,13 +148,15 @@ function App() {
 
 	return (
 		<LoggedInUserContext.Provider value={loggedInUserContextValues}>
-			<MainHeader logoutHandler={logoutHandler} />
+			<NotFoundProvider>
+				<MainHeader logoutHandler={logoutHandler} />
 
-			<MobileTopBar logoutHandler={logoutHandler} />
+				<MobileTopBar logoutHandler={logoutHandler} />
 
-			<Router />
+				<Router />
 
-			<TabBar />
+				<TabBar />
+			</NotFoundProvider>
 		</LoggedInUserContext.Provider>
 	);
 }

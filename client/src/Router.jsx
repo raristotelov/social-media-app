@@ -12,6 +12,7 @@ import FeedView from './components/FeedView/FeedView';
 import PopularPostsLayout from './components/PopularPostsLayout/PopularPostsLayout';
 import PopularPostsView from './components/PopularPostsView/PopularPostsView';
 import PopularPostsPostsView from './components/PopularPostsPostsView/PopularPostsPostsView';
+import NotFoundView from './components/NotFoundView/NotFoundView';
 
 import './index.css';
 
@@ -40,6 +41,8 @@ const Router = () => {
 
 					<Route path='posts' element={<ProfilePostsView />} />
 				</Route>
+
+				<Route path='*' element={<NotFoundView />} />
 			</Routes>
 		</div>
 	);
