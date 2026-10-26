@@ -47,6 +47,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - Row (`User Row`): profile photo (placeholder when none), username, follower count ("1 follower" / "N followers"); hover fills `border/inset`. Clicking a row opens that profile and closes the popup.
 - If the logged-in user is in the list, they appear at the top.
 - Desktop/tablet: 400px popup with title and close icon; the popup hugs its rows up to a 372px list, then the list scrolls. Mobile: full-screen view with close icon + title, like Edit Profile.
+- Header and dividers (#5): title 16 Bold in a 48px header with a full-width `border/inset` line under it; `border/inset` lines between rows, starting at the username, none after the last row. Same on mobile and on the story viewers sheet. Shared by every list popup (followers, following, viewers, likes).
 
 ## Upload Picture popup (own profile)
 

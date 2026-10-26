@@ -1,4 +1,4 @@
-import { buildTestUser } from '../../support/testUser';
+import { buildTestUser, TEST_USERNAME_PREFIX } from '../../support/testUser';
 import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, followUserViaApi } from '../../support/api';
 
 describe('followers and following popup', () => {
@@ -20,6 +20,8 @@ describe('followers and following popup', () => {
 	const popup = () => cy.get('.user-list-popup');
 
 	const rows = () => cy.get('.user-list-popup .user-list-results .search-result');
+
+	const dividerOf = ($row) => $row[0].ownerDocument.defaultView.getComputedStyle($row[0], '::before');
 
 	before(() => {
 		createUserViaApi(owner);
@@ -180,6 +182,61 @@ describe('followers and following popup', () => {
 
 		cy.wait('@userListRequest');
 		rows().should('have.length', 2);
+	});
+
+	it('shows a 16px bold title on desktop', () => {
+		cy.viewport(1440, 900);
+		cy.visit(ownerPath);
+
+		statButton('followers').click();
+
+		cy.get('.user-list-popup .popup-title').should('have.css', 'font-size', '16px').and('have.css', 'font-weight', '700');
+	});
+
+	it('keeps the popup corners rounded at 12px with overflow hidden on desktop', () => {
+		cy.viewport(1440, 900);
+		cy.visit(ownerPath);
+
+		statButton('followers').click();
+
+		cy.get('.user-list-popup .popup-body')
+			.should('have.css', 'overflow', 'hidden')
+			.and('have.css', 'border-bottom-left-radius', '12px')
+			.and('have.css', 'border-bottom-right-radius', '12px');
+	});
+
+	it('draws a divider before every row except the first', () => {
+		cy.viewport(1440, 900);
+		cy.visit(ownerPath);
+
+		statButton('followers').click();
+
+		rows().should('have.length', 2);
+		rows()
+			.first()
+			.then(($row) => {
+				expect(dividerOf($row).content).to.eq('none');
+			});
+		rows()
+			.last()
+			.then(($row) => {
+				const divider = dividerOf($row);
+
+				expect(divider.content).to.eq('""');
+				expect(divider.height).to.eq('1px');
+			});
+	});
+
+	it('does not draw dividers between search dropdown rows', () => {
+		cy.viewport(1440, 900);
+		cy.visit(ownerPath);
+
+		cy.get('.search-input').type(TEST_USERNAME_PREFIX);
+
+		cy.get('.search-results-dropdown .search-result').should('have.length.greaterThan', 1);
+		cy.get('.search-results-dropdown .search-result').each(($row) => {
+			expect(dividerOf($row).content).to.eq('none');
+		});
 	});
 
 	[300, 390].forEach((width) => {
