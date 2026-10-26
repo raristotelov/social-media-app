@@ -1,13 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import CloseIcon from '../icons/Close';
 
 import './Popup.css';
 
 const Popup = ({ title, onClosePopupClick, className, bodyClassName, children }) => {
+	const containerRef = useRef(null);
+
 	useEffect(() => {
 		const closeOnEscape = (event) => {
-			if (event.key === 'Escape') {
+			const hasPopupOnTop = Boolean(containerRef.current?.querySelector('.popup-container'));
+
+			if (event.key === 'Escape' && !hasPopupOnTop) {
 				onClosePopupClick();
 			}
 		};
@@ -23,7 +27,7 @@ const Popup = ({ title, onClosePopupClick, className, bodyClassName, children })
 	const bodyClassNames = ['popup-body', bodyClassName].filter(Boolean).join(' ');
 
 	return (
-		<div className={containerClassNames} onMouseDown={onClosePopupClick}>
+		<div ref={containerRef} className={containerClassNames} onMouseDown={onClosePopupClick}>
 			<div className={bodyClassNames} onMouseDown={(e) => e.stopPropagation()}>
 				<button type='button' className='popup-close' onClick={onClosePopupClick} aria-label='Close'>
 					<CloseIcon iconColorProp='currentColor' />

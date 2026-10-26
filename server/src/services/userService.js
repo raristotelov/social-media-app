@@ -10,17 +10,12 @@ const { asFieldError } = require('../utils/fieldErrors');
 const { createUserNotFoundError } = require('../utils/notFoundErrors');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
+const { USER_ROW_PROJECTION, getUserRowsInOrder } = require('./userRowService');
 
 const necessaryUserFields = ['_id', 'email', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following'];
 
-const FOLLOW_LIST_ROW_PROJECTION = {
-	_id: 1,
-	username: 1,
-	'profilePicture.imageUrl': 1,
-};
-
-const USER_ROW_PROJECTION = {
-	...FOLLOW_LIST_ROW_PROJECTION,
+const SEARCH_ROW_PROJECTION = {
+	...USER_ROW_PROJECTION,
 	followersCount: { $size: { $ifNull: ['$followers', []] } },
 };
 
@@ -183,7 +178,7 @@ const getUsersProfileDataBySearchWord = async ({ searchWord }) => {
 	try {
 		const users = await UserModel.aggregate([
 			{ $match: { username: { $regex: `^${escapeRegExp(searchWord)}`, $options: 'i' } } },
-			{ $project: USER_ROW_PROJECTION },
+			{ $project: SEARCH_ROW_PROJECTION },
 		]);
 
 		return users;
@@ -204,10 +199,7 @@ const getFollowListByUserId = async ({ userId, listField, requesterId }) => {
 
 		const listedUserIds = user[listField];
 
-		const rows = await UserModel.aggregate([{ $match: { _id: { $in: listedUserIds } } }, { $project: FOLLOW_LIST_ROW_PROJECTION }]);
-
-		const rowsById = new Map(rows.map((row) => [String(row._id), row]));
-		const orderedRows = listedUserIds.map((listedUserId) => rowsById.get(String(listedUserId))).filter(Boolean);
+		const orderedRows = await getUserRowsInOrder(listedUserIds);
 
 		return [...orderedRows].sort((a, b) => Number(String(b._id) === String(requesterId)) - Number(String(a._id) === String(requesterId)));
 	} catch (error) {

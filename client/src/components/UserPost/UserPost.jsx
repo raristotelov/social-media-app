@@ -8,6 +8,7 @@ import usePostActionsMenu from '../../hooks/usePostActionsMenu';
 import { likeUserPost, unlikeUserPost } from '../../services/userPostService';
 import { addComment } from '../../services/commentService';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
+import { USER_LIST_TYPES } from '../../constants/userLists';
 import { countCommentsAndReplies, getPreviewComments } from '../../utils/comments';
 import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
 import { getPostImageAspectRatio } from '../../utils/images';
@@ -17,6 +18,7 @@ import CommentsPopup from '../CommentsPopup/CommentsPopup';
 import PostActionsMenu from '../PostActionsMenu/PostActionsMenu';
 import PostCaption from '../PostCaption/PostCaption';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
+import UserListPopup from '../UserListPopup/UserListPopup';
 import CommentOutlineIcon from '../icons/CommentOutline';
 import HeartIcon from '../icons/Heart';
 import PostActionsIcon from '../icons/PostActions';
@@ -28,6 +30,7 @@ const HEART_PULSE_DURATION_MS = 500;
 const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDeleteClick, onPostChange }) => {
 	const [isHeartPulsing, setIsHeartPulsing] = useState(false);
 	const [isCommentsPopupOpen, setIsCommentsPopupOpen] = useState(false);
+	const [isLikesPopupOpen, setIsLikesPopupOpen] = useState(false);
 	const isUpdatingLikeRef = useRef(false);
 	const heartPulseTimeoutRef = useRef(null);
 
@@ -41,6 +44,8 @@ const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDe
 	const imageAspectRatio = getPostImageAspectRatio({ imageWidth, imageHeight });
 
 	const hasLikedUserPost = likes.includes(loggedInUser?._id);
+
+	const likesLabel = `${likes.length} ${likes.length === 1 ? 'like' : 'likes'}`;
 
 	useEffect(() => {
 		return () => {
@@ -165,7 +170,13 @@ const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDe
 							/>
 						</button>
 
-						<span>{`${likes.length} ${likes.length === 1 ? 'like' : 'likes'}`}</span>
+						{likes.length ? (
+							<button type='button' className='user-post-likes-button' onClick={() => setIsLikesPopupOpen(true)}>
+								{likesLabel}
+							</button>
+						) : (
+							<span>{likesLabel}</span>
+						)}
 					</div>
 
 					<button type='button' className='user-post-stat user-post-comments-button' onClick={() => setIsCommentsPopupOpen(true)}>
@@ -191,6 +202,10 @@ const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDe
 
 				<AddCommentForm onSubmit={submitComment} />
 			</div>
+
+			{isLikesPopupOpen ? (
+				<UserListPopup userPostId={userPostId} listType={USER_LIST_TYPES.POST_LIKES} onClose={() => setIsLikesPopupOpen(false)} />
+			) : null}
 
 			{isCommentsPopupOpen ? (
 				<CommentsPopup userPostId={userPostId} onClose={() => setIsCommentsPopupOpen(false)} onCommentsLoaded={updateFromLoadedComments} />

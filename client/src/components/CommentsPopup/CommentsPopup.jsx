@@ -132,7 +132,7 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 		return (
 			<div className='comments-popup-list'>
 				{comments.map((comment) => (
-					<Comment key={comment._id} comment={comment} userPostId={userPostId} onReload={reloadComments} />
+					<Comment key={comment._id} comment={comment} userPostId={userPostId} onReload={reloadComments} onCloseComments={onClose} />
 				))}
 			</div>
 		);

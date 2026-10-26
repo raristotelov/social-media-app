@@ -7,6 +7,7 @@ const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { createPostNotFoundError, createCommentNotFoundError } = require('../utils/notFoundErrors');
+const { getUserRowsInOrder } = require('./userRowService');
 
 const AUTHOR_POPULATE = {
 	path: 'userId',
@@ -158,6 +159,28 @@ const unlikeComment = async ({ commentId, userId }) => {
 	}
 };
 
+const getCommentLikes = async ({ commentId }) => {
+	try {
+		if (!mongoose.isObjectIdOrHexString(commentId)) {
+			throw createCommentNotFoundError();
+		}
+
+		const comment = await CommentModel.findById(commentId).select({ likes: 1 });
+
+		if (!comment) {
+			throw createCommentNotFoundError();
+		}
+
+		return await getUserRowsInOrder([...comment.likes].reverse());
+	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
+		throw new AppError('Could not load the likes', 500, { cause: error });
+	}
+};
+
 const getPreviewCommentsForPosts = async (userPostIds) => {
 	try {
 		const previewGroups = await CommentModel.aggregate([
@@ -202,6 +225,7 @@ module.exports = {
 	getCommentsForPost,
 	likeComment,
 	unlikeComment,
+	getCommentLikes,
 	getPreviewCommentsForPosts,
 	deleteCommentsForPost,
 };

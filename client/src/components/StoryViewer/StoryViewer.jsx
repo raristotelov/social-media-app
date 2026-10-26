@@ -4,7 +4,7 @@ import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { deleteStory, getUserStories, markStoryViewed } from '../../services/storyService';
-import { FOLLOW_LIST_TYPES } from '../../constants/followLists';
+import { USER_LIST_TYPES } from '../../constants/userLists';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 import {
 	DELETE_STORY_MESSAGE,
@@ -17,10 +17,10 @@ import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
 import { formatStoryAge, getStartStoryIndex, isStoryAspectRatio } from '../../utils/stories';
 
 import DeletePostConfirm from '../DeletePostConfirm/DeletePostConfirm';
-import FollowListPopup from '../FollowListPopup/FollowListPopup';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 import Popup from '../Popup/Popup';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
+import UserListPopup from '../UserListPopup/UserListPopup';
 import ChevronLeftIcon from '../icons/ChevronLeft';
 import ChevronRightIcon from '../icons/ChevronRight';
 import CloseIcon from '../icons/Close';
@@ -371,7 +371,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 			</div>
 
 			{openOverlay === STORY_VIEWER_OVERLAYS.VIEWERS ? (
-				<FollowListPopup storyId={currentStoryId} listType={FOLLOW_LIST_TYPES.VIEWERS} onClose={closeOverlay} />
+				<UserListPopup storyId={currentStoryId} listType={USER_LIST_TYPES.VIEWERS} onClose={closeOverlay} />
 			) : null}
 
 			{openOverlay === STORY_VIEWER_OVERLAYS.DELETE ? (

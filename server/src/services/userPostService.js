@@ -9,6 +9,7 @@ const { createPostNotFoundError } = require('../utils/notFoundErrors');
 const { asFieldError } = require('../utils/fieldErrors');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
+const { getUserRowsInOrder } = require('./userRowService');
 
 const AUTHOR_POPULATE = {
 	path: 'userId',
@@ -181,6 +182,28 @@ const unlikeUserPost = async ({ userPostId, userWhoUnlikedId }) => {
 	}
 };
 
+const getUserPostLikes = async ({ userPostId }) => {
+	try {
+		if (!mongoose.isObjectIdOrHexString(userPostId)) {
+			throw createPostNotFoundError();
+		}
+
+		const userPost = await UserPostModel.findById(userPostId).select({ likes: 1 });
+
+		if (!userPost) {
+			throw createPostNotFoundError();
+		}
+
+		return await getUserRowsInOrder([...userPost.likes].reverse());
+	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
+		throw new AppError('Could not load the likes', 500, { cause: error });
+	}
+};
+
 const updateUserPostCaption = async ({ userPostId, userId, caption }) => {
 	try {
 		if (typeof caption !== 'string') {
@@ -235,6 +258,7 @@ module.exports = {
 	getFollowedUsersPosts,
 	likeUserPost,
 	unlikeUserPost,
+	getUserPostLikes,
 	updateUserPostCaption,
 	deleteUserPost,
 };

@@ -19,6 +19,12 @@ export const likeComment = ({ commentId, jwtToken }) => {
 	return request.post(`${serverUrl}/comments/${commentId}/like`);
 };
 
+export const getCommentLikes = ({ commentId, jwtToken }) => {
+	const request = requestFactory(jwtToken);
+
+	return request.get(`${serverUrl}/comments/${commentId}/likes`);
+};
+
 export const unlikeComment = ({ commentId, jwtToken }) => {
 	const request = requestFactory(jwtToken);
 

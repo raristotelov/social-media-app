@@ -53,6 +53,12 @@ export const likeUserPost = ({ userPostToLikeId, jwtToken }) => {
 	return request.post(`${serverUrl}/user-posts/like/${userPostToLikeId}`);
 };
 
+export const getUserPostLikes = ({ userPostId, jwtToken }) => {
+	const request = requestFactory(jwtToken);
+
+	return request.get(`${serverUrl}/user-posts/${userPostId}/likes`);
+};
+
 export const unlikeUserPost = ({ userPostToUnlikeId, jwtToken }) => {
 	const request = requestFactory(jwtToken);
 

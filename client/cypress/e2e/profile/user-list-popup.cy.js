@@ -17,9 +17,9 @@ describe('followers and following popup', () => {
 
 	const statButton = (label) => cy.contains('.profile-stat-button', label);
 
-	const popup = () => cy.get('.follow-list-popup');
+	const popup = () => cy.get('.user-list-popup');
 
-	const rows = () => cy.get('.follow-list-popup .follow-list-results .search-result');
+	const rows = () => cy.get('.user-list-popup .user-list-results .search-result');
 
 	before(() => {
 		createUserViaApi(owner);
@@ -60,11 +60,11 @@ describe('followers and following popup', () => {
 
 		statButton('followers').click();
 
-		cy.contains('.follow-list-popup .popup-title', 'Followers').should('be.visible');
+		cy.contains('.user-list-popup .popup-title', 'Followers').should('be.visible');
 		rows().should('have.length', 2);
-		cy.contains('.follow-list-results .search-result', firstFollower.username).should('be.visible');
-		cy.contains('.follow-list-results .search-result', secondFollower.username).should('be.visible');
-		cy.get('.follow-list-results .search-result-followers').should('not.exist');
+		cy.contains('.user-list-results .search-result', firstFollower.username).should('be.visible');
+		cy.contains('.user-list-results .search-result', secondFollower.username).should('be.visible');
+		cy.get('.user-list-results .search-result-followers').should('not.exist');
 	});
 
 	it('lists the people they follow by photo and username, without a follower count', () => {
@@ -73,9 +73,9 @@ describe('followers and following popup', () => {
 
 		statButton('following').click();
 
-		cy.contains('.follow-list-popup .popup-title', 'Following').should('be.visible');
-		cy.contains('.follow-list-results .search-result', firstFollower.username).find('.search-result-avatar').should('be.visible');
-		cy.get('.follow-list-results .search-result-followers').should('not.exist');
+		cy.contains('.user-list-popup .popup-title', 'Following').should('be.visible');
+		cy.contains('.user-list-results .search-result', firstFollower.username).find('.search-result-avatar').should('be.visible');
+		cy.get('.user-list-results .search-result-followers').should('not.exist');
 	});
 
 	it('shows an avatar on every row', () => {
@@ -95,7 +95,7 @@ describe('followers and following popup', () => {
 
 		statButton('following').click();
 
-		cy.contains('.follow-list-popup .popup-title', 'Following').should('be.visible');
+		cy.contains('.user-list-popup .popup-title', 'Following').should('be.visible');
 		rows().should('have.length', 1);
 		rows().first().should('contain.text', firstFollower.username);
 	});
@@ -115,7 +115,7 @@ describe('followers and following popup', () => {
 		cy.visit(ownerPath);
 
 		statButton('followers').click();
-		cy.contains('.follow-list-results .search-result', firstFollower.username).click();
+		cy.contains('.user-list-results .search-result', firstFollower.username).click();
 
 		cy.location('pathname').should('eq', firstFollowerPath);
 		cy.contains('.profile-header .username', firstFollower.username).should('be.visible');
@@ -127,7 +127,7 @@ describe('followers and following popup', () => {
 		cy.visit(ownerPath);
 
 		statButton('followers').click();
-		cy.get('.follow-list-popup .popup-close').click();
+		cy.get('.user-list-popup .popup-close').click();
 
 		popup().should('not.exist');
 		cy.location('pathname').should('eq', ownerPath);
@@ -166,19 +166,19 @@ describe('followers and following popup', () => {
 			}
 
 			req.reply({ statusCode: 500, body: { code: 'INTERNAL_ERROR' } });
-		}).as('followListRequest');
+		}).as('userListRequest');
 		statButton('followers').click();
 
-		cy.wait('@followListRequest');
-		cy.contains('.follow-list-error', "Couldn't load this list").should('be.visible');
+		cy.wait('@userListRequest');
+		cy.contains('.user-list-error', "Couldn't load this list").should('be.visible');
 		rows().should('not.exist');
 
 		cy.then(() => {
 			shouldFail = false;
 		});
-		cy.contains('.follow-list-error button', 'Try again').click();
+		cy.contains('.user-list-error button', 'Try again').click();
 
-		cy.wait('@followListRequest');
+		cy.wait('@userListRequest');
 		rows().should('have.length', 2);
 	});
 
@@ -189,7 +189,7 @@ describe('followers and following popup', () => {
 
 			statButton('followers').click();
 
-			cy.get('.follow-list-popup .popup-body').then(($body) => {
+			cy.get('.user-list-popup .popup-body').then(($body) => {
 				const { width: bodyWidth, height: bodyHeight } = $body[0].getBoundingClientRect();
 
 				expect(bodyWidth).to.eq(width);

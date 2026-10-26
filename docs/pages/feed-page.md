@@ -2,7 +2,7 @@
 
 Status: Complete
 
-Routes `/user-feed` and `/user/:userId/posts` (`client/src/Router.jsx`). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
+Routes `/user-feed` and `/user/:userId/posts` (`client/src/Router.jsx`). Liking and the likes list: [likes.md](./likes.md). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 
 ## Scope
 
@@ -76,11 +76,9 @@ Apply the #30 error system: behaviour per [error-handling.md](../error-handling.
 - Posts view fails to load: the profile's load error, via the parent route.
 - Comments fail to load: inline "Couldn't load comments · Try again" (`Feed View – Comments – Load Error` frames).
 - Comment or reply saved but the list fails to reload: keep the current list, add the new comment locally, keep the form usable, show no error.
-- Comment like saved but the list fails to reload: keep the current list, apply the like locally, show no error.
 - New codes: `COMMENT_TEXT_REQUIRED` (400, empty comment or reply) — "Comment can't be empty"; `COMMENT_NOT_FOUND` (404, like or reply on a deleted or malformed comment) — "This comment no longer exists".
 - New code: `CAPTION_TOO_LONG` (400, field `caption`, post upload and caption edit) — "Caption must be at most 1000 characters".
 - `POST_NOT_FOUND` also covers like, unlike, add comment and load comments on a missing or malformed post.
-- Like / unlike a post or a comment: toast, fallback "Couldn't update your like. Try again."
 - Add comment: form message under the box, fallback "Couldn't post your comment. Try again."
 - Reply: form message, fallback "Couldn't post your reply. Try again."
 - `UNAUTHENTICATED` on any of these: session ends, redirect to `/log-in`.
@@ -88,7 +86,6 @@ Apply the #30 error system: behaviour per [error-handling.md](../error-handling.
 ## Server fixes
 
 - `GET /comments/post/:userPostId` requires a login today; it becomes public so guests can read comments.
-- Liking a post uses `$push`, so a double click records two likes; switch to `$addToSet`.
 - Like / unlike on a missing post returns 200 with `null`, and commenting on one saves an orphaned comment; a malformed id returns 500. Both become `POST_NOT_FOUND` 404.
 - The empty-comment 400 carries no code; it becomes `COMMENT_TEXT_REQUIRED`.
 - A reply's parent is not checked. It must be a top-level comment (`parentCommentId: null`) on the same post; otherwise `COMMENT_NOT_FOUND`.

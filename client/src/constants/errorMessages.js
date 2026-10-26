@@ -69,7 +69,7 @@ export const LOAD_ERROR_MESSAGES = Object.freeze({
 		MESSAGE: "Couldn't load comments",
 		RETRY_LABEL: 'Try again',
 	}),
-	FOLLOW_LIST: Object.freeze({
+	USER_LIST: Object.freeze({
 		MESSAGE: "Couldn't load this list",
 		RETRY_LABEL: 'Try again',
 	}),

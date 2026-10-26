@@ -7,7 +7,7 @@ import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowers, getFollowing } from '../../services/userService';
 import { getStoryViewers } from '../../services/storyService';
 
-import FollowListPopup from './FollowListPopup';
+import UserListPopup from './UserListPopup';
 
 jest.mock('../../services/userService');
 jest.mock('../../services/storyService');
@@ -32,7 +32,7 @@ const renderPopup = ({
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, endSession }}>
 			<MemoryRouter initialEntries={['/user/owner']}>
-				<FollowListPopup userId={userId} storyId={storyId} listType={listType} onClose={onClose} />
+				<UserListPopup userId={userId} storyId={storyId} listType={listType} onClose={onClose} />
 
 				<CurrentPath />
 			</MemoryRouter>
@@ -44,7 +44,7 @@ const renderPopup = ({
 
 const getRowUsernames = (container) => Array.from(container.querySelectorAll('.search-result-username')).map((row) => row.textContent);
 
-describe('FollowListPopup', () => {
+describe('UserListPopup', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
 		getFollowers.mockResolvedValue([buildRow({ _id: 'user1', username: 'janedoe' }), buildRow({ _id: 'user2', username: 'johndoe' })]);
