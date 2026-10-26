@@ -465,5 +465,50 @@ describe('popular posts', () => {
 				cy.wait('@nextBatch').its('request.body.shownPostIds').should('deep.equal', shownIds);
 			});
 		});
+
+		it('keeps both loaded batches, opening a second-batch post and going back, without requesting the page again', () => {
+			cy.intercept('GET', '**/user-posts/popular*').as('firstPage');
+			cy.intercept('POST', '**/user-posts/popular').as('nextBatch');
+
+			cy.visit(GRID_PATH);
+
+			cy.get('.profile-post').should('have.length.at.least', FIRST_BATCH_SIZE);
+
+			cy.scrollTo('bottom');
+
+			cy.wait('@nextBatch').its('response.statusCode').should('eq', 200);
+
+			cy.get('.profile-post').should('have.length.greaterThan', FIRST_BATCH_SIZE);
+
+			let firstPageRequestCount;
+
+			cy.get('@firstPage.all').then((requests) => {
+				firstPageRequestCount = requests.length;
+			});
+
+			cy.get('a.profile-post-link').then(($links) => {
+				const loadedCount = $links.length;
+				const secondBatchLink = $links[loadedCount - 1];
+				const secondBatchPostId = secondBatchLink.getAttribute('href').split('#')[1];
+
+				cy.wrap(secondBatchLink).scrollIntoView().click();
+
+				cy.location('pathname').should('eq', POSTS_PATH);
+				cy.location('hash').should('eq', `#${secondBatchPostId}`);
+				cy.get(`[id="${secondBatchPostId}"]`).should('exist');
+				expectPostInView(secondBatchPostId);
+				cy.get('.user-post').should('have.length.at.least', loadedCount);
+
+				cy.get('.posts-bar-back').then(($back) => $back[0].click());
+
+				cy.location('pathname').should('eq', GRID_PATH);
+				cy.get('.profile-post').should('have.length.at.least', loadedCount);
+				tileFor(secondBatchPostId).should('exist');
+			});
+
+			cy.get('@firstPage.all').should(($requests) => {
+				expect($requests).to.have.length(firstPageRequestCount);
+			});
+		});
 	});
 });
