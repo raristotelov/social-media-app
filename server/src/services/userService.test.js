@@ -1044,11 +1044,10 @@ describe('userService', () => {
 				return { _id, posts, toObject: () => ({ ...data }) };
 			};
 
-			const givenLookup = ({ users, commentCounts = {}, previewComments = {} }) => {
+			const givenLookup = ({ users, previewComments = {} }) => {
 				UserModel.find = jest.fn().mockReturnValue({
 					select: jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(users) }),
 				});
-				commentService.getCommentCountsForPosts.mockResolvedValue(commentCounts);
 				commentService.getPreviewCommentsForPosts.mockResolvedValue(previewComments);
 			};
 
@@ -1097,10 +1096,17 @@ describe('userService', () => {
 			});
 
 			describe('profile post comment counts', () => {
-				it('adds a commentsCount to each profile post, defaulting to 0', async () => {
+				it('keeps the commentsCount stored on each profile post and adds the preview comments', async () => {
 					givenLookup({
-						users: [buildUser({ _id: OWNER_ID, posts: [{ _id: 'post1' }, { _id: 'post2' }] })],
-						commentCounts: { post1: 3 },
+						users: [
+							buildUser({
+								_id: OWNER_ID,
+								posts: [
+									{ _id: 'post1', commentsCount: 3 },
+									{ _id: 'post2', commentsCount: 0 },
+								],
+							}),
+						],
 					});
 
 					const [profile] = await getUsersProfileDataByUserIds({ userIds: [OWNER_ID] });
@@ -1111,14 +1117,15 @@ describe('userService', () => {
 					]);
 				});
 
-				it('asks for the comment counts of all profile posts in one call', async () => {
+				it('asks for the previews of all profile posts in one call', async () => {
 					givenLookup({
 						users: [buildUser({ _id: OWNER_ID, posts: [{ _id: 'post1' }] }), buildUser({ _id: OTHER_ID, posts: [{ _id: 'post2' }] })],
 					});
 
 					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
 
-					expect(commentService.getCommentCountsForPosts).toHaveBeenCalledWith(['post1', 'post2']);
+					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
+					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2']);
 				});
 			});
 

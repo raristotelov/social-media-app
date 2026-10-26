@@ -1,16 +1,13 @@
 import { useCallback, useRef } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 
+import useGoBackOrTo from '../../hooks/useGoBackOrTo';
 import usePostHashSync from '../../hooks/usePostHashSync';
 
 import PostsBar from '../PostsBar/PostsBar';
 import UserPost from '../UserPost/UserPost';
 
 import './ProfilePostsView.css';
-
-const FIRST_HISTORY_ENTRY_INDEX = 0;
-
-const isFirstHistoryEntry = () => window.history.state?.idx === FIRST_HISTORY_ENTRY_INDEX;
 
 const ProfilePostsView = () => {
 	const { userData, userPosts, setUserPosts, isLoggedInUserProfile, onEditPostClick, onDeletePostClick } = useOutletContext();
@@ -19,17 +16,7 @@ const ProfilePostsView = () => {
 
 	usePostHashSync(postsListRef);
 
-	const navigate = useNavigate();
-
-	const goBackToProfile = () => {
-		if (isFirstHistoryEntry()) {
-			navigate(`/user/${userData._id}`, { replace: true });
-
-			return;
-		}
-
-		navigate(-1);
-	};
+	const goBackToProfile = useGoBackOrTo(`/user/${userData._id}`);
 
 	const updatePost = useCallback(
 		(postId, changes) => {
@@ -40,7 +27,7 @@ const ProfilePostsView = () => {
 
 	return (
 		<section className='profile-posts-view'>
-			<PostsBar username={userData.username} onBackClick={goBackToProfile} />
+			<PostsBar subtitle={userData.username} onBackClick={goBackToProfile} />
 
 			<div className='profile-posts-list' ref={postsListRef}>
 				{userPosts.map((post) => (

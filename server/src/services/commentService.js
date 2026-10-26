@@ -72,6 +72,7 @@ const addComment = async ({ userPostId, userId, text, parentCommentId, mentioned
 		});
 
 		await comment.save();
+		await UserPostModel.updateOne({ _id: userPostId }, { $inc: { commentsCount: 1 } });
 		await comment.populate([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
 
 		return comment;
@@ -157,23 +158,6 @@ const unlikeComment = async ({ commentId, userId }) => {
 	}
 };
 
-// Map of userPostId -> total comment count (comments + replies) for feed cards.
-const getCommentCountsForPosts = async (userPostIds) => {
-	try {
-		const counts = await CommentModel.aggregate([
-			{ $match: { userPostId: { $in: userPostIds } } },
-			{ $group: { _id: '$userPostId', count: { $sum: 1 } } },
-		]);
-
-		return counts.reduce((map, entry) => {
-			map[entry._id.toString()] = entry.count;
-			return map;
-		}, {});
-	} catch (error) {
-		throw new AppError('Could not load comment counts', 500, { cause: error });
-	}
-};
-
 const getPreviewCommentsForPosts = async (userPostIds) => {
 	try {
 		const previewGroups = await CommentModel.aggregate([
@@ -218,7 +202,6 @@ module.exports = {
 	getCommentsForPost,
 	likeComment,
 	unlikeComment,
-	getCommentCountsForPosts,
 	getPreviewCommentsForPosts,
 	deleteCommentsForPost,
 };

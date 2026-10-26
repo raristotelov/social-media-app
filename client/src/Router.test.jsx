@@ -21,7 +21,17 @@ jest.mock('./components/ProfileLayout/ProfileLayout', () => {
 	);
 });
 jest.mock('./components/FeedView/FeedView', () => () => <p>Feed view</p>);
+jest.mock('./components/PopularPostsLayout/PopularPostsLayout', () => {
+	const { Outlet } = require('react-router-dom');
+
+	return () => (
+		<div data-testid='popular-posts-layout'>
+			<Outlet />
+		</div>
+	);
+});
 jest.mock('./components/PopularPostsView/PopularPostsView', () => () => <p>Popular posts view</p>);
+jest.mock('./components/PopularPostsPostsView/PopularPostsPostsView', () => () => <p>Popular posts posts view</p>);
 
 const LocationDisplay = () => {
 	const location = useLocation();
@@ -112,6 +122,44 @@ describe('Router', () => {
 			renderRouterAt('/user-feed', null);
 
 			expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE');
+		});
+	});
+
+	describe('the popular posts routes', () => {
+		it.each([
+			['a guest', null],
+			['a logged-in user', 'token123'],
+		])('shows the popular grid inside the popular layout to %s', (_name, jwtToken) => {
+			renderRouterAt('/popular-posts', jwtToken);
+
+			expect(screen.getByTestId('popular-posts-layout')).toContainElement(screen.getByText('Popular posts view'));
+		});
+
+		it.each([
+			['a guest', null],
+			['a logged-in user', 'token123'],
+		])('shows the popular posts view inside the popular layout to %s', (_name, jwtToken) => {
+			renderRouterAt('/popular-posts/posts', jwtToken);
+
+			expect(screen.getByTestId('popular-posts-layout')).toContainElement(screen.getByText('Popular posts posts view'));
+		});
+
+		it('does not show the grid on the posts route', () => {
+			renderRouterAt('/popular-posts/posts', null);
+
+			expect(screen.queryByText('Popular posts view')).not.toBeInTheDocument();
+		});
+
+		it('does not show the posts view on the grid route', () => {
+			renderRouterAt('/popular-posts', null);
+
+			expect(screen.queryByText('Popular posts posts view')).not.toBeInTheDocument();
+		});
+
+		it('keeps the guest on the popular posts route instead of sending them to log in', () => {
+			renderRouterAt('/popular-posts/posts', null);
+
+			expect(screen.getByTestId('location')).toHaveTextContent(/^\/popular-posts\/posts$/);
 		});
 	});
 

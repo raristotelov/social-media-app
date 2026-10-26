@@ -1,8 +1,9 @@
 const { Router } = require('express');
 const router = Router();
 
-const { userPostService } = require('../services');
+const { userPostService, popularPostService } = require('../services');
 const verifyJwtToken = require('../middlewares/verifyJwtToken');
+const readOptionalJwtToken = require('../middlewares/readOptionalJwtToken');
 const uploadImage = require('../middlewares/uploadImage');
 const constants = require('../config/constants');
 
@@ -22,6 +23,25 @@ router.get('/followed-users-posts', verifyJwtToken, async (req, res) => {
 	const followedUsersPostsData = await userPostService.getFollowedUsersPosts(res.userId);
 
 	return res.json(followedUsersPostsData);
+});
+
+router.get('/popular', readOptionalJwtToken, async (req, res) => {
+	const popularPostsData = await popularPostService.getPopularPosts({
+		userId: res.userId,
+		firstPostId: req.query.firstPostId,
+	});
+
+	return res.json(popularPostsData);
+});
+
+router.post('/popular', readOptionalJwtToken, async (req, res) => {
+	const popularPostsData = await popularPostService.getNextPopularPosts({
+		userId: res.userId,
+		snapshotTime: req.body?.snapshotTime,
+		shownPostIds: req.body?.shownPostIds,
+	});
+
+	return res.json(popularPostsData);
 });
 
 router.post('/like/:userPostId', verifyJwtToken, async (req, res) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,11 +40,16 @@ function App() {
 	const [storedTheme, setStoredTheme] = useLocalStorage('theme', null);
 
 	const navigate = useNavigate();
+	const navigateRef = useRef(navigate);
+
+	useEffect(() => {
+		navigateRef.current = navigate;
+	}, [navigate]);
 
 	const endSession = useCallback(() => {
 		setJwtToken(null);
-		navigate('/log-in');
-	}, [setJwtToken, navigate]);
+		navigateRef.current('/log-in');
+	}, [setJwtToken]);
 
 	useEffect(() => {
 		document.title = APP_NAME;

@@ -56,6 +56,15 @@ export const LOAD_ERROR_MESSAGES = Object.freeze({
 		DESCRIPTION: 'Check your connection and try again.',
 		RETRY_LABEL: 'Retry',
 	}),
+	POPULAR: Object.freeze({
+		HEADING: "Couldn't load popular posts",
+		DESCRIPTION: 'Check your connection and try again.',
+		RETRY_LABEL: 'Retry',
+	}),
+	POPULAR_NEXT_BATCH: Object.freeze({
+		MESSAGE: "Couldn't load more posts",
+		RETRY_LABEL: 'Try again',
+	}),
 	COMMENTS: Object.freeze({
 		MESSAGE: "Couldn't load comments",
 		RETRY_LABEL: 'Try again',

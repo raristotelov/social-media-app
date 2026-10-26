@@ -129,7 +129,7 @@ const login = async ({ email, password }) => {
 
 const compareNewestFirst = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
 
-const toProfileData = ({ user, requesterId, commentCounts, previewComments }) => {
+const toProfileData = ({ user, requesterId, previewComments }) => {
 	const profileData = user.toObject();
 
 	if (String(user._id) !== String(requesterId)) {
@@ -141,7 +141,6 @@ const toProfileData = ({ user, requesterId, commentCounts, previewComments }) =>
 		posts: profileData.posts
 			.map((post) => ({
 				...post,
-				commentsCount: commentCounts[post._id.toString()] || 0,
 				previewComments: previewComments[post._id.toString()] || [],
 			}))
 			.sort(compareNewestFirst),
@@ -166,12 +165,9 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds, request
 
 		const profilePostIds = usersResult.flatMap((user) => user.posts.map((post) => post._id));
 
-		const [commentCounts, previewComments] = await Promise.all([
-			commentService.getCommentCountsForPosts(profilePostIds),
-			commentService.getPreviewCommentsForPosts(profilePostIds),
-		]);
+		const previewComments = await commentService.getPreviewCommentsForPosts(profilePostIds);
 
-		const mappedUsers = usersResult.map((user) => toProfileData({ user, requesterId, commentCounts, previewComments }));
+		const mappedUsers = usersResult.map((user) => toProfileData({ user, requesterId, previewComments }));
 
 		return mappedUsers;
 	} catch (error) {

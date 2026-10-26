@@ -6,15 +6,7 @@ const CommentModel = require('../models/commentModel');
 const UserPostModel = require('../models/userPostModel');
 const UserModel = require('../models/userModel');
 const { ERROR_CODES } = require('../config/errorCodes');
-const {
-	addComment,
-	getCommentsForPost,
-	likeComment,
-	unlikeComment,
-	getCommentCountsForPosts,
-	getPreviewCommentsForPosts,
-	deleteCommentsForPost,
-} = require('./commentService');
+const { addComment, getCommentsForPost, likeComment, unlikeComment, getPreviewCommentsForPosts, deleteCommentsForPost } = require('./commentService');
 
 const POST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
 const COMMENT_ID = '64b7f0a1c2d3e4f5a6b7c8f1';
@@ -385,6 +377,102 @@ describe('commentService', () => {
 				});
 			});
 		});
+
+		describe('the stored comment count of the post', () => {
+			beforeEach(() => {
+				UserPostModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+			});
+
+			it('adds 1 to the commentsCount of the post when a top-level comment is saved', async () => {
+				givenPostExists();
+				buildCommentModelMock();
+
+				await addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Nice shot' });
+
+				expect(UserPostModel.updateOne).toHaveBeenCalledTimes(1);
+				expect(UserPostModel.updateOne).toHaveBeenCalledWith({ _id: POST_ID }, { $inc: { commentsCount: 1 } });
+			});
+
+			it('adds 1 to the commentsCount of the post when a reply is saved', async () => {
+				givenPostExists();
+				givenParentExists();
+				buildCommentModelMock();
+
+				await addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Thanks', parentCommentId: PARENT_ID });
+
+				expect(UserPostModel.updateOne).toHaveBeenCalledTimes(1);
+				expect(UserPostModel.updateOne).toHaveBeenCalledWith({ _id: POST_ID }, { $inc: { commentsCount: 1 } });
+			});
+
+			it('adds to the count only after the comment is saved', async () => {
+				const callOrder = [];
+
+				givenPostExists();
+				buildCommentModelMock({
+					save: jest.fn().mockImplementation(async () => {
+						callOrder.push('save');
+					}),
+				});
+				UserPostModel.updateOne = jest.fn().mockImplementation(async () => {
+					callOrder.push('increment');
+				});
+
+				await addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Nice shot' });
+
+				expect(callOrder).toEqual(['save', 'increment']);
+			});
+
+			it('does not change the count when saving the comment fails', async () => {
+				givenPostExists();
+				buildCommentModelMock({ save: jest.fn().mockRejectedValue(new Error('connection lost')) });
+
+				await expect(addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Nice shot' })).rejects.toBeDefined();
+
+				expect(UserPostModel.updateOne).not.toHaveBeenCalled();
+			});
+
+			it('does not change the count when the text is empty', async () => {
+				givenPostExists();
+				buildCommentModelMock();
+
+				await expect(addComment({ userPostId: POST_ID, userId: USER_ID, text: '   ' })).rejects.toBeDefined();
+
+				expect(UserPostModel.updateOne).not.toHaveBeenCalled();
+			});
+
+			it('does not change the count when the post does not exist', async () => {
+				givenPostExists(false);
+				buildCommentModelMock();
+
+				await expect(addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Nice shot' })).rejects.toBeDefined();
+
+				expect(UserPostModel.updateOne).not.toHaveBeenCalled();
+			});
+
+			it('does not change the count when the parent comment of a reply is not valid', async () => {
+				givenPostExists();
+				givenParentExists(false);
+				buildCommentModelMock();
+
+				await expect(addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Thanks', parentCommentId: PARENT_ID })).rejects.toBeDefined();
+
+				expect(UserPostModel.updateOne).not.toHaveBeenCalled();
+			});
+
+			it('wraps a failing count update in a 500 AppError that keeps the cause', async () => {
+				const updateError = new Error('connection lost');
+
+				givenPostExists();
+				buildCommentModelMock();
+				UserPostModel.updateOne = jest.fn().mockRejectedValue(updateError);
+
+				await expect(addComment({ userPostId: POST_ID, userId: USER_ID, text: 'Nice shot' })).rejects.toMatchObject({
+					statusCode: 500,
+					message: 'Could not add comment',
+					cause: updateError,
+				});
+			});
+		});
 	});
 
 	describe('getCommentsForPost', () => {
@@ -595,54 +683,6 @@ describe('commentService', () => {
 			await expect(action({ commentId: COMMENT_ID, userId: USER_ID })).rejects.toMatchObject({
 				statusCode: 500,
 				message: failureMessage,
-				cause: dbError,
-			});
-		});
-	});
-
-	describe('getCommentCountsForPosts', () => {
-		it('counts every comment and reply of the given posts', async () => {
-			CommentModel.aggregate = jest.fn().mockResolvedValue([]);
-
-			await getCommentCountsForPosts(['post1', 'post2']);
-
-			expect(CommentModel.aggregate).toHaveBeenCalledWith([
-				{ $match: { userPostId: { $in: ['post1', 'post2'] } } },
-				{ $group: { _id: '$userPostId', count: { $sum: 1 } } },
-			]);
-		});
-
-		it('returns the counts keyed by post id', async () => {
-			CommentModel.aggregate = jest.fn().mockResolvedValue([
-				{ _id: 'post1', count: 3 },
-				{ _id: 'post2', count: 1 },
-			]);
-
-			await expect(getCommentCountsForPosts(['post1', 'post2'])).resolves.toEqual({ post1: 3, post2: 1 });
-		});
-
-		it('leaves out posts that have no comments', async () => {
-			CommentModel.aggregate = jest.fn().mockResolvedValue([{ _id: 'post1', count: 3 }]);
-
-			const counts = await getCommentCountsForPosts(['post1', 'post2']);
-
-			expect(counts).not.toHaveProperty('post2');
-		});
-
-		it('returns an empty map when there are no posts', async () => {
-			CommentModel.aggregate = jest.fn().mockResolvedValue([]);
-
-			await expect(getCommentCountsForPosts([])).resolves.toEqual({});
-		});
-
-		it('wraps an unexpected database failure in a 500 AppError that keeps the cause', async () => {
-			const dbError = new Error('connection lost');
-
-			CommentModel.aggregate = jest.fn().mockRejectedValue(dbError);
-
-			await expect(getCommentCountsForPosts(['post1'])).rejects.toMatchObject({
-				statusCode: 500,
-				message: 'Could not load comment counts',
 				cause: dbError,
 			});
 		});

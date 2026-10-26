@@ -27,7 +27,7 @@ const getTrailingAction = (pathname, loggedInUser) => {
 	return 'none';
 };
 
-const PROFILE_POSTS_PATH_PATTERN = /^\/user\/[^/]+\/posts\/?$/;
+const POSTS_VIEW_PATH_PATTERN = /^\/(?:user\/[^/]+|popular-posts)\/posts\/?$/;
 
 const MobileTopBar = ({ logoutHandler }) => {
 	const { loggedInUser } = useContext(LoggedInUserContext);
@@ -51,7 +51,7 @@ const MobileTopBar = ({ logoutHandler }) => {
 		clearSearch();
 	};
 
-	if (PROFILE_POSTS_PATH_PATTERN.test(pathname)) {
+	if (POSTS_VIEW_PATH_PATTERN.test(pathname)) {
 		return null;
 	}
 

@@ -1,0 +1,28 @@
+.popular-posts-load-error {
+	margin: 0;
+	padding: 16px 0;
+
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 6px;
+
+	font-family: 'Mada';
+	font-size: 15px;
+	color: var(--text-primary);
+	text-align: center;
+}
+
+.popular-posts-load-error-retry {
+	padding: 0;
+	border: none;
+	background-color: transparent;
+
+	font: inherit;
+	font-weight: bold;
+	color: inherit;
+}
+
+.popular-posts-load-error-retry:hover {
+	cursor: pointer;
+}

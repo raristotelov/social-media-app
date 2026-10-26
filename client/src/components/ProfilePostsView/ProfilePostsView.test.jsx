@@ -146,7 +146,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			expect(screen.getByRole('heading', { name: 'Posts' })).toBeInTheDocument();
-			expect(document.querySelector('.posts-bar-username')).toHaveTextContent('janedoe');
+			expect(document.querySelector('.posts-bar-subtitle')).toHaveTextContent('janedoe');
 		});
 
 		it('shows the posts of that profile, not the posts of the feed', async () => {

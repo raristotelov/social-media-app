@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import useUserSearch from '../../hooks/useUserSearch';
+import { POPULAR_POSTS_PATH, POPULAR_POSTS_VIEW_PATH } from '../../constants/popularPosts';
 
 import Logo from '../Logo/Logo';
 import SearchInput from '../SearchInput/SearchInput';
@@ -23,6 +24,16 @@ const MainHeader = ({ logoutHandler }) => {
 	const { loggedInUser } = useContext(LoggedInUserContext);
 	const { searchWord, setSearchWord, results, isLoading, clearSearch } = useUserSearch();
 
+	const isPopularActive = currentPath === POPULAR_POSTS_PATH || currentPath === POPULAR_POSTS_VIEW_PATH;
+
+	const popularLink = (
+		<Link to={POPULAR_POSTS_PATH} title='Popular' className={`navigation-item-icon ${isPopularActive ? 'navigation-item-active' : ''}`}>
+			<FlameIcon iconColorProp='currentColor' />
+
+			<span>Popular</span>
+		</Link>
+	);
+
 	const loggedUserLinks = (
 		<div className='navigation-links'>
 			<Link to='/' title='Feed' className={`navigation-item-icon ${currentPath === '/user-feed' ? 'navigation-item-active' : ''}`}>
@@ -31,27 +42,23 @@ const MainHeader = ({ logoutHandler }) => {
 				<span>Feed</span>
 			</Link>
 
-			<Link
-				to='/popular-posts'
-				title='Popular'
-				className={`navigation-item-icon ${currentPath === '/popular-posts' ? 'navigation-item-active' : ''}`}
-			>
-				<FlameIcon iconColorProp='currentColor' />
-
-				<span>Popular</span>
-			</Link>
+			{popularLink}
 		</div>
 	);
 
 	const guestUserLinks = (
-		<div className='navigation-links'>
-			<Link to='/log-in' className={`navigation-item-text ${currentPath === '/log-in' ? 'navigation-item-active' : ''}`}>
-				Log in
-			</Link>
+		<div className='navigation-links navigation-links-guest'>
+			{popularLink}
 
-			<Link to='/sign-up' className={`navigation-item-text ${currentPath === '/sign-up' ? 'navigation-item-active' : ''}`}>
-				Sign up
-			</Link>
+			<div className='navigation-auth-actions'>
+				<Link to='/log-in' className={`navigation-item-text ${currentPath === '/log-in' ? 'navigation-item-active' : ''}`}>
+					Log in
+				</Link>
+
+				<Link to='/sign-up' className={`navigation-item-text ${currentPath === '/sign-up' ? 'navigation-item-active' : ''}`}>
+					Sign up
+				</Link>
+			</div>
 		</div>
 	);
 

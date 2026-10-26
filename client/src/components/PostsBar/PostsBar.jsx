@@ -4,7 +4,7 @@ import ChevronLeftIcon from '../icons/ChevronLeft';
 
 import './PostsBar.css';
 
-const PostsBar = ({ username, onBackClick }) => {
+const PostsBar = ({ subtitle, onBackClick }) => {
 	const isHidden = useHideOnScrollDown();
 
 	const classNames = isHidden ? 'posts-bar posts-bar-hidden' : 'posts-bar';
@@ -18,7 +18,7 @@ const PostsBar = ({ username, onBackClick }) => {
 			<div className='posts-bar-title'>
 				<h1 className='posts-bar-heading'>Posts</h1>
 
-				<span className='posts-bar-username'>{username}</span>
+				<span className='posts-bar-subtitle'>{subtitle}</span>
 			</div>
 		</div>
 	);

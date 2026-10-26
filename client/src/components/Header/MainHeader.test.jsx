@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -10,12 +10,12 @@ import MainHeader from './MainHeader';
 
 jest.mock('../../services/userService');
 
-const renderMainHeader = (loggedInUser, logoutHandler = jest.fn(), searchResults = []) => {
+const renderMainHeader = (loggedInUser, logoutHandler = jest.fn(), searchResults = [], path = '/') => {
 	getUsersProfileData.mockResolvedValue(searchResults);
 
 	return render(
 		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser }}>
-			<MemoryRouter>
+			<MemoryRouter initialEntries={[path]}>
 				<MainHeader logoutHandler={logoutHandler} />
 			</MemoryRouter>
 		</LoggedInUserContext.Provider>,
@@ -112,6 +112,90 @@ describe('MainHeader', () => {
 
 			expect(screen.queryByText('2 followers')).not.toBeInTheDocument();
 			expect(screen.getByPlaceholderText('Search')).toHaveValue('');
+		});
+	});
+
+	describe('the Popular link', () => {
+		const member = { _id: 'user1', username: 'johndoe', following: [] };
+
+		it('is shown to a guest, next to Log in and Sign up', () => {
+			renderMainHeader(null);
+
+			expect(screen.getByRole('link', { name: 'Popular' })).toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
+			expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
+		});
+
+		it('comes before Log in and Sign up for a guest', () => {
+			renderMainHeader(null);
+
+			const links = screen.getAllByRole('link').map((link) => link.textContent);
+
+			expect(links.indexOf('Popular')).toBeLessThan(links.indexOf('Log in'));
+			expect(links.indexOf('Log in')).toBeLessThan(links.indexOf('Sign up'));
+		});
+
+		it('keeps Log in and Sign up together in their own group for a guest', () => {
+			const { container } = renderMainHeader(null);
+
+			const authActions = container.querySelector('.navigation-auth-actions');
+
+			expect(
+				within(authActions)
+					.getAllByRole('link')
+					.map((link) => link.textContent),
+			).toEqual(['Log in', 'Sign up']);
+		});
+
+		it('is shown to a guest without the Feed link', () => {
+			renderMainHeader(null);
+
+			expect(screen.queryByRole('link', { name: 'Feed' })).not.toBeInTheDocument();
+		});
+
+		it.each([
+			['a guest', null],
+			['a member', member],
+		])('goes to /popular-posts for %s', (_name, user) => {
+			renderMainHeader(user);
+
+			expect(screen.getByRole('link', { name: 'Popular' })).toHaveAttribute('href', '/popular-posts');
+		});
+
+		it.each([
+			['a guest', null],
+			['a member', member],
+		])('is current on the popular grid for %s', (_name, user) => {
+			renderMainHeader(user, jest.fn(), [], '/popular-posts');
+
+			expect(screen.getByRole('link', { name: 'Popular' })).toHaveClass('navigation-item-active');
+		});
+
+		it.each([
+			['a guest', null],
+			['a member', member],
+		])('is current on the popular posts view for %s', (_name, user) => {
+			renderMainHeader(user, jest.fn(), [], '/popular-posts/posts');
+
+			expect(screen.getByRole('link', { name: 'Popular' })).toHaveClass('navigation-item-active');
+		});
+
+		it.each([
+			['a guest', null, '/log-in'],
+			['a guest', null, '/sign-up'],
+			['a member', member, '/user-feed'],
+			['a member', member, '/user/user1'],
+			['a member', member, '/user/user2/posts'],
+		])('is not current for %s at %s', (_name, user, path) => {
+			renderMainHeader(user, jest.fn(), [], path);
+
+			expect(screen.getByRole('link', { name: 'Popular' })).not.toHaveClass('navigation-item-active');
+		});
+
+		it('marks Log in as current at /log-in, not Popular', () => {
+			renderMainHeader(null, jest.fn(), [], '/log-in');
+
+			expect(screen.getByRole('link', { name: 'Log in' })).toHaveClass('navigation-item-active');
 		});
 	});
 

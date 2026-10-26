@@ -37,6 +37,11 @@ const UserPostSchema = new mongoose.Schema({
 			ref: 'User',
 		},
 	],
+	commentsCount: {
+		type: Number,
+		default: 0,
+		min: 0,
+	},
 	createdAt: {
 		type: Date,
 		default: Date.now,

@@ -128,14 +128,10 @@ const getFollowedUsersPosts = async (userId) => {
 
 		const postIds = followedUsersPostDocs.map((post) => post._id);
 
-		const [commentCounts, previewComments] = await Promise.all([
-			commentService.getCommentCountsForPosts(postIds),
-			commentService.getPreviewCommentsForPosts(postIds),
-		]);
+		const previewComments = await commentService.getPreviewCommentsForPosts(postIds);
 
 		return followedUsersPostDocs.map((post) => ({
 			...post.toObject(),
-			commentsCount: commentCounts[post._id.toString()] || 0,
 			previewComments: previewComments[post._id.toString()] || [],
 		}));
 	} catch (error) {
