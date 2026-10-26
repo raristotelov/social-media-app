@@ -138,7 +138,7 @@ describe('userService', () => {
 
 		beforeEach(() => {
 			UserModel.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: USER_ID, password: 'storedHash' }) });
-			UserModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+			UserModel.updateOne = jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
 			bcrypt.compare.mockResolvedValue(true);
 			bcrypt.hash.mockResolvedValue('newHash');
 		});
@@ -236,8 +236,17 @@ describe('userService', () => {
 			await changePassword(USER_ID, validInput);
 
 			expect(bcrypt.hash).toHaveBeenCalledWith('newPassword1', constants.SALT_ROUNDS);
-			expect(UserModel.updateOne).toHaveBeenCalledWith({ _id: USER_ID }, { password: 'newHash' });
+			expect(UserModel.updateOne).toHaveBeenCalledWith({ _id: USER_ID, password: 'storedHash' }, { password: 'newHash' });
 			expect(UserModel.updateOne).not.toHaveBeenCalledWith(expect.anything(), { password: 'newPassword1' });
+		});
+
+		it('rejects with CURRENT_PASSWORD_WRONG when the password changed between the check and the write', async () => {
+			UserModel.updateOne = jest.fn().mockResolvedValue({ matchedCount: 0, modifiedCount: 0 });
+
+			await expect(changePassword(USER_ID, validInput)).rejects.toMatchObject({
+				statusCode: 400,
+				fields: { currentPassword: ERROR_CODES.CURRENT_PASSWORD_WRONG },
+			});
 		});
 
 		it('resolves with nothing, so no password or hash can leak into the response', async () => {

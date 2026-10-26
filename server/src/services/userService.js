@@ -155,7 +155,11 @@ const changePassword = async (userId, { currentPassword, newPassword } = {}) => 
 
 		const hashedPassword = await bcrypt.hash(newPassword, constants.SALT_ROUNDS);
 
-		await UserModel.updateOne({ _id: userId }, { password: hashedPassword });
+		const { matchedCount } = await UserModel.updateOne({ _id: userId, password: user.password }, { password: hashedPassword });
+
+		if (!matchedCount) {
+			throw AppError.fromFields({ currentPassword: ERROR_CODES.CURRENT_PASSWORD_WRONG }, 400);
+		}
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;

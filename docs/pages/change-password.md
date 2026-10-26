@@ -1,6 +1,6 @@
 # Change Password
 
-Status: In Development
+Status: Complete
 
 Changing your password from the account menu (#24). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 
