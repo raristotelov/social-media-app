@@ -102,10 +102,6 @@
 		border-radius: 16px 16px 0 0;
 	}
 
-	.comments-popup > .popup-body::before {
-		background-color: var(--text-muted);
-	}
-
 	.comments-popup > .popup-body > .popup-close {
 		display: none;
 	}

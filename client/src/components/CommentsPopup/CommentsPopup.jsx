@@ -139,7 +139,7 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 	};
 
 	return (
-		<Popup title='Comments' className='comments-popup' bodyClassName='bottom-sheet' onClosePopupClick={onClose}>
+		<Popup title='Comments' className='comments-popup' isBottomSheet onClosePopupClick={onClose}>
 			<div className='comments-popup-content'>{renderComments()}</div>
 
 			<AddCommentForm onSubmit={submitComment} isDisabled={hasLoadFailed && !isLoading} className='comments-popup-form' />

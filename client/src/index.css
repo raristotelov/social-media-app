@@ -139,17 +139,4 @@ code {
 		width: 100%;
 		max-width: 450px;
 	}
-
-	.bottom-sheet::before {
-		content: '';
-		display: block;
-		align-self: center;
-		flex-shrink: 0;
-
-		width: 40px;
-		height: 4px;
-		border-radius: 2px;
-
-		background-color: var(--border-divider);
-	}
 }

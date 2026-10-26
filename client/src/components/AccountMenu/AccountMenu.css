@@ -85,7 +85,7 @@
 	left: 0;
 
 	width: 100%;
-	padding: 8px 0 24px;
+	padding: 10px 0 24px;
 
 	border: none;
 	border-top: 1px solid var(--border-divider);
@@ -93,15 +93,12 @@
 	box-shadow: 0 -4px 12px 0 rgba(0, 0, 0, 0.12);
 }
 
-.account-menu-sheet::before {
-	content: '';
-	display: block;
-	align-self: center;
+.account-menu-sheet .bottom-sheet-handle {
+	margin-bottom: 14px;
+}
 
-	width: 40px;
-	height: 4px;
-	margin-bottom: 8px;
+.account-menu-sheet .account-menu-row {
+	padding: 16px 24px;
 
-	border-radius: 2px;
-	background-color: var(--border-divider);
+	font-size: 16px;
 }

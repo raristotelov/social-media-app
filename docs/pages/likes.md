@@ -20,4 +20,5 @@ Liking posts and comments (#11) and the likes list (#5). Tokens: [style-guide.md
 - Open to guests.
 - A comment's list opens over the comments popup; closing it returns to the comments where they were.
 - Clicking an account opens that profile and closes the popup (and the comments popup under it).
+- Mobile bottom sheets get a handle and swipe-to-close ([design-system.md](../design-system.md#patterns)).
 - Fails to load: the popup's inline "Couldn't load this list · Try again" ([error-messages.md](../error-messages.md)).

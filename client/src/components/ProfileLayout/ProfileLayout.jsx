@@ -167,7 +167,7 @@ const ProfileLayout = () => {
 			) : null}
 
 			{postToDelete ? (
-				<Popup title='Delete post' className='delete-post-popup' bodyClassName='bottom-sheet' onClosePopupClick={closeDeletePostConfirm}>
+				<Popup title='Delete post' className='delete-post-popup' isBottomSheet onClosePopupClick={closeDeletePostConfirm}>
 					<DeletePostConfirm onDeleteClick={deletePostHandler} onCancelClick={closeDeletePostConfirm} isDeleting={isDeletingPost} />
 				</Popup>
 			) : null}

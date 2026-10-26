@@ -375,7 +375,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 			) : null}
 
 			{openOverlay === STORY_VIEWER_OVERLAYS.DELETE ? (
-				<Popup title='Delete story' className='delete-post-popup' bodyClassName='bottom-sheet' onClosePopupClick={closeOverlay}>
+				<Popup title='Delete story' className='delete-post-popup' isBottomSheet onClosePopupClick={closeOverlay}>
 					<DeletePostConfirm
 						message={DELETE_STORY_MESSAGE}
 						onDeleteClick={confirmDelete}

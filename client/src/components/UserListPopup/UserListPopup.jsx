@@ -75,7 +75,7 @@ const UserListPopup = ({ userId, storyId, userPostId, commentId, listType, onClo
 		<Popup
 			title={USER_LIST_TITLES[listType]}
 			className={isViewersList ? 'user-list-popup story-viewers-popup' : 'user-list-popup'}
-			bodyClassName={isViewersList ? 'bottom-sheet' : undefined}
+			isBottomSheet={isViewersList}
 			onClosePopupClick={onClose}
 		>
 			{hasLoadFailed && !isLoading ? (
