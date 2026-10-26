@@ -8,6 +8,7 @@ import { getFollowers, getFollowing } from '../../services/userService';
 import { getStoryViewers } from '../../services/storyService';
 import { getUserPostLikes } from '../../services/userPostService';
 import { getCommentLikes } from '../../services/commentService';
+import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBottomSheetEnvironment } from '../../testUtils/bottomSheet';
 
 import UserListPopup from './UserListPopup';
 
@@ -560,6 +561,78 @@ describe('UserListPopup', () => {
 
 			await waitFor(() => expect(getFollowers).toHaveBeenCalledTimes(2));
 			expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+		});
+	});
+
+	describe('the bottom sheet handle', () => {
+		beforeEach(() => {
+			installBottomSheetEnvironment();
+			getStoryViewers.mockResolvedValue([buildRow({ _id: 'v1', username: 'viewer1' })]);
+		});
+
+		afterEach(() => {
+			restoreBottomSheetEnvironment();
+		});
+
+		it('is shown on the viewers list', async () => {
+			const { container } = renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			await screen.findByText('viewer1');
+
+			expect(container.querySelector('.story-viewers-popup .bottom-sheet-handle')).toBeInTheDocument();
+		});
+
+		it.each([
+			['followers', 'Followers'],
+			['following', 'Following'],
+		])('is not shown on the %s list', async (listType, title) => {
+			const { container } = renderPopup({ listType });
+
+			await screen.findByRole('heading', { name: title });
+			await waitFor(() => expect(container.querySelector('.loading-spinner')).not.toBeInTheDocument());
+
+			expect(container.querySelector('.bottom-sheet-handle')).not.toBeInTheDocument();
+		});
+
+		it('closes the viewers list when the handle is dragged down past 25%', async () => {
+			const { container, onClose } = renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			await screen.findByText('viewer1');
+			dragDown(container.querySelector('.bottom-sheet-handle'), 120);
+
+			expect(onClose).not.toHaveBeenCalled();
+
+			fireTransitionEnd(container.querySelector('.story-viewers-popup .popup-body'));
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('closes the viewers list when the Viewers title is dragged down past 25%', async () => {
+			const { container, onClose } = renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			await screen.findByText('viewer1');
+			dragDown(screen.getByRole('heading', { name: 'Viewers' }), 120);
+			fireTransitionEnd(container.querySelector('.story-viewers-popup .popup-body'));
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not close when the drag starts on a viewer', async () => {
+			const { container, onClose } = renderPopup({ listType: 'viewers', storyId: 'story1' });
+
+			dragDown(await screen.findByText('viewer1'), 300);
+			fireTransitionEnd(container.querySelector('.story-viewers-popup .popup-body'));
+
+			expect(onClose).not.toHaveBeenCalled();
+		});
+
+		it('does not close the followers list on a drag from its title', async () => {
+			const { container, onClose } = renderPopup({ listType: 'followers' });
+
+			dragDown(await screen.findByRole('heading', { name: 'Followers' }), 300);
+			fireTransitionEnd(container.querySelector('.popup-body'));
+
+			expect(onClose).not.toHaveBeenCalled();
 		});
 	});
 

@@ -16,6 +16,26 @@ const PRIMARY_MOUSE_BUTTON = 0;
 
 const prefersReducedMotion = () => Boolean(window.matchMedia?.(REDUCED_MOTION_MEDIA_QUERY)?.matches);
 
+const capturePointer = (element, pointerId) => {
+	try {
+		element.setPointerCapture?.(pointerId);
+
+		return true;
+	} catch {
+		return false;
+	}
+};
+
+const releasePointer = (element, pointerId) => {
+	try {
+		element.releasePointerCapture?.(pointerId);
+
+		return true;
+	} catch {
+		return false;
+	}
+};
+
 const useBottomSheetDrag = (onClose) => {
 	const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
 	const dragRef = useRef(null);
@@ -35,7 +55,6 @@ const useBottomSheetDrag = (onClose) => {
 		const sheet = event.currentTarget;
 
 		clearTransition(sheet);
-		sheet.setPointerCapture?.(event.pointerId);
 
 		dragRef.current = {
 			sheet,
@@ -46,6 +65,8 @@ const useBottomSheetDrag = (onClose) => {
 			offset: 0,
 			velocity: 0,
 		};
+
+		capturePointer(sheet, event.pointerId);
 	};
 
 	const handlePointerMove = (event) => {
@@ -75,7 +96,7 @@ const useBottomSheetDrag = (onClose) => {
 		}
 
 		dragRef.current = null;
-		drag.sheet.releasePointerCapture?.(event.pointerId);
+		releasePointer(drag.sheet, event.pointerId);
 
 		const isPastCloseDistance = drag.offset > drag.sheet.offsetHeight * BOTTOM_SHEET_CLOSE_HEIGHT_RATIO;
 		const isFlick = drag.offset > 0 && drag.velocity > BOTTOM_SHEET_FLICK_VELOCITY_PX_PER_MS;
