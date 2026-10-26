@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 const UserPostModel = require('../models/userPostModel');
 const UserModel = require('../models/userModel');
-const CommentModel = require('../models/commentModel');
 const {
 	POPULAR_POSTS_PAGE_SIZE,
 	POPULAR_COMMENT_WEIGHT,
@@ -21,7 +20,7 @@ const AUTHOR_POPULATE = {
 	select: 'username profilePicture',
 };
 
-const POPULAR_SCORE_FIELDS_TO_DROP = { commentCounts: 0, snapshotCommentsCount: 0, likesCount: 0, ageHours: 0, popularityScore: 0 };
+const POPULAR_SCORE_FIELDS_TO_DROP = { storedCommentsCount: 0, likesCount: 0, ageHours: 0, popularityScore: 0 };
 
 const createBadRequestError = (message) => new AppError(message, 400, { code: ERROR_CODES.BAD_REQUEST });
 
@@ -82,19 +81,8 @@ const parseShownPostIds = (shownPostIds) => {
 
 const buildScoreStages = (snapshotTime) => [
 	{
-		$lookup: {
-			from: CommentModel.collection.name,
-			let: { postId: '$_id' },
-			pipeline: [
-				{ $match: { $expr: { $and: [{ $eq: ['$userPostId', '$$postId'] }, { $lte: ['$createdAt', snapshotTime] }] } } },
-				{ $count: 'count' },
-			],
-			as: 'commentCounts',
-		},
-	},
-	{
 		$addFields: {
-			snapshotCommentsCount: { $ifNull: [{ $first: '$commentCounts.count' }, 0] },
+			storedCommentsCount: { $ifNull: ['$commentsCount', 0] },
 			likesCount: { $size: { $ifNull: ['$likes', []] } },
 			ageHours: { $divide: [{ $subtract: [snapshotTime, '$createdAt'] }, MS_PER_HOUR] },
 		},
@@ -103,7 +91,7 @@ const buildScoreStages = (snapshotTime) => [
 		$addFields: {
 			popularityScore: {
 				$divide: [
-					{ $add: ['$likesCount', { $multiply: [POPULAR_COMMENT_WEIGHT, '$snapshotCommentsCount'] }] },
+					{ $add: ['$likesCount', { $multiply: [POPULAR_COMMENT_WEIGHT, '$storedCommentsCount'] }] },
 					{ $pow: [{ $add: ['$ageHours', POPULAR_AGE_OFFSET_HOURS] }, POPULAR_AGE_EXPONENT] },
 				],
 			},
@@ -124,14 +112,10 @@ const withCommentData = async (posts) => {
 	const populatedPosts = await UserPostModel.populate(posts, AUTHOR_POPULATE);
 	const postIds = populatedPosts.map((post) => post._id);
 
-	const [commentCounts, previewComments] = await Promise.all([
-		commentService.getCommentCountsForPosts(postIds),
-		commentService.getPreviewCommentsForPosts(postIds),
-	]);
+	const previewComments = await commentService.getPreviewCommentsForPosts(postIds);
 
 	return populatedPosts.map((post) => ({
 		...post,
-		commentsCount: commentCounts[post._id.toString()] || 0,
 		previewComments: previewComments[post._id.toString()] || [],
 	}));
 };
@@ -143,9 +127,13 @@ const loadPopularPage = async ({ userId, snapshotTime, firstPost, shownPostIds }
 
 	const rankedPosts = await getRankedPosts({ snapshotTime, excludedAuthorIds, shownPostIds, limit: rankedLimit });
 
-	const posts = await withCommentData([...(firstPost ? [firstPost] : []), ...rankedPosts.slice(0, rankedLimit)]);
+	const returnedRankedPosts = rankedPosts.slice(0, rankedLimit);
+	const posts = await withCommentData([...(firstPost ? [firstPost] : []), ...returnedRankedPosts]);
 
-	return { posts, snapshotTime: snapshotTime.toISOString(), hasMore: rankedPosts.length > rankedLimit };
+	const shownTotal = shownPostIds.length + returnedRankedPosts.length;
+	const hasMore = rankedPosts.length > rankedLimit && shownTotal < MAX_SHOWN_POST_IDS;
+
+	return { posts, snapshotTime: snapshotTime.toISOString(), hasMore };
 };
 
 const getPopularPosts = async ({ userId, firstPostId }) => {

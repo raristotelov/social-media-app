@@ -19,7 +19,9 @@ Ticket #3. Popular posts (`/popular-posts`), open to guests and logged-in users.
 
 - 30 posts at a time; the next 30 load when scrolling near the bottom, in the grid and in the posts view.
 - Loaded posts never move; the page changes only on reload.
-- Each next batch sends the ids already shown (POST body) and gets the top 30 of the rest, ranked with the time the page opened as "now". Nothing repeats or is skipped; a post whose likes rose shows at the top of the next batch.
+- Each next batch sends the ids already shown (POST body) and gets the top 30 of the rest, ranked with the time the page opened as "now". Nothing repeats or is skipped; a post whose likes or comments rose shows at the top of the next batch.
+- Likes and comments are the post's current counts; each post stores its comment count (replies included), kept up to date as comments are added or removed.
+- After 10000 shown posts the list quietly ends, as if there were no more.
 
 ## Empty
 

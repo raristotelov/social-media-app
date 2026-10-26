@@ -8,16 +8,14 @@ jest.mock('../services', () => ({
 	},
 }));
 
-const express = require('express');
 const JWT = require('jsonwebtoken');
 const mongoose = require('mongoose');
 
 const { popularPostService } = require('../services');
-const userPostController = require('./userPostController');
-const errorHandler = require('../middlewares/errorHandler');
+const app = require('../app');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
-const { POPULAR_BODY_LIMIT_BYTES, MAX_SHOWN_POST_IDS } = require('../config/popularPosts');
+const { MAX_SHOWN_POST_IDS } = require('../config/popularPosts');
 
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const POST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
@@ -44,13 +42,6 @@ describe('popular post routes', () => {
 	beforeAll(async () => {
 		originalJwtSecret = process.env.JWT_SECRET;
 		process.env.JWT_SECRET = JWT_SECRET;
-
-		const app = express();
-
-		app.post('/user-posts/popular', express.json({ limit: POPULAR_BODY_LIMIT_BYTES }));
-		app.use(express.json());
-		app.use('/user-posts', userPostController);
-		app.use(errorHandler);
 
 		server = await new Promise((resolve) => {
 			const listeningServer = app.listen(0, '127.0.0.1', () => resolve(listeningServer));

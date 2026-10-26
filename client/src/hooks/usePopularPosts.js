@@ -3,7 +3,10 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import LoggedInUserContext from '../contexts/LoggedInUserContext';
 import { getPopularPosts, getNextPopularPosts } from '../services/userPostService';
 import { ERROR_CODES } from '../constants/errorCodes';
+import { MAX_SHOWN_POST_IDS } from '../constants/popularPosts';
 import { getErrorCode, isUnauthenticatedError } from '../utils/errors';
+
+const canRequestMore = (serverHasMore, shownPostIds) => serverHasMore && shownPostIds.length < MAX_SHOWN_POST_IDS;
 
 const usePopularPosts = ({ firstPostId, onFirstPostMissing }) => {
 	const [posts, setPosts] = useState([]);
@@ -60,7 +63,7 @@ const usePopularPosts = ({ firstPostId, onFirstPostMissing }) => {
 
 				setPosts(result.posts);
 				setSnapshotTime(result.snapshotTime);
-				setHasMore(result.hasMore);
+				setHasMore(canRequestMore(result.hasMore, shownPostIdsRef.current));
 				setHasLoadFailed(false);
 			})
 			.catch((error) => {
@@ -111,7 +114,7 @@ const usePopularPosts = ({ firstPostId, onFirstPostMissing }) => {
 			shownPostIdsRef.current = [...shownPostIdsRef.current, ...result.posts.map((post) => post._id)];
 
 			setPosts((state) => [...state, ...result.posts]);
-			setHasMore(result.hasMore);
+			setHasMore(canRequestMore(result.hasMore, shownPostIdsRef.current));
 		} catch (error) {
 			if (isUnauthenticatedError(error)) {
 				endSession();
