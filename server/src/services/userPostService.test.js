@@ -383,20 +383,25 @@ describe('userPostService', () => {
 	describe('getFollowedUsersPosts', () => {
 		const FOLLOWED_IDS = ['64b7f0a1c2d3e4f5a6b7c8a1', '64b7f0a1c2d3e4f5a6b7c8a2'];
 
-		const buildPostDoc = (id, authorUsername = 'alice') => {
-			const data = { _id: id, imageUrl: `https://example.com/${id}.jpg`, likes: [], userId: { _id: 'author1', username: authorUsername } };
+		const buildPostDoc = (id, authorUsername = 'alice', commentsCount = 0) => {
+			const data = {
+				_id: id,
+				imageUrl: `https://example.com/${id}.jpg`,
+				likes: [],
+				commentsCount,
+				userId: { _id: 'author1', username: authorUsername },
+			};
 
 			return { _id: id, toObject: () => ({ ...data }) };
 		};
 
-		const givenFeed = ({ following = FOLLOWED_IDS, posts = [], commentCounts = {}, previewComments = {} } = {}) => {
+		const givenFeed = ({ following = FOLLOWED_IDS, posts = [], previewComments = {} } = {}) => {
 			const populate = jest.fn().mockResolvedValue(posts);
 			const sort = jest.fn().mockReturnValue({ populate });
 			const select = jest.fn().mockResolvedValue({ following });
 
 			UserModel.findById = jest.fn().mockReturnValue({ select });
 			UserPostModel.find = jest.fn().mockReturnValue({ sort });
-			commentService.getCommentCountsForPosts.mockResolvedValue(commentCounts);
 			commentService.getPreviewCommentsForPosts.mockResolvedValue(previewComments);
 
 			return { sort, populate, select };
@@ -444,12 +449,20 @@ describe('userPostService', () => {
 			expect(feed.map((post) => post.userId.username)).toEqual(['carol', 'bob', 'alice']);
 		});
 
-		it('adds the comment count of each post, defaulting to 0', async () => {
-			givenFeed({ posts: [buildPostDoc('p2'), buildPostDoc('p1')], commentCounts: { p2: 4 } });
+		it('returns the comment count stored on each post, without counting comments again', async () => {
+			givenFeed({ posts: [buildPostDoc('p2', 'alice', 4), buildPostDoc('p1', 'alice', 0)] });
 
 			const feed = await getFollowedUsersPosts(OWNER_ID);
 
 			expect(feed.map((post) => post.commentsCount)).toEqual([4, 0]);
+		});
+
+		it('keeps the stored comment count when the post also has preview comments', async () => {
+			givenFeed({ posts: [buildPostDoc('p1', 'alice', 9)], previewComments: { p1: [{ _id: 'c1' }] } });
+
+			const [post] = await getFollowedUsersPosts(OWNER_ID);
+
+			expect(post).toMatchObject({ commentsCount: 9, previewComments: [{ _id: 'c1' }] });
 		});
 
 		it('adds the preview comments of each post, defaulting to an empty list', async () => {
@@ -462,13 +475,11 @@ describe('userPostService', () => {
 			expect(feed.map((post) => post.previewComments)).toEqual([preview, []]);
 		});
 
-		it('asks for the counts and previews of all the posts in one call each', async () => {
+		it('asks for the previews of all the posts in one call', async () => {
 			givenFeed({ posts: [buildPostDoc('p2'), buildPostDoc('p1')] });
 
 			await getFollowedUsersPosts(OWNER_ID);
 
-			expect(commentService.getCommentCountsForPosts).toHaveBeenCalledTimes(1);
-			expect(commentService.getCommentCountsForPosts).toHaveBeenCalledWith(['p2', 'p1']);
 			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
 			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['p2', 'p1']);
 		});
@@ -514,7 +525,6 @@ describe('userPostService', () => {
 				await getFollowedUsersPosts(OWNER_ID).catch(() => undefined);
 
 				expect(UserPostModel.find).not.toHaveBeenCalled();
-				expect(commentService.getCommentCountsForPosts).not.toHaveBeenCalled();
 				expect(commentService.getPreviewCommentsForPosts).not.toHaveBeenCalled();
 			});
 		});
@@ -535,10 +545,10 @@ describe('userPostService', () => {
 		});
 
 		it('rethrows an AppError from the comment service unchanged', async () => {
-			const commentError = new AppError('Could not load comment counts', 500);
+			const commentError = new AppError('Could not load preview comments', 500);
 
 			givenFeed({ posts: [buildPostDoc('p1')] });
-			commentService.getCommentCountsForPosts.mockRejectedValue(commentError);
+			commentService.getPreviewCommentsForPosts.mockRejectedValue(commentError);
 
 			await expect(getFollowedUsersPosts(OWNER_ID)).rejects.toBe(commentError);
 		});

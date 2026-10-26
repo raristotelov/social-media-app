@@ -263,6 +263,18 @@ describe('popular post routes', () => {
 				expect(body.code).toBe(ERROR_CODES.BAD_REQUEST);
 				expect(popularPostService.getNextPopularPosts).not.toHaveBeenCalled();
 			});
+
+			it('keeps the default body limit on the other routes, so the raised limit applies to the popular route only', async () => {
+				const response = await fetch(`${baseUrl}/users/login`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ email: 'a@example.com', password: 'x'.repeat(200 * 1024) }),
+				});
+				const body = await response.json();
+
+				expect(response.status).toBe(413);
+				expect(body.code).toBe(ERROR_CODES.BAD_REQUEST);
+			});
 		});
 	});
 });

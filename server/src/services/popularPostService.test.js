@@ -10,7 +10,6 @@ jest.mock('../models/commentModel', () => ({
 	collection: { name: 'comments' },
 }));
 jest.mock('./commentService', () => ({
-	getCommentCountsForPosts: jest.fn(),
 	getPreviewCommentsForPosts: jest.fn(),
 }));
 
@@ -79,7 +78,6 @@ describe('popularPostService', () => {
 		UserPostModel.aggregate.mockImplementation(async () => rankedPosts);
 		UserPostModel.populate.mockImplementation(async (posts) => posts);
 		UserModel.findById.mockReturnValue(buildLeanQuery({ _id: ME, following: [FOLLOWED_A, FOLLOWED_B] }));
-		commentService.getCommentCountsForPosts.mockResolvedValue({});
 		commentService.getPreviewCommentsForPosts.mockResolvedValue({});
 	});
 
@@ -143,26 +141,36 @@ describe('popularPostService', () => {
 				expect(getPipeline().find((stage) => stage.$sort).$sort).toEqual({ popularityScore: -1, _id: -1 });
 			});
 
-			it('counts only the comments made up to the snapshot time', async () => {
+			it('scores with the comment count stored on the post, treating a missing count as 0', async () => {
 				await getPopularPosts({});
 
-				const lookup = getPipeline().find((stage) => stage.$lookup).$lookup;
+				const scoreFields = getPipeline().find((stage) => stage.$addFields).$addFields;
 
-				expect(JSON.stringify(lookup.pipeline[0].$match.$expr.$and[1])).toBe(JSON.stringify({ $lte: ['$createdAt', NOW] }));
+				expect(scoreFields.storedCommentsCount).toEqual({ $ifNull: ['$commentsCount', 0] });
 			});
 
-			it('drops the scoring fields from the posts it returns', async () => {
+			it('does not count the comments collection while ranking', async () => {
+				await getPopularPosts({});
+
+				expect(getPipeline().some((stage) => stage.$lookup)).toBe(false);
+			});
+
+			it('weighs the stored comment count into the score', async () => {
+				await getPopularPosts({});
+
+				const [, scoreStage] = getPipeline().filter((stage) => stage.$addFields);
+
+				expect(JSON.stringify(scoreStage.$addFields.popularityScore.$divide[0])).toBe(
+					JSON.stringify({ $add: ['$likesCount', { $multiply: [2, '$storedCommentsCount'] }] }),
+				);
+			});
+
+			it('drops the scoring fields from the posts it returns, keeping the stored commentsCount', async () => {
 				await getPopularPosts({});
 
 				const projection = getPipeline().find((stage) => stage.$project).$project;
 
-				expect(Object.keys(projection).sort()).toEqual([
-					'ageHours',
-					'commentCounts',
-					'likesCount',
-					'popularityScore',
-					'snapshotCommentsCount',
-				]);
+				expect(Object.keys(projection).sort()).toEqual(['ageHours', 'likesCount', 'popularityScore', 'storedCommentsCount']);
 				expect(Object.values(projection).every((value) => value === 0)).toBe(true);
 			});
 
@@ -224,29 +232,47 @@ describe('popularPostService', () => {
 				expect(UserPostModel.populate).toHaveBeenCalledWith(rankedPosts, { path: 'userId', select: 'username profilePicture' });
 			});
 
-			it('adds the comment count and the preview comments to each post', async () => {
+			it('adds the preview comments to each post, defaulting to an empty list', async () => {
 				rankedPosts = buildPosts(2);
 				const [first, second] = rankedPosts;
 				const preview = [{ _id: buildId(900), text: 'Nice' }];
 
-				commentService.getCommentCountsForPosts.mockResolvedValue({ [first._id.toString()]: 7 });
 				commentService.getPreviewCommentsForPosts.mockResolvedValue({ [first._id.toString()]: preview });
 
 				const result = await getPopularPosts({});
 
-				expect(result.posts[0]).toMatchObject({ _id: first._id, commentsCount: 7, previewComments: preview });
-				expect(result.posts[1]).toMatchObject({ _id: second._id, commentsCount: 0, previewComments: [] });
+				expect(result.posts[0]).toMatchObject({ _id: first._id, previewComments: preview });
+				expect(result.posts[1]).toMatchObject({ _id: second._id, previewComments: [] });
 			});
 
-			it('asks for the counts and previews of exactly the returned posts', async () => {
+			it('keeps the stored commentsCount of each post as it came from the ranking', async () => {
+				rankedPosts = [
+					{ ...buildPost(1), commentsCount: 7 },
+					{ ...buildPost(2), commentsCount: 0 },
+				];
+
+				const result = await getPopularPosts({});
+
+				expect(result.posts.map((post) => post.commentsCount)).toEqual([7, 0]);
+			});
+
+			it('does not count the comments of the posts again', async () => {
+				rankedPosts = [{ ...buildPost(1), commentsCount: 7 }];
+				commentService.getPreviewCommentsForPosts.mockResolvedValue({
+					[rankedPosts[0]._id.toString()]: [{ _id: buildId(900) }, { _id: buildId(901) }],
+				});
+
+				const result = await getPopularPosts({});
+
+				expect(result.posts[0].commentsCount).toBe(7);
+			});
+
+			it('asks for the previews of exactly the returned posts', async () => {
 				rankedPosts = buildPosts(3);
 
 				await getPopularPosts({});
 
-				const expectedIds = rankedPosts.map((post) => post._id);
-
-				expect(commentService.getCommentCountsForPosts).toHaveBeenCalledWith(expectedIds);
-				expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(expectedIds);
+				expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(rankedPosts.map((post) => post._id));
 			});
 		});
 
@@ -342,9 +368,9 @@ describe('popularPostService', () => {
 				expect(error.cause).toBe(failure);
 			});
 
-			it('answers 500 when the comment counts fail', async () => {
+			it('answers 500 when the preview comments fail', async () => {
 				rankedPosts = buildPosts(1);
-				commentService.getCommentCountsForPosts.mockRejectedValue(new AppError('Could not load comment counts', 500));
+				commentService.getPreviewCommentsForPosts.mockRejectedValue(new AppError('Could not load preview comments', 500));
 
 				const error = await getPopularPosts({}).catch((rejection) => rejection);
 
@@ -418,9 +444,8 @@ describe('popularPostService', () => {
 				expect(getMatch().userId).toEqual({ $nin: [] });
 			});
 
-			it('adds the comment count and the preview comments to each post', async () => {
-				rankedPosts = buildPosts(1);
-				commentService.getCommentCountsForPosts.mockResolvedValue({ [rankedPosts[0]._id.toString()]: 3 });
+			it('keeps the stored commentsCount and adds the preview comments to each post', async () => {
+				rankedPosts = [{ ...buildPost(1), commentsCount: 3 }];
 
 				const result = await next();
 
@@ -482,6 +507,58 @@ describe('popularPostService', () => {
 			it('answers 400 and never looks the user up when the input is invalid', async () => {
 				await expectAppError(next({ userId: ME.toString(), snapshotTime: 'bad' }), { statusCode: 400, code: ERROR_CODES.BAD_REQUEST });
 				expect(UserModel.findById).not.toHaveBeenCalled();
+			});
+		});
+
+		describe('the quiet end at the cap of shown posts', () => {
+			const buildShownIds = (count) => Array.from({ length: count }, () => new mongoose.Types.ObjectId().toString());
+
+			it('reports no more once the shown posts plus the returned ones reach the cap exactly', async () => {
+				rankedPosts = buildPosts(POPULAR_POSTS_PAGE_SIZE + 1);
+
+				const result = await next({ shownPostIds: buildShownIds(MAX_SHOWN_POST_IDS - POPULAR_POSTS_PAGE_SIZE) });
+
+				expect(result.posts).toHaveLength(POPULAR_POSTS_PAGE_SIZE);
+				expect(result.hasMore).toBe(false);
+			});
+
+			it('still reports more when the shown posts plus the returned ones stay one below the cap', async () => {
+				rankedPosts = buildPosts(POPULAR_POSTS_PAGE_SIZE + 1);
+
+				const result = await next({ shownPostIds: buildShownIds(MAX_SHOWN_POST_IDS - POPULAR_POSTS_PAGE_SIZE - 1) });
+
+				expect(result.hasMore).toBe(true);
+			});
+
+			it('reports no more when the cap is already full, whatever else could be ranked', async () => {
+				rankedPosts = buildPosts(POPULAR_POSTS_PAGE_SIZE + 1);
+
+				const result = await next({ shownPostIds: buildShownIds(MAX_SHOWN_POST_IDS) });
+
+				expect(result.hasMore).toBe(false);
+			});
+
+			it('still returns the posts of the batch that reaches the cap', async () => {
+				rankedPosts = buildPosts(POPULAR_POSTS_PAGE_SIZE + 1);
+
+				const result = await next({ shownPostIds: buildShownIds(MAX_SHOWN_POST_IDS - POPULAR_POSTS_PAGE_SIZE) });
+
+				expect(getIds(result)).toEqual(rankedPosts.slice(0, POPULAR_POSTS_PAGE_SIZE).map((post) => post._id.toString()));
+			});
+
+			it('reports no more for a short last batch below the cap, as before', async () => {
+				rankedPosts = buildPosts(5);
+
+				const result = await next({ shownPostIds: buildShownIds(100) });
+
+				expect(result.hasMore).toBe(false);
+			});
+
+			it('still answers 400 BAD_REQUEST for a body over the cap', async () => {
+				await expectAppError(next({ shownPostIds: buildShownIds(MAX_SHOWN_POST_IDS + 1) }), {
+					statusCode: 400,
+					code: ERROR_CODES.BAD_REQUEST,
+				});
 			});
 		});
 

@@ -6,6 +6,7 @@ const UserPostModel = require('../models/userPostModel');
 const CommentModel = require('../models/commentModel');
 const { ERROR_CODES } = require('../config/errorCodes');
 const { POPULAR_POSTS_PAGE_SIZE, MAX_SHOWN_POST_IDS } = require('../config/popularPosts');
+const { addComment } = require('./commentService');
 const { getPopularPosts, getNextPopularPosts } = require('./popularPostService');
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -57,14 +58,16 @@ const createPost = async (author, options) => {
 
 const createPosts = (author, optionsList) => UserPostModel.insertMany(optionsList.map((options) => buildPostDocument(author, options)));
 
-const createComment = (post, commenter, { createdAt = new Date(), parentCommentId = null } = {}) =>
-	CommentModel.create({ userPostId: post._id, userId: commenter._id, text: 'a comment', createdAt, parentCommentId });
+const createComment = (post, commenter, { parentCommentId } = {}) =>
+	addComment({ userPostId: post._id, userId: commenter._id, text: 'a comment', parentCommentId });
 
-const createComments = async (post, commenter, count, options) => {
+const createComments = async (post, commenter, count) => {
 	for (let index = 0; index < count; index += 1) {
-		await createComment(post, commenter, options);
+		await createComment(post, commenter);
 	}
 };
+
+const getStoredCommentsCount = async (post) => (await UserPostModel.findById(post._id).lean()).commentsCount;
 
 const ids = (posts) => posts.map((post) => String(post._id));
 
@@ -201,6 +204,52 @@ describe('popularPostService against a real database', () => {
 			expect(result.posts.find((post) => String(post._id) === String(quiet._id)).commentsCount).toBe(0);
 		});
 
+		it('ranks by the count stored on the post, raised by each comment added through the service', async () => {
+			const commented = await createPost(author, { likes: 0 });
+			const threeLikes = await createPost(author, { likes: 3 });
+
+			await createComments(commented, commenter, 2);
+
+			expect(await getStoredCommentsCount(commented)).toBe(2);
+			expect(idsOf(await getPopularPosts({}))).toEqual(ids([commented, threeLikes]));
+		});
+
+		it('does not rank by comment documents that never raised the stored count', async () => {
+			const unCounted = await createPost(author, { likes: 0 });
+			const oneLike = await createPost(author, { likes: 1 });
+
+			await CommentModel.create([
+				{ userPostId: unCounted._id, userId: commenter._id, text: 'a' },
+				{ userPostId: unCounted._id, userId: commenter._id, text: 'b' },
+				{ userPostId: unCounted._id, userId: commenter._id, text: 'c' },
+			]);
+
+			const result = await getPopularPosts({});
+
+			expect(idsOf(result)).toEqual(ids([oneLike, unCounted]));
+			expect(result.posts.find((post) => String(post._id) === String(unCounted._id)).commentsCount).toBe(0);
+		});
+
+		it('ranks by a stored count set directly on the post', async () => {
+			const counted = await createPost(author, { likes: 0 });
+			const threeLikes = await createPost(author, { likes: 3 });
+
+			await UserPostModel.updateOne({ _id: counted._id }, { $set: { commentsCount: 2 } });
+
+			expect(idsOf(await getPopularPosts({}))).toEqual(ids([counted, threeLikes]));
+		});
+
+		it('treats a post stored without a commentsCount as having no comments', async () => {
+			const noCountField = await createPost(author, { likes: 0 });
+			const oneLike = await createPost(author, { likes: 1 });
+
+			await UserPostModel.collection.updateOne({ _id: noCountField._id }, { $unset: { commentsCount: '' } });
+
+			const result = await getPopularPosts({});
+
+			expect(idsOf(result)).toEqual(ids([oneLike, noCountField]));
+		});
+
 		it('breaks a tie by putting the newest post first', async () => {
 			const createdAt = hoursAgo(5);
 			const first = await createPost(author, { likes: 2, createdAt });
@@ -335,40 +384,44 @@ describe('popularPostService against a real database', () => {
 			expect(idsOf(result)).toEqual([String(atSnapshot._id)]);
 		});
 
-		it('ignores the comments made after the snapshot time', async () => {
+		it('counts the comments made after the snapshot time, since the comment count is current', async () => {
 			const snapshotTime = hoursAgo(3);
 			const commentedLate = await createPost(author, { likes: 0, createdAt: hoursAgo(10) });
 			const liked = await createPost(author, { likes: 1, createdAt: hoursAgo(10) });
 
-			await createComments(commentedLate, commenter, 5, { createdAt: hoursAgo(1) });
+			await createComments(commentedLate, commenter, 5);
 
 			const result = await getNextPopularPosts({ snapshotTime: snapshotTime.toISOString(), shownPostIds: [] });
 
-			expect(idsOf(result)).toEqual(ids([liked, commentedLate]));
+			expect(idsOf(result)).toEqual(ids([commentedLate, liked]));
 		});
 
-		it('counts the comments made before the snapshot time', async () => {
-			const snapshotTime = hoursAgo(3);
-			const commentedEarly = await createPost(author, { likes: 0, createdAt: hoursAgo(10) });
-			const liked = await createPost(author, { likes: 1, createdAt: hoursAgo(10) });
+		it('shows a post that was commented on after the page opened at the top of the next batch', async () => {
+			const ranked = await createPosts(
+				author,
+				Array.from({ length: POPULAR_POSTS_PAGE_SIZE + 5 }, (_item, index) => ({ likes: index + 1 })),
+			);
+			const lowestRanked = ranked[0];
 
-			await createComments(commentedEarly, commenter, 5, { createdAt: hoursAgo(6) });
+			const first = await getPopularPosts({});
 
-			const result = await getNextPopularPosts({ snapshotTime: snapshotTime.toISOString(), shownPostIds: [] });
+			await createComments(lowestRanked, commenter, 40);
 
-			expect(idsOf(result)).toEqual(ids([commentedEarly, liked]));
+			const second = await getNextPopularPosts({ snapshotTime: first.snapshotTime, shownPostIds: toShownIds(first) });
+
+			expect(idsOf(second)[0]).toBe(String(lowestRanked._id));
 		});
 
-		it('counts the comments made exactly at the snapshot time', async () => {
-			const snapshotTime = hoursAgo(3);
-			const commentedAtSnapshot = await createPost(author, { likes: 0, createdAt: hoursAgo(10) });
-			const liked = await createPost(author, { likes: 1, createdAt: hoursAgo(10) });
+		it('measures the age of a commented post against the snapshot time', async () => {
+			const snapshotTime = hoursAgo(100);
+			const olderCommented = await createPost(author, { likes: 0, createdAt: hoursBefore(snapshotTime, 10) });
+			const newerLiked = await createPost(author, { likes: 3, createdAt: hoursBefore(snapshotTime, 1) });
 
-			await createComments(commentedAtSnapshot, commenter, 2, { createdAt: snapshotTime });
+			await createComments(olderCommented, commenter, 4);
 
 			const result = await getNextPopularPosts({ snapshotTime: snapshotTime.toISOString(), shownPostIds: [] });
 
-			expect(idsOf(result)).toEqual(ids([commentedAtSnapshot, liked]));
+			expect(idsOf(result)).toEqual(ids([newerLiked, olderCommented]));
 		});
 
 		it('measures the age of a post against the snapshot time, not against the current time', async () => {
@@ -453,6 +506,31 @@ describe('popularPostService against a real database', () => {
 			const result = await getNextPopularPosts({ snapshotTime: new Date().toISOString(), shownPostIds: ids(everything) });
 
 			expect(result).toMatchObject({ posts: [], hasMore: false });
+		});
+
+		it('ends quietly once the shown posts plus the batch reach the cap, though more posts exist', async () => {
+			await createPosts(
+				author,
+				Array.from({ length: POPULAR_POSTS_PAGE_SIZE + 5 }, (_item, index) => ({ likes: index })),
+			);
+			const shownPostIds = Array.from({ length: MAX_SHOWN_POST_IDS - POPULAR_POSTS_PAGE_SIZE }, () => String(newId()));
+
+			const result = await getNextPopularPosts({ snapshotTime: new Date().toISOString(), shownPostIds });
+
+			expect(result.posts).toHaveLength(POPULAR_POSTS_PAGE_SIZE);
+			expect(result.hasMore).toBe(false);
+		});
+
+		it('keeps going while the shown posts plus the batch stay one below the cap', async () => {
+			await createPosts(
+				author,
+				Array.from({ length: POPULAR_POSTS_PAGE_SIZE + 5 }, (_item, index) => ({ likes: index })),
+			);
+			const shownPostIds = Array.from({ length: MAX_SHOWN_POST_IDS - POPULAR_POSTS_PAGE_SIZE - 1 }, () => String(newId()));
+
+			const result = await getNextPopularPosts({ snapshotTime: new Date().toISOString(), shownPostIds });
+
+			expect(result.hasMore).toBe(true);
 		});
 
 		it('reports hasMore false when exactly 30 posts exist', async () => {
@@ -823,7 +901,7 @@ describe('popularPostService against a real database', () => {
 
 			const [shown] = (await getPopularPosts({})).posts;
 
-			['commentCounts', 'snapshotCommentsCount', 'likesCount', 'ageHours', 'popularityScore'].forEach((field) => {
+			['storedCommentsCount', 'likesCount', 'ageHours', 'popularityScore'].forEach((field) => {
 				expect(shown).not.toHaveProperty(field);
 			});
 		});

@@ -7,6 +7,10 @@ import { getPopularPosts, getNextPopularPosts } from '../services/userPostServic
 import usePopularPosts from './usePopularPosts';
 
 jest.mock('../services/userPostService');
+jest.mock('../constants/popularPosts', () => ({
+	...jest.requireActual('../constants/popularPosts'),
+	MAX_SHOWN_POST_IDS: 10,
+}));
 
 const SNAPSHOT_TIME = '2026-10-24T10:00:00.000Z';
 
@@ -462,6 +466,98 @@ describe('usePopularPosts', () => {
 			await act(async () => result.current.loadMore());
 
 			expect(getNextPopularPosts).toHaveBeenCalledWith(expect.objectContaining({ shownPostIds: ['x1'] }));
+		});
+	});
+
+	describe('the quiet end at the cap of shown posts', () => {
+		const CAP = 10;
+
+		const buildIds = (count, prefix = 'p') => Array.from({ length: count }, (_item, index) => `${prefix}${index + 1}`);
+
+		it('cannot load more when the first page already reaches the cap, though the server says there is more', async () => {
+			const { result } = await renderPopularPosts({ firstPage: buildPage(buildIds(CAP), { hasMore: true }) });
+
+			expect(result.current.canLoadMore).toBe(false);
+		});
+
+		it('requests no further batch when the first page reaches the cap', async () => {
+			const { result } = await renderPopularPosts({ firstPage: buildPage(buildIds(CAP), { hasMore: true }) });
+
+			await act(async () => result.current.loadMore());
+
+			expect(getNextPopularPosts).not.toHaveBeenCalled();
+		});
+
+		it('can still load more when the first page stays one below the cap', async () => {
+			const { result } = await renderPopularPosts({ firstPage: buildPage(buildIds(CAP - 1), { hasMore: true }) });
+
+			expect(result.current.canLoadMore).toBe(true);
+		});
+
+		it('stops requesting once a batch brings the shown ids to the cap', async () => {
+			getNextPopularPosts.mockResolvedValue(buildPage(buildIds(CAP - 2, 'n'), { hasMore: true }));
+
+			const { result } = await renderPopularPosts({ firstPage: buildPage(['p1', 'p2'], { hasMore: true }) });
+
+			await act(async () => result.current.loadMore());
+			await act(async () => result.current.loadMore());
+
+			expect(getNextPopularPosts).toHaveBeenCalledTimes(1);
+			expect(result.current.canLoadMore).toBe(false);
+		});
+
+		it('keeps every loaded post and shows no load-more failure at the cap', async () => {
+			getNextPopularPosts.mockResolvedValue(buildPage(buildIds(CAP - 2, 'n'), { hasMore: true }));
+
+			const { result } = await renderPopularPosts({ firstPage: buildPage(['p1', 'p2'], { hasMore: true }) });
+
+			await act(async () => result.current.loadMore());
+
+			expect(result.current.posts).toHaveLength(CAP);
+			expect(result.current.hasLoadMoreFailed).toBe(false);
+			expect(result.current.hasLoadFailed).toBe(false);
+			expect(result.current.isLoadingMore).toBe(false);
+		});
+
+		it('keeps loading while a batch leaves the shown ids one below the cap', async () => {
+			getNextPopularPosts.mockResolvedValue(buildPage(buildIds(CAP - 3, 'n'), { hasMore: true }));
+
+			const { result } = await renderPopularPosts({ firstPage: buildPage(['p1', 'p2'], { hasMore: true }) });
+
+			await act(async () => result.current.loadMore());
+
+			expect(result.current.canLoadMore).toBe(true);
+		});
+
+		it('sends all the shown ids with the last batch before the cap', async () => {
+			getNextPopularPosts
+				.mockResolvedValueOnce(buildPage(buildIds(CAP - 4, 'n'), { hasMore: true }))
+				.mockResolvedValueOnce(buildPage(['last1', 'last2'], { hasMore: true }));
+
+			const { result } = await renderPopularPosts({ firstPage: buildPage(['p1', 'p2'], { hasMore: true }) });
+
+			await act(async () => result.current.loadMore());
+			await act(async () => result.current.loadMore());
+
+			expect(getNextPopularPosts).toHaveBeenNthCalledWith(
+				2,
+				expect.objectContaining({ shownPostIds: [...['p1', 'p2'], ...buildIds(CAP - 4, 'n')] }),
+			);
+			expect(result.current.canLoadMore).toBe(false);
+		});
+
+		it('starts again from an empty list after a reload, so the cap is counted anew', async () => {
+			getPopularPosts
+				.mockResolvedValueOnce(buildPage(buildIds(CAP), { hasMore: true }))
+				.mockResolvedValueOnce(buildPage(['q1', 'q2'], { hasMore: true }));
+
+			const { result } = await renderPopularPosts({ firstPage: null });
+
+			expect(result.current.canLoadMore).toBe(false);
+
+			act(() => result.current.reload());
+
+			await waitFor(() => expect(result.current.canLoadMore).toBe(true));
 		});
 	});
 
