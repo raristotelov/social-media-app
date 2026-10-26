@@ -1,5 +1,5 @@
 import { ERROR_CODES, isKnownErrorCode } from './errorCodes';
-import { ACTION_FALLBACK_MESSAGES, ERROR_MESSAGES, LOAD_ERROR_MESSAGES } from './errorMessages';
+import { ACTION_FALLBACK_MESSAGES, CRASH_MESSAGES, ERROR_MESSAGES, LOAD_ERROR_MESSAGES } from './errorMessages';
 
 describe('ERROR_MESSAGES', () => {
 	it.each([
@@ -67,7 +67,7 @@ describe('LOAD_ERROR_MESSAGES', () => {
 		expect(LOAD_ERROR_MESSAGES.PROFILE).toEqual({
 			HEADING: "Couldn't load this profile",
 			DESCRIPTION: 'Check your connection and try again.',
-			RETRY_LABEL: 'Retry',
+			ACTION_LABEL: 'Retry',
 		});
 	});
 
@@ -75,7 +75,7 @@ describe('LOAD_ERROR_MESSAGES', () => {
 		expect(LOAD_ERROR_MESSAGES.FEED).toEqual({
 			HEADING: "Couldn't load your feed",
 			DESCRIPTION: 'Check your connection and try again.',
-			RETRY_LABEL: 'Retry',
+			ACTION_LABEL: 'Retry',
 		});
 	});
 
@@ -83,7 +83,15 @@ describe('LOAD_ERROR_MESSAGES', () => {
 		expect(LOAD_ERROR_MESSAGES.POPULAR).toEqual({
 			HEADING: "Couldn't load popular posts",
 			DESCRIPTION: 'Check your connection and try again.',
-			RETRY_LABEL: 'Retry',
+			ACTION_LABEL: 'Retry',
+		});
+	});
+
+	it('has the documented 404 page copy', () => {
+		expect(LOAD_ERROR_MESSAGES.NOT_FOUND).toEqual({
+			HEADING: 'Page not found',
+			DESCRIPTION: 'This link may be broken, or the page may have been removed.',
+			ACTION_LABEL: 'Go home',
 		});
 	});
 
@@ -105,6 +113,17 @@ describe('LOAD_ERROR_MESSAGES', () => {
 		expect(LOAD_ERROR_MESSAGES.USER_LIST).toEqual({
 			MESSAGE: "Couldn't load this list",
 			RETRY_LABEL: 'Try again',
+		});
+	});
+});
+
+describe('CRASH_MESSAGES', () => {
+	it('has the documented "Something went wrong" page copy', () => {
+		expect(CRASH_MESSAGES).toEqual({
+			HEADING: 'Something went wrong',
+			DESCRIPTION: 'Try reloading the page.',
+			RELOAD_LABEL: 'Reload',
+			GO_HOME_LABEL: 'Go home',
 		});
 	});
 });

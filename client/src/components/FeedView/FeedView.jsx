@@ -96,7 +96,7 @@ const FeedView = () => {
 	}, []);
 
 	if (hasLoadFailed) {
-		return <PageLoadError onRetryClick={reloadPosts} isRetrying={isLoading} messages={LOAD_ERROR_MESSAGES.FEED} />;
+		return <PageLoadError onActionClick={reloadPosts} isRetrying={isLoading} messages={LOAD_ERROR_MESSAGES.FEED} />;
 	}
 
 	const postItems = posts.map((post) => <UserPost key={post._id} userPostData={post} author={post.userId} onPostChange={updatePost} />);

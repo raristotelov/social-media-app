@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 
 import App from './App';
 import ToastProvider from './components/ToastProvider/ToastProvider';
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
 
 import './index.css';
 
@@ -11,10 +12,12 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
 	<React.StrictMode>
-		<BrowserRouter>
-			<ToastProvider>
-				<App />
-			</ToastProvider>
-		</BrowserRouter>
+		<ErrorBoundary>
+			<BrowserRouter>
+				<ToastProvider>
+					<App />
+				</ToastProvider>
+			</BrowserRouter>
+		</ErrorBoundary>
 	</React.StrictMode>,
 );

@@ -1,0 +1,97 @@
+.crash-view {
+	position: relative;
+	width: 100%;
+	min-height: 100vh;
+	box-sizing: border-box;
+
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+
+	background-color: var(--background-page);
+	font-family: 'Mada';
+	color: var(--text-primary);
+}
+
+.crash-view-logo-row {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+
+	max-width: 1920px;
+	height: var(--header-height);
+	margin: 0 auto;
+	padding: 0 40px;
+	box-sizing: border-box;
+
+	display: flex;
+	align-items: center;
+}
+
+.crash-view-content {
+	width: 100%;
+	padding: var(--header-height) 16px;
+	box-sizing: border-box;
+
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+
+	text-align: center;
+}
+
+.crash-view-icon {
+	width: 56px;
+	height: 56px;
+	margin-bottom: 16px;
+
+	color: var(--feedback-error);
+}
+
+.crash-view-icon svg {
+	width: 100%;
+	height: 100%;
+}
+
+.crash-view-heading {
+	margin: 0;
+
+	font-size: 26px;
+	font-weight: normal;
+	overflow-wrap: anywhere;
+}
+
+.crash-view-description {
+	margin: 0;
+
+	font-size: 15px;
+	overflow-wrap: anywhere;
+}
+
+.crash-view-actions {
+	margin-top: 24px;
+
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 16px;
+}
+
+@media (min-width: 600px) and (max-width: 1279px) {
+	.crash-view-logo-row {
+		padding: 0 24px;
+	}
+}
+
+@media (max-width: 599px) {
+	.crash-view-logo-row {
+		padding: 0 16px;
+	}
+
+	.crash-view-logo-row .logo {
+		font-size: 22px;
+	}
+}

@@ -11,6 +11,7 @@ import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 import { getErrorCode, getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
 
 import PageLoadError from '../PageLoadError/PageLoadError';
+import NotFoundView from '../NotFoundView/NotFoundView';
 import Popup from '../Popup/Popup';
 import EditPostForm from '../EditPostForm/EditPostForm';
 import DeletePostConfirm from '../DeletePostConfirm/DeletePostConfirm';
@@ -25,6 +26,7 @@ const ProfileLayout = () => {
 	const [isDeletingPost, setIsDeletingPost] = useState(false);
 	const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 	const [loadFailedUserId, setLoadFailedUserId] = useState(null);
+	const [notFoundUserId, setNotFoundUserId] = useState(null);
 	const [reloadCount, setReloadCount] = useState(0);
 	const [profileRequestCount, setProfileRequestCount] = useState(0);
 
@@ -55,6 +57,7 @@ const ProfileLayout = () => {
 				setUserData(result[0]);
 				setUserPosts(result[0].posts);
 				setLoadFailedUserId(null);
+				setNotFoundUserId(null);
 			})
 			.catch((error) => {
 				if (!isCurrentRequest) {
@@ -64,9 +67,12 @@ const ProfileLayout = () => {
 				if (getErrorCode(error) === ERROR_CODES.USER_NOT_FOUND) {
 					setUserData(null);
 					setLoadFailedUserId(null);
+					setNotFoundUserId(userId);
 
 					return;
 				}
+
+				setNotFoundUserId(null);
 
 				if (isUnauthenticatedError(error)) {
 					endSession();
@@ -137,8 +143,12 @@ const ProfileLayout = () => {
 		}
 	};
 
+	if (notFoundUserId === userId) {
+		return <NotFoundView />;
+	}
+
 	if (loadFailedUserId === userId && userData?._id !== userId) {
-		return <PageLoadError onRetryClick={retryProfileLoad} isRetrying={isLoadingProfile} />;
+		return <PageLoadError onActionClick={retryProfileLoad} isRetrying={isLoadingProfile} />;
 	}
 
 	if (!userData) {

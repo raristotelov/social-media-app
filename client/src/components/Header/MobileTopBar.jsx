@@ -2,6 +2,7 @@ import { useContext, useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import NotFoundContext from '../../contexts/NotFoundContext';
 import useUserSearch from '../../hooks/useUserSearch';
 
 import Logo from '../Logo/Logo';
@@ -32,6 +33,7 @@ const POSTS_VIEW_PATH_PATTERN = /^\/(?:user\/[^/]+|popular-posts)\/posts\/?$/;
 
 const MobileTopBar = ({ logoutHandler }) => {
 	const { loggedInUser } = useContext(LoggedInUserContext);
+	const { isNotFound } = useContext(NotFoundContext);
 	const { pathname } = useLocation();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 	const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -46,14 +48,14 @@ const MobileTopBar = ({ logoutHandler }) => {
 	}, [isSearching]);
 	const { searchWord, setSearchWord, results, isLoading, clearSearch } = useUserSearch();
 
-	const trailingAction = getTrailingAction(pathname, loggedInUser);
+	const trailingAction = isNotFound ? 'search' : getTrailingAction(pathname, loggedInUser);
 
 	const closeSearch = () => {
 		setIsSearching(false);
 		clearSearch();
 	};
 
-	if (POSTS_VIEW_PATH_PATTERN.test(pathname)) {
+	if (!isNotFound && POSTS_VIEW_PATH_PATTERN.test(pathname)) {
 		return null;
 	}
 

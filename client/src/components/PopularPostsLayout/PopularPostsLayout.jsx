@@ -34,7 +34,7 @@ const PopularPostsLayout = () => {
 	useLoadMoreOnScroll({ onLoadMore: loadMore, isEnabled: canLoadMore });
 
 	if (hasLoadFailed) {
-		return <PageLoadError onRetryClick={reload} isRetrying={isLoading} messages={LOAD_ERROR_MESSAGES.POPULAR} />;
+		return <PageLoadError onActionClick={reload} isRetrying={isLoading} messages={LOAD_ERROR_MESSAGES.POPULAR} />;
 	}
 
 	if (isLoading) {

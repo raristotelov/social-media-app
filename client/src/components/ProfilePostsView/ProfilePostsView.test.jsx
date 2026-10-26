@@ -9,6 +9,7 @@ import { updateUserPostCaption, deleteUserPost, likeUserPost } from '../../servi
 import { getComments, addComment, likeComment } from '../../services/commentService';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
+import NotFoundProvider from '../NotFoundProvider/NotFoundProvider';
 import ProfileLayout from '../ProfileLayout/ProfileLayout';
 import ProfileView from '../ProfileView/ProfileView';
 
@@ -66,21 +67,23 @@ const renderProfileRoutes = ({ entries = ['/user/user2/posts#post2'], initialInd
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, updateLoggedInUser: jest.fn(), endSession }}>
 			<ToastProvider>
-				<MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
-					<Routes>
-						<Route path='/user/:userId' element={<ProfileLayout />}>
-							<Route index element={<ProfileView />} />
+				<NotFoundProvider>
+					<MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
+						<Routes>
+							<Route path='/user/:userId' element={<ProfileLayout />}>
+								<Route index element={<ProfileView />} />
 
-							<Route path='posts' element={<ProfilePostsView />} />
-						</Route>
+								<Route path='posts' element={<ProfilePostsView />} />
+							</Route>
 
-						<Route path='/log-in' element={<LoginProbe />} />
+							<Route path='/log-in' element={<LoginProbe />} />
 
-						<Route path='/popular-posts' element={<p>Popular posts page</p>} />
-					</Routes>
+							<Route path='/popular-posts' element={<p>Popular posts page</p>} />
+						</Routes>
 
-					<LocationProbe />
-				</MemoryRouter>
+						<LocationProbe />
+					</MemoryRouter>
+				</NotFoundProvider>
 			</ToastProvider>
 		</LoggedInUserContext.Provider>,
 	);
@@ -207,12 +210,12 @@ describe('ProfilePostsView', () => {
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 		});
 
-		it('shows a blank page area when the user does not exist', async () => {
+		it('shows the 404 page when the user does not exist', async () => {
 			getUsersProfileData.mockRejectedValue({ code: 'USER_NOT_FOUND', status: 404 });
 			renderProfileRoutes();
 
-			await waitFor(() => expect(getUsersProfileData).toHaveBeenCalledTimes(1));
-			await waitFor(() => expect(document.querySelector('.profile-posts-view')).not.toBeInTheDocument());
+			expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+			expect(document.querySelector('.profile-posts-view')).not.toBeInTheDocument();
 			expect(screen.queryByRole('heading', { name: "Couldn't load this profile" })).not.toBeInTheDocument();
 		});
 

@@ -119,20 +119,22 @@ describe('profile load error', () => {
 	});
 
 	describe('USER_NOT_FOUND', () => {
-		it('leaves the page area blank for a user id that does not exist, without a load error', () => {
+		it('shows the 404 page, not the load error, for a user id that does not exist', () => {
 			cy.visit('/user/64b7f0a1c2d3e4f5a6b7c8d1');
 
-			cy.get('.header-wrapper, .tab-bar').should('exist');
+			cy.contains('.page-load-error h1', 'Page not found').should('be.visible');
+			cy.contains('.page-load-error h1', "Couldn't load this profile").should('not.exist');
+			cy.contains('.page-load-error button', 'Retry').should('not.exist');
 			cy.get('.profile-header').should('not.exist');
-			cy.get('.page-load-error').should('not.exist');
 			cy.get('.toast').should('not.exist');
 		});
 
-		it('leaves the page area blank for a malformed user id, without a load error', () => {
+		it('shows the 404 page, not the load error, for a malformed user id', () => {
 			cy.visit('/user/not-an-object-id');
 
+			cy.contains('.page-load-error h1', 'Page not found').should('be.visible');
+			cy.contains('.page-load-error h1', "Couldn't load this profile").should('not.exist');
 			cy.get('.profile-header').should('not.exist');
-			cy.get('.page-load-error').should('not.exist');
 			cy.get('.toast').should('not.exist');
 		});
 	});

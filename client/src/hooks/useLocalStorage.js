@@ -4,13 +4,17 @@ const useLocalStorage = (key, initialValue) => {
 	const [state, setState] = useState(() => {
 		const persistedStateSerialized = localStorage.getItem(key);
 
-		if (persistedStateSerialized) {
-			const persistedState = JSON.parse(persistedStateSerialized);
-
-			return persistedState;
+		if (!persistedStateSerialized) {
+			return initialValue;
 		}
 
-		return initialValue;
+		try {
+			return JSON.parse(persistedStateSerialized);
+		} catch {
+			localStorage.removeItem(key);
+
+			return initialValue;
+		}
 	});
 
 	// Stable identity so callers can safely list it as an effect dependency.

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import NotFoundContext from '../../contexts/NotFoundContext';
 import ToastContext from '../../contexts/ToastContext';
 import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBottomSheetEnvironment } from '../../testUtils/bottomSheet';
 
@@ -13,12 +14,14 @@ jest.mock('../../services/userService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', following: [] };
 
-const renderTopBarAt = (path, user = loggedInUser) =>
+const renderTopBarAt = (path, user = loggedInUser, isNotFound = false) =>
 	render(
 		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user }}>
-			<MemoryRouter initialEntries={[path]}>
-				<MobileTopBar logoutHandler={jest.fn()} />
-			</MemoryRouter>
+			<NotFoundContext.Provider value={{ isNotFound, setIsNotFound: jest.fn() }}>
+				<MemoryRouter initialEntries={[path]}>
+					<MobileTopBar logoutHandler={jest.fn()} />
+				</MemoryRouter>
+			</NotFoundContext.Provider>
 		</LoggedInUserContext.Provider>,
 	);
 
@@ -92,15 +95,51 @@ describe('MobileTopBar', () => {
 		});
 	});
 
+	describe('while a 404 page is showing', () => {
+		it.each([['/some/unknown/path'], ['/user/missing'], ['/user/missing/posts'], ['/user/missing/posts/']])('offers search at %s', (path) => {
+			renderTopBarAt(path, loggedInUser, true);
+
+			expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+		});
+
+		it('offers search to a guest too', () => {
+			renderTopBarAt('/user/missing', null, true);
+
+			expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+		});
+
+		it('is not hidden on a profile posts path', () => {
+			renderTopBarAt('/user/missing/posts', loggedInUser, true);
+
+			expect(screen.getByRole('link')).toHaveAttribute('href', '/');
+		});
+
+		it('offers no search on someone else profile when no 404 is showing', () => {
+			renderTopBarAt('/user/user2', loggedInUser, false);
+
+			expect(screen.queryByRole('button', { name: 'Search' })).not.toBeInTheDocument();
+		});
+
+		it('opens the search field from the Search action', () => {
+			renderTopBarAt('/some/unknown/path', loggedInUser, true);
+
+			userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+			expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
+		});
+	});
+
 	describe('Change password', () => {
 		const renderOwnProfileTopBar = () =>
 			render(
 				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser }}>
-					<ToastContext.Provider value={{ showToast: jest.fn(), dismissToast: jest.fn() }}>
-						<MemoryRouter initialEntries={['/user/user1']}>
-							<MobileTopBar logoutHandler={jest.fn()} />
-						</MemoryRouter>
-					</ToastContext.Provider>
+					<NotFoundContext.Provider value={{ isNotFound: false, setIsNotFound: jest.fn() }}>
+						<ToastContext.Provider value={{ showToast: jest.fn(), dismissToast: jest.fn() }}>
+							<MemoryRouter initialEntries={['/user/user1']}>
+								<MobileTopBar logoutHandler={jest.fn()} />
+							</MemoryRouter>
+						</ToastContext.Provider>
+					</NotFoundContext.Provider>
 				</LoggedInUserContext.Provider>,
 			);
 
