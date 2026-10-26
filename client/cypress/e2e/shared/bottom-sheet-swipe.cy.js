@@ -14,7 +14,7 @@ const SHEET_SELECTORS = {
 };
 
 const pointerEvent = (selector, type, clientY) =>
-	cy.get(selector).trigger(type, { clientX: 100, clientY, pointerId: 1, pointerType: 'touch', button: 0, force: true });
+	cy.get(selector).trigger(type, { clientX: 100, clientY, pointerId: 7, pointerType: 'touch', button: 0, force: true });
 
 const pressAt = (selector) => pointerEvent(selector, 'pointerdown', START_Y);
 

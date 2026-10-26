@@ -463,6 +463,163 @@ describe('useBottomSheetDrag', () => {
 		});
 	});
 
+	describe('when pointer capture is unavailable for the pointer', () => {
+		const throwNotFound = () => {
+			throw new DOMException('No active pointer with the given id is found.', 'NotFoundError');
+		};
+
+		describe('and setPointerCapture throws', () => {
+			const renderSheetWithFailingCapture = () => {
+				const rendered = renderSheet();
+
+				rendered.sheet.setPointerCapture = jest.fn(throwNotFound);
+
+				return rendered;
+			};
+
+			it('does not throw when the press starts', () => {
+				const { handle } = renderSheetWithFailingCapture();
+
+				expect(() => firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 })).not.toThrow();
+			});
+
+			it('still attempts the capture with the pointer id', () => {
+				const { sheet, handle } = renderSheetWithFailingCapture();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
+
+				expect(sheet.setPointerCapture).toHaveBeenCalledWith(7);
+			});
+
+			it('starts the drag and moves the sheet with the pointer', () => {
+				const { sheet, handle } = renderSheetWithFailingCapture();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
+				firePointer(handle, 'pointermove', { clientY: 160, pointerId: 7 });
+
+				expect(sheet.style.transform).toBe('translateY(60px)');
+			});
+
+			it('slides out and closes when released past 25% of the sheet height', () => {
+				const { sheet, handle, onClose } = renderSheetWithFailingCapture();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, timeStamp: 0, pointerId: 7 });
+				firePointer(handle, 'pointermove', { clientY: 100 + CLOSE_DISTANCE + 1, timeStamp: 1000, pointerId: 7 });
+				firePointer(handle, 'pointerup', { clientY: 100 + CLOSE_DISTANCE + 1, timeStamp: 1000, pointerId: 7 });
+
+				expect(sheet.style.transition).toBe('transform 200ms ease-in');
+				fireTransitionEnd(sheet);
+				expect(onClose).toHaveBeenCalledTimes(1);
+			});
+
+			it('springs back when released short of 25% of the sheet height', () => {
+				const { sheet, handle, onClose } = renderSheetWithFailingCapture();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, timeStamp: 0, pointerId: 7 });
+				firePointer(handle, 'pointermove', { clientY: 100 + CLOSE_DISTANCE - 1, timeStamp: 1000, pointerId: 7 });
+				firePointer(handle, 'pointerup', { clientY: 100 + CLOSE_DISTANCE - 1, timeStamp: 1000, pointerId: 7 });
+
+				expect(sheet.style.transition).toBe('transform 200ms ease-out');
+				expect(sheet.style.transform).toBe('');
+				expect(onClose).not.toHaveBeenCalled();
+			});
+
+			it('springs back when the pointer is cancelled past 25%', () => {
+				const { sheet, handle, onClose } = renderSheetWithFailingCapture();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
+				firePointer(handle, 'pointermove', { clientY: 100 + CLOSE_DISTANCE + 50, timeStamp: 1000, pointerId: 7 });
+				firePointer(handle, 'pointercancel', { clientY: 100 + CLOSE_DISTANCE + 50, timeStamp: 1000, pointerId: 7 });
+
+				expect(sheet.style.transition).toBe('transform 200ms ease-out');
+				expect(sheet.style.transform).toBe('');
+				expect(onClose).not.toHaveBeenCalled();
+			});
+		});
+
+		describe('and releasePointerCapture throws', () => {
+			const renderSheetWithFailingRelease = () => {
+				const rendered = renderSheet();
+
+				rendered.sheet.releasePointerCapture = jest.fn(throwNotFound);
+
+				return rendered;
+			};
+
+			it('does not throw on pointerup', () => {
+				const { handle } = renderSheetWithFailingRelease();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
+
+				expect(() => firePointer(handle, 'pointerup', { clientY: 100, pointerId: 7 })).not.toThrow();
+			});
+
+			it('does not throw on pointercancel', () => {
+				const { handle } = renderSheetWithFailingRelease();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
+
+				expect(() => firePointer(handle, 'pointercancel', { clientY: 100, pointerId: 7 })).not.toThrow();
+			});
+
+			it('attempts the release with the pointer id on pointerup', () => {
+				const { sheet, handle } = renderSheetWithFailingRelease();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
+				firePointer(handle, 'pointerup', { clientY: 100, pointerId: 7 });
+
+				expect(sheet.releasePointerCapture).toHaveBeenCalledWith(7);
+			});
+
+			it('still slides out and closes on pointerup past 25%', () => {
+				const { sheet, handle, onClose } = renderSheetWithFailingRelease();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, timeStamp: 0, pointerId: 7 });
+				firePointer(handle, 'pointermove', { clientY: 100 + CLOSE_DISTANCE + 1, timeStamp: 1000, pointerId: 7 });
+				firePointer(handle, 'pointerup', { clientY: 100 + CLOSE_DISTANCE + 1, timeStamp: 1000, pointerId: 7 });
+
+				expect(sheet.style.transition).toBe('transform 200ms ease-in');
+				fireTransitionEnd(sheet);
+				expect(onClose).toHaveBeenCalledTimes(1);
+			});
+
+			it('still springs back on pointerup short of 25%', () => {
+				const { sheet, handle, onClose } = renderSheetWithFailingRelease();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, timeStamp: 0, pointerId: 7 });
+				firePointer(handle, 'pointermove', { clientY: 100 + CLOSE_DISTANCE - 1, timeStamp: 1000, pointerId: 7 });
+				firePointer(handle, 'pointerup', { clientY: 100 + CLOSE_DISTANCE - 1, timeStamp: 1000, pointerId: 7 });
+
+				expect(sheet.style.transition).toBe('transform 200ms ease-out');
+				expect(sheet.style.transform).toBe('');
+				expect(onClose).not.toHaveBeenCalled();
+			});
+
+			it('still springs back on pointercancel past 25%', () => {
+				const { sheet, handle, onClose } = renderSheetWithFailingRelease();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
+				firePointer(handle, 'pointermove', { clientY: 100 + CLOSE_DISTANCE + 50, timeStamp: 1000, pointerId: 7 });
+				firePointer(handle, 'pointercancel', { clientY: 100 + CLOSE_DISTANCE + 50, timeStamp: 1000, pointerId: 7 });
+
+				expect(sheet.style.transition).toBe('transform 200ms ease-out');
+				expect(sheet.style.transform).toBe('');
+				expect(onClose).not.toHaveBeenCalled();
+			});
+
+			it('accepts a new drag after the failed release', () => {
+				const { sheet, handle } = renderSheetWithFailingRelease();
+
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
+				firePointer(handle, 'pointerup', { clientY: 100, pointerId: 7 });
+				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 8 });
+				firePointer(handle, 'pointermove', { clientY: 130, pointerId: 8 });
+
+				expect(sheet.style.transform).toBe('translateY(30px)');
+			});
+		});
+	});
+
 	describe('with reduced motion preferred', () => {
 		it('closes at once, with no slide-out, when released past 25%', () => {
 			const { sheet, handle, onClose } = renderSheet({ prefersReducedMotion: true });

@@ -1,6 +1,6 @@
 # Likes
 
-Status: In Development
+Status: Complete
 
 Liking posts and comments (#11) and the likes list (#5). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 

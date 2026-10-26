@@ -35,7 +35,7 @@
 	content: '';
 	position: absolute;
 	top: -1px;
-	left: 68px;
+	left: calc(var(--search-result-padding-x) + var(--search-result-avatar-size) + var(--search-result-gap));
 	right: 0;
 	height: 1px;
 	background-color: var(--border-inset);
