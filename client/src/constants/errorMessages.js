@@ -59,22 +59,22 @@ export const LOAD_ERROR_MESSAGES = Object.freeze({
 	PROFILE: Object.freeze({
 		HEADING: "Couldn't load this profile",
 		DESCRIPTION: 'Check your connection and try again.',
-		RETRY_LABEL: 'Retry',
+		ACTION_LABEL: 'Retry',
 	}),
 	FEED: Object.freeze({
 		HEADING: "Couldn't load your feed",
 		DESCRIPTION: 'Check your connection and try again.',
-		RETRY_LABEL: 'Retry',
+		ACTION_LABEL: 'Retry',
 	}),
 	POPULAR: Object.freeze({
 		HEADING: "Couldn't load popular posts",
 		DESCRIPTION: 'Check your connection and try again.',
-		RETRY_LABEL: 'Retry',
+		ACTION_LABEL: 'Retry',
 	}),
 	NOT_FOUND: Object.freeze({
 		HEADING: 'Page not found',
 		DESCRIPTION: 'This link may be broken, or the page may have been removed.',
-		RETRY_LABEL: 'Go home',
+		ACTION_LABEL: 'Go home',
 	}),
 	POPULAR_NEXT_BATCH: Object.freeze({
 		MESSAGE: "Couldn't load more posts",

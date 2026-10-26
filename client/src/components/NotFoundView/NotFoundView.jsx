@@ -10,7 +10,7 @@ const NotFoundView = () => {
 
 	useMarkPageNotFound();
 
-	return <PageLoadError messages={LOAD_ERROR_MESSAGES.NOT_FOUND} onRetryClick={() => navigate('/')} />;
+	return <PageLoadError messages={LOAD_ERROR_MESSAGES.NOT_FOUND} onActionClick={() => navigate('/')} />;
 };
 
 export default NotFoundView;

@@ -148,7 +148,7 @@ const ProfileLayout = () => {
 	}
 
 	if (loadFailedUserId === userId && userData?._id !== userId) {
-		return <PageLoadError onRetryClick={retryProfileLoad} isRetrying={isLoadingProfile} />;
+		return <PageLoadError onActionClick={retryProfileLoad} isRetrying={isLoadingProfile} />;
 	}
 
 	if (!userData) {

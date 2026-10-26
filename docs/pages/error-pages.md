@@ -1,6 +1,6 @@
 # Error Pages
 
-Status: In Development
+Status: Complete
 
 404 and "Something went wrong" pages (#29). Look based on the full-page load error ([error-handling.md](../error-handling.md)). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 
