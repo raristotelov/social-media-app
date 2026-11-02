@@ -6,10 +6,10 @@ const { detectImageType } = require('../utils/imageType');
 
 const ALLOWED_IMAGE_FORMATS = ['jpg', 'png', 'webp'];
 
-const uploadBuffer = (buffer, folder) =>
+const uploadBuffer = (buffer, options) =>
 	new Promise((resolve, reject) => {
 		const uploadStream = cloudinary.uploader.upload_stream(
-			{ resource_type: 'image', allowed_formats: ALLOWED_IMAGE_FORMATS, folder },
+			{ resource_type: 'image', allowed_formats: ALLOWED_IMAGE_FORMATS, ...options },
 			(error, result) => {
 				if (error || !result) {
 					reject(error || new Error('Cloudinary returned no upload result'));
@@ -48,7 +48,7 @@ const uploadImage = async ({ file, fieldName }) => {
 	}
 
 	try {
-		const result = await uploadBuffer(file.buffer, folder);
+		const result = await uploadBuffer(file.buffer, { folder });
 
 		return {
 			imageIdentifier: result.public_id,
@@ -96,6 +96,7 @@ const discardUploadedImage = async (imageIdentifier) => {
 };
 
 module.exports = {
+	uploadBuffer,
 	uploadImage,
 	deleteImage,
 	discardUploadedImage,
