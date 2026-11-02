@@ -1,12 +1,20 @@
 const { Router } = require('express');
 const router = Router();
 
-const { userController, userPostController, commentController, storyController, suggestionController } = require('./controllers');
+const {
+	userController,
+	userPostController,
+	commentController,
+	storyController,
+	suggestionController,
+	demoActivityController,
+} = require('./controllers');
 
 router.use('/users', userController);
 router.use('/user-posts', userPostController);
 router.use('/comments', commentController);
 router.use('/stories', storyController);
 router.use('/suggestions', suggestionController);
+router.use('/internal/demo-activity', demoActivityController);
 
 module.exports = router;

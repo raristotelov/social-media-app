@@ -3,6 +3,7 @@ const userPostController = require('./userPostController');
 const commentController = require('./commentController');
 const storyController = require('./storyController');
 const suggestionController = require('./suggestionController');
+const demoActivityController = require('./demoActivityController');
 
 module.exports = {
 	userController,
@@ -10,4 +11,5 @@ module.exports = {
 	commentController,
 	storyController,
 	suggestionController,
+	demoActivityController,
 };

@@ -18,11 +18,15 @@
     "jest": "^30.4.2",
     "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.1.10",
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.6",
+    "sharp": "^0.35.5"
   },
   "scripts": {
     "start": "node ./src/server.js",
     "dev": "nodemon ./src/server.js",
+    "seed:assign": "node ./src/seed/assignPhotos.js",
+    "seed:demo": "node ./src/seed/seedDemo.js",
+    "seed:upload": "node ./src/seed/uploadPhotos.js",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.js\"",
