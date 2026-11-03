@@ -3,8 +3,11 @@ const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { detectImageType } = require('../utils/imageType');
+const demoConfig = require('../demo/demoConfig');
 
 const ALLOWED_IMAGE_FORMATS = ['jpg', 'png', 'webp'];
+
+const isSharedDemoImage = (imageIdentifier) => demoConfig.VISITOR_SHARED_IMAGE_PREFIXES.some((prefix) => imageIdentifier.startsWith(prefix));
 
 const uploadBuffer = (buffer, options) =>
 	new Promise((resolve, reject) => {
@@ -62,7 +65,7 @@ const uploadImage = async ({ file, fieldName }) => {
 };
 
 const deleteImage = async (imageIdentifier) => {
-	if (!imageIdentifier) {
+	if (!imageIdentifier || isSharedDemoImage(imageIdentifier)) {
 		return { result: 'skipped' };
 	}
 

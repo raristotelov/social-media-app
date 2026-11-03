@@ -60,6 +60,12 @@ const UserSchema = new mongoose.Schema({
 	suggestionsCarouselDismissedUntil: {
 		type: Date,
 	},
+	accountType: {
+		type: String,
+		enum: ['user', 'persona', 'demo'],
+		default: 'user',
+		index: true,
+	},
 });
 
 const model = mongoose.model('User', UserSchema);

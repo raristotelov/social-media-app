@@ -12,12 +12,17 @@ jest.mock('../models/commentModel', () => ({
 jest.mock('./commentService', () => ({
 	getPreviewCommentsForPosts: jest.fn(),
 }));
+jest.mock('./visitorVisibilityService', () => ({
+	...jest.requireActual('./visitorVisibilityService'),
+	getHiddenVisitorIds: jest.fn(),
+}));
 
 const mongoose = require('mongoose');
 
 const UserPostModel = require('../models/userPostModel');
 const UserModel = require('../models/userModel');
 const commentService = require('./commentService');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 const { ERROR_CODES } = require('../config/errorCodes');
 const { POPULAR_POSTS_PAGE_SIZE, MAX_SHOWN_POST_IDS } = require('../config/popularPosts');
 const AppError = require('../utils/AppError');
@@ -79,6 +84,7 @@ describe('popularPostService', () => {
 		UserPostModel.populate.mockImplementation(async (posts) => posts);
 		UserModel.findById.mockReturnValue(buildLeanQuery({ _id: ME, following: [FOLLOWED_A, FOLLOWED_B] }));
 		commentService.getPreviewCommentsForPosts.mockResolvedValue({});
+		getHiddenVisitorIds.mockResolvedValue([]);
 	});
 
 	afterEach(() => {
@@ -272,7 +278,10 @@ describe('popularPostService', () => {
 
 				await getPopularPosts({});
 
-				expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(rankedPosts.map((post) => post._id));
+				expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(
+					rankedPosts.map((post) => post._id),
+					[],
+				);
 			});
 		});
 

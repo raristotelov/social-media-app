@@ -44,8 +44,8 @@ router.post('/popular', readOptionalJwtToken, async (req, res) => {
 	return res.json(popularPostsData);
 });
 
-router.get('/:userPostId/likes', async (req, res) => {
-	const likes = await userPostService.getUserPostLikes({ userPostId: req.params.userPostId });
+router.get('/:userPostId/likes', readOptionalJwtToken, async (req, res) => {
+	const likes = await userPostService.getUserPostLikes({ userPostId: req.params.userPostId, requesterId: res.userId });
 
 	return res.json(likes);
 });

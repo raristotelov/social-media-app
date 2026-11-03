@@ -177,6 +177,7 @@ const buildDemoData = ({ users, assignments, photosManifest, captionBanks, repli
 		return {
 			_id: account.id,
 			email: `${account.username}@${config.DEMO_EMAIL_DOMAIN}`,
+			accountType: 'persona',
 			username: account.username,
 			bio: account.bio,
 			profilePicture: avatar ? { imageUrl: avatar.imageUrl, imageIdentifier: avatar.imageIdentifier } : undefined,

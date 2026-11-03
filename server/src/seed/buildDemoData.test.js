@@ -12,6 +12,7 @@ const NON_BANK_FILES = [
 	'avatarExclusions.json',
 	'photos.json',
 	'replies.json',
+	'genericComments.json',
 ];
 const NOW = new Date('2026-10-29T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;

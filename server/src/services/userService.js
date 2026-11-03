@@ -9,11 +9,16 @@ const AppError = require('../utils/AppError');
 const { asFieldError } = require('../utils/fieldErrors');
 const { createUserNotFoundError } = require('../utils/notFoundErrors');
 const { getPasswordRuleErrorCode } = require('../utils/passwordRules');
+const { createDemoVisitor } = require('../demo/createDemoVisitor');
+const { reactToSignUp } = require('../demo/userReactions');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const { USER_ROW_PROJECTION, getUserRowsInOrder } = require('./userRowService');
+const { createPostVisibility, getHiddenVisitorIds, withoutHiddenIds } = require('./visitorVisibilityService');
 
-const necessaryUserFields = ['_id', 'email', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following'];
+const necessaryUserFields = ['_id', 'email', 'accountType', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following'];
+
+const FOLLOW_LIST_FIELDS = ['followers', 'following'];
 
 const SEARCH_ROW_PROJECTION = {
 	...USER_ROW_PROJECTION,
@@ -27,12 +32,18 @@ const signAuthToken = ({ _id, username }) =>
 		expiresIn: constants.JWT_EXPIRY,
 	});
 
-const getNeccessaryUserData = (user) => {
+const getNeccessaryUserData = (user, hiddenVisitorIds = []) => {
 	const userObject = {};
 
 	for (let i = 0; i < necessaryUserFields.length; i += 1) {
 		if (user[necessaryUserFields[i]]) {
 			userObject[necessaryUserFields[i]] = user[necessaryUserFields[i]];
+		}
+	}
+
+	for (const listField of FOLLOW_LIST_FIELDS) {
+		if (userObject[listField]) {
+			userObject[listField] = withoutHiddenIds(userObject[listField], hiddenVisitorIds);
 		}
 	}
 
@@ -73,6 +84,8 @@ const signUp = async ({ email, username, password }) => {
 
 		await user.save();
 
+		reactToSignUp(user._id);
+
 		return signAuthToken(user);
 	} catch (error) {
 		if (error instanceof AppError) {
@@ -86,6 +99,20 @@ const signUp = async ({ email, username, password }) => {
 		}
 
 		throw new AppError('Could not sign up', 500, { cause: error });
+	}
+};
+
+const demoLogin = async () => {
+	try {
+		const visitor = await createDemoVisitor();
+
+		return signAuthToken(visitor);
+	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
+		throw new AppError('Could not start the demo', 500, { cause: error });
 	}
 };
 
@@ -171,18 +198,25 @@ const changePassword = async (userId, { currentPassword, newPassword } = {}) => 
 
 const compareNewestFirst = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
 
-const toProfileData = ({ user, requesterId, previewComments }) => {
+const toProfileData = ({ user, requesterId, previewComments, hiddenVisitorIds, applyVisibility }) => {
 	const profileData = user.toObject();
 
 	if (String(user._id) !== String(requesterId)) {
 		delete profileData.email;
+		delete profileData.accountType;
+	}
+
+	for (const listField of FOLLOW_LIST_FIELDS) {
+		if (profileData[listField]) {
+			profileData[listField] = withoutHiddenIds(profileData[listField], hiddenVisitorIds);
+		}
 	}
 
 	return {
 		...profileData,
 		posts: profileData.posts
 			.map((post) => ({
-				...post,
+				...applyVisibility(post),
 				previewComments: previewComments[post._id.toString()] || [],
 			}))
 			.sort(compareNewestFirst),
@@ -197,8 +231,14 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds, request
 			throw new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND });
 		}
 
+		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+
+		if (withoutHiddenIds(userIds, hiddenVisitorIds).length !== userIds.length) {
+			throw createUserNotFoundError();
+		}
+
 		const usersResult = await UserModel.find({ _id: { $in: userIds } })
-			.select({ _id: 1, username: 1, email: 1, posts: 1, bio: 1, theme: 1, profilePicture: 1, following: 1, followers: 1 })
+			.select({ _id: 1, username: 1, email: 1, accountType: 1, posts: 1, bio: 1, theme: 1, profilePicture: 1, following: 1, followers: 1 })
 			.populate({ path: 'posts' });
 
 		if (usersResult.length !== userIds.length) {
@@ -207,9 +247,10 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds, request
 
 		const profilePostIds = usersResult.flatMap((user) => user.posts.map((post) => post._id));
 
-		const previewComments = await commentService.getPreviewCommentsForPosts(profilePostIds);
+		const applyVisibility = await createPostVisibility(profilePostIds, hiddenVisitorIds);
+		const previewComments = await commentService.getPreviewCommentsForPosts(profilePostIds, hiddenVisitorIds);
 
-		const mappedUsers = usersResult.map((user) => toProfileData({ user, requesterId, previewComments }));
+		const mappedUsers = usersResult.map((user) => toProfileData({ user, requesterId, previewComments, hiddenVisitorIds, applyVisibility }));
 
 		return mappedUsers;
 	} catch (error) {
@@ -221,12 +262,16 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds, request
 	}
 };
 
-const getUsersProfileDataBySearchWord = async ({ searchWord }) => {
+const getUsersProfileDataBySearchWord = async ({ searchWord, requesterId }) => {
 	try {
-		const users = await UserModel.aggregate([
-			{ $match: { username: { $regex: `^${escapeRegExp(searchWord)}`, $options: 'i' } } },
-			{ $project: SEARCH_ROW_PROJECTION },
-		]);
+		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+		const match = { username: { $regex: `^${escapeRegExp(searchWord)}`, $options: 'i' } };
+
+		if (hiddenVisitorIds.length) {
+			match._id = { $nin: hiddenVisitorIds };
+		}
+
+		const users = await UserModel.aggregate([{ $match: match }, { $project: SEARCH_ROW_PROJECTION }]);
 
 		return users;
 	} catch (error) {
@@ -244,7 +289,13 @@ const getFollowListByUserId = async ({ userId, listField, requesterId }) => {
 			throw createUserNotFoundError();
 		}
 
-		const listedUserIds = user[listField];
+		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+
+		if (withoutHiddenIds([user._id], hiddenVisitorIds).length === 0) {
+			throw createUserNotFoundError();
+		}
+
+		const listedUserIds = withoutHiddenIds(user[listField], hiddenVisitorIds);
 
 		const orderedRows = await getUserRowsInOrder(listedUserIds);
 
@@ -341,7 +392,7 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 			}
 		}
 
-		const updatedUserData = getNeccessaryUserData(user);
+		const updatedUserData = getNeccessaryUserData(user, await getHiddenVisitorIds(userId));
 
 		return updatedUserData;
 	} catch (error) {
@@ -371,7 +422,7 @@ const followUser = async (userId, userIdToFollow) => {
 
 		await UserModel.updateOne({ _id: userIdToFollow }, { $addToSet: { followers: userId } }, { new: true });
 
-		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser);
+		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser, await getHiddenVisitorIds(userId));
 
 		return updatedUserData;
 	} catch (error) {
@@ -391,7 +442,7 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 
 		await UserModel.updateOne({ _id: userIdToUnfollow }, { $pull: { followers: userId } }, { new: true });
 
-		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser);
+		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser, await getHiddenVisitorIds(userId));
 
 		return updatedUserData;
 	} catch (error) {
@@ -406,6 +457,7 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 module.exports = {
 	signUp,
 	login,
+	demoLogin,
 	changePassword,
 	getUsersProfileDataByUserIds,
 	getUsersProfileDataBySearchWord,

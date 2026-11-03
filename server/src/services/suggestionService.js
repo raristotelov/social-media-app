@@ -11,6 +11,7 @@ const {
 } = require('../config/suggestions');
 const AppError = require('../utils/AppError');
 const { selectSuggestions } = require('../utils/suggestionSelection');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 
 const FOLLOWERS_COUNT = { $size: { $ifNull: ['$followers', []] } };
 
@@ -150,7 +151,8 @@ const getSuggestions = async ({ userId, placement }) => {
 		}
 
 		const followingIds = currentUser.following ?? [];
-		const excludedIds = [currentUser._id, ...followingIds];
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const excludedIds = [currentUser._id, ...followingIds, ...hiddenVisitorIds];
 		const size = Object.values(mix).reduce((total, groupCount) => total + groupCount, 0);
 		const poolSize = (size + reserveSize) * POOL_SIZE_FACTOR;
 

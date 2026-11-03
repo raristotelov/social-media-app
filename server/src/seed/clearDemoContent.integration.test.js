@@ -21,8 +21,16 @@ const TEST_TIMEOUT_MS = 30 * 1000;
 
 jest.setTimeout(TEST_TIMEOUT_MS);
 
+const ACCOUNT_TYPES_BY_DOMAIN = { 'demo.invalid': 'persona', 'visitor.demo.invalid': 'demo' };
+
 const createUser = (username, { domain = 'example.com', ...extra } = {}) =>
-	UserModel.create({ email: `${username}@${domain}`, username, password: 'hashed-password', ...extra });
+	UserModel.create({
+		email: `${username}@${domain}`,
+		accountType: ACCOUNT_TYPES_BY_DOMAIN[domain] || 'user',
+		username,
+		password: 'hashed-password',
+		...extra,
+	});
 
 const createPost = (author, extra = {}) =>
 	UserPostModel.create({

@@ -9,6 +9,7 @@ import { ERROR_CODES } from './constants/errorCodes';
 import { APP_NAME } from './constants/app';
 import { getErrorCode } from './utils/errors';
 
+import DemoStrip from './components/DemoStrip/DemoStrip';
 import MainHeader from './components/Header/MainHeader';
 import MobileTopBar from './components/Header/MobileTopBar';
 import TabBar from './components/TabBar/TabBar';
@@ -149,6 +150,8 @@ function App() {
 	return (
 		<LoggedInUserContext.Provider value={loggedInUserContextValues}>
 			<NotFoundProvider>
+				<DemoStrip />
+
 				<MainHeader logoutHandler={logoutHandler} />
 
 				<MobileTopBar logoutHandler={logoutHandler} />

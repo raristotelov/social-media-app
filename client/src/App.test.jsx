@@ -9,6 +9,7 @@ import App from './App';
 
 const mockSeenEndSessions = [];
 
+jest.mock('./components/DemoStrip/DemoStrip', () => () => <aside>Demo strip</aside>);
 jest.mock('./components/Header/MainHeader', () => () => <header>Main header</header>);
 jest.mock('./components/Header/MobileTopBar', () => () => <header>Mobile top bar</header>);
 jest.mock('./components/TabBar/TabBar', () => () => <nav>Tab bar</nav>);

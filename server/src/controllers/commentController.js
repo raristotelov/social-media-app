@@ -3,6 +3,7 @@ const router = Router();
 
 const { commentService } = require('../services');
 const verifyJwtToken = require('../middlewares/verifyJwtToken');
+const readOptionalJwtToken = require('../middlewares/readOptionalJwtToken');
 
 // Add a comment, or a reply when parentCommentId is provided.
 router.post('/', verifyJwtToken, async (req, res) => {
@@ -19,14 +20,14 @@ router.post('/', verifyJwtToken, async (req, res) => {
 	return res.json(comment);
 });
 
-router.get('/post/:userPostId', async (req, res) => {
-	const comments = await commentService.getCommentsForPost({ userPostId: req.params.userPostId });
+router.get('/post/:userPostId', readOptionalJwtToken, async (req, res) => {
+	const comments = await commentService.getCommentsForPost({ userPostId: req.params.userPostId, requesterId: res.userId });
 
 	return res.json(comments);
 });
 
-router.get('/:commentId/likes', async (req, res) => {
-	const likes = await commentService.getCommentLikes({ commentId: req.params.commentId });
+router.get('/:commentId/likes', readOptionalJwtToken, async (req, res) => {
+	const likes = await commentService.getCommentLikes({ commentId: req.params.commentId, requesterId: res.userId });
 
 	return res.json(likes);
 });

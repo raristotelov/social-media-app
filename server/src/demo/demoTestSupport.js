@@ -22,6 +22,7 @@ const NON_BANK_FILES = [
 	'avatarExclusions.json',
 	'photos.json',
 	'replies.json',
+	'genericComments.json',
 ];
 
 const readJson = (fileName) => JSON.parse(fs.readFileSync(path.join(DATA_DIRECTORY, fileName), 'utf8'));

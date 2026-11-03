@@ -61,7 +61,7 @@
 @media (max-width: 599px) {
 	.posts-bar {
 		position: fixed;
-		top: 0;
+		top: var(--demo-strip-offset, 0);
 		left: 0;
 		z-index: 2;
 

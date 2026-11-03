@@ -9,6 +9,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.7.3",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
     "multer": "^2.4.0"
@@ -16,6 +17,7 @@
   "devDependencies": {
     "eslint": "^9.38.0",
     "jest": "^30.4.2",
+    "migrate-mongo": "^14.0.7",
     "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.1.10",
     "prettier": "^3.9.6",
@@ -27,12 +29,25 @@
     "seed:assign": "node ./src/seed/assignPhotos.js",
     "seed:demo": "node ./src/seed/seedDemo.js",
     "seed:upload": "node ./src/seed/uploadPhotos.js",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write \"src/**/*.js\"",
-    "format:check": "prettier --check \"src/**/*.js\"",
+    "migrate:up": "migrate-mongo up",
+    "migrate:down": "migrate-mongo down",
+    "migrate:status": "migrate-mongo status",
+    "lint": "eslint src migrate-mongo-config.js",
+    "lint:fix": "eslint src migrate-mongo-config.js --fix",
+    "format": "prettier --write \"src/**/*.js\" migrate-mongo-config.js",
+    "format:check": "prettier --check \"src/**/*.js\" migrate-mongo-config.js",
     "test": "jest",
     "test:coverage": "jest --coverage"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/src/migrations/"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/src/migrations/"
+    ]
   },
   "keywords": [],
   "author": "",

@@ -37,7 +37,7 @@ describe('ERROR_MESSAGES', () => {
 	);
 
 	it('has copy for exactly the codes the spec documents, and no other', () => {
-		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(22);
+		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(23);
 	});
 });
 

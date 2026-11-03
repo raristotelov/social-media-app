@@ -4,6 +4,12 @@ jest.mock('./commentService');
 jest.mock('./imageStorageService');
 jest.mock('bcrypt');
 jest.mock('jsonwebtoken');
+jest.mock('../demo/createDemoVisitor');
+jest.mock('../demo/userReactions');
+jest.mock('./visitorVisibilityService', () => ({
+	...jest.requireActual('./visitorVisibilityService'),
+	getHiddenVisitorIds: jest.fn(),
+}));
 
 const bcrypt = require('bcrypt');
 const JWT = require('jsonwebtoken');
@@ -12,6 +18,7 @@ const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const imageStorageService = require('./imageStorageService');
 const commentService = require('./commentService');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
@@ -31,6 +38,7 @@ const {
 describe('userService', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
+		getHiddenVisitorIds.mockResolvedValue([]);
 	});
 
 	describe('login', () => {
@@ -1280,7 +1288,7 @@ describe('userService', () => {
 					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
 
 					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
-					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2']);
+					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2'], []);
 				});
 			});
 
@@ -1387,7 +1395,7 @@ describe('userService', () => {
 					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
 
 					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
-					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2']);
+					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2'], []);
 				});
 			});
 

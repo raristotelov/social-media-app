@@ -9,6 +9,7 @@ const AppError = require('../utils/AppError');
 const { createStoryNotFoundError, createUserNotFoundError } = require('../utils/notFoundErrors');
 const { asFieldError } = require('../utils/fieldErrors');
 const imageStorageService = require('./imageStorageService');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 
 const DUPLICATE_KEY_ERROR_CODE = 11000;
 
@@ -167,8 +168,14 @@ const getStoryTray = async (userId) => {
 	}
 };
 
-const getViewersCountsByStoryId = async (storyIds) => {
-	const counts = await StoryViewModel.aggregate([{ $match: { storyId: { $in: storyIds } } }, { $group: { _id: '$storyId', count: { $sum: 1 } } }]);
+const getViewersCountsByStoryId = async (storyIds, hiddenVisitorIds) => {
+	const match = { storyId: { $in: storyIds } };
+
+	if (hiddenVisitorIds.length) {
+		match.viewerId = { $nin: hiddenVisitorIds };
+	}
+
+	const counts = await StoryViewModel.aggregate([{ $match: match }, { $group: { _id: '$storyId', count: { $sum: 1 } } }]);
 
 	return new Map(counts.map((entry) => [String(entry._id), entry.count]));
 };
@@ -197,7 +204,7 @@ const getUserStories = async ({ authorId, requesterId }) => {
 
 		const isOwnStories = String(authorId) === String(requesterId);
 		const storyIds = stories.map((story) => story._id);
-		const viewersCounts = isOwnStories ? await getViewersCountsByStoryId(storyIds) : null;
+		const viewersCounts = isOwnStories ? await getViewersCountsByStoryId(storyIds, await getHiddenVisitorIds(requesterId)) : null;
 		const watchedStoryIds = isOwnStories ? null : await getWatchedStoryIds({ storyIds, viewerId: requesterId });
 
 		return {
@@ -246,7 +253,9 @@ const getStoryViewers = async ({ storyId, userId }) => {
 	try {
 		const story = await findOwnedActiveStory({ storyId, userId });
 
-		const views = await StoryViewModel.find({ storyId: story._id, viewerId: { $ne: userId } })
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const viewerFilter = hiddenVisitorIds.length ? { $nin: [userId, ...hiddenVisitorIds] } : { $ne: userId };
+		const views = await StoryViewModel.find({ storyId: story._id, viewerId: viewerFilter })
 			.sort({ createdAt: -1, _id: -1 })
 			.populate({ path: 'viewerId', select: STORY_AUTHOR_SELECT });
 

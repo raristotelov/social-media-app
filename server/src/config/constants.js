@@ -12,6 +12,9 @@ module.exports = {
 	STORY_IMAGE_FIELD: 'image',
 	STORY_LIFETIME_MS: 24 * 60 * 60 * 1000,
 	EXPIRED_STORIES_JOB_INTERVAL_MS: 60 * 60 * 1000,
+	DEMO_LOGIN_RATE_LIMIT_WINDOW_MS: 60 * 60 * 1000,
+	DEMO_LOGIN_RATE_LIMIT_MAX_REQUESTS: 5,
+	PROXY_HOPS: 1,
 	PROFILE_PICTURE_FIELD: 'profilePicture',
 	ALLOWED_PROFILE_UPDATE_FIELDS: ['email', 'username', 'bio', 'theme', 'profilePicture'],
 };

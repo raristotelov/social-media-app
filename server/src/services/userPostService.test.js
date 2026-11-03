@@ -3,12 +3,18 @@ jest.mock('../models/userPostModel');
 jest.mock('./commentService');
 jest.mock('./imageStorageService');
 jest.mock('./userRowService');
+jest.mock('../demo/userReactions');
+jest.mock('./visitorVisibilityService', () => ({
+	...jest.requireActual('./visitorVisibilityService'),
+	getHiddenVisitorIds: jest.fn(),
+}));
 
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const { getUserRowsInOrder } = require('./userRowService');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
 const {
@@ -49,6 +55,7 @@ const givenPostOwnedByCaller = (post = buildPost()) => {
 describe('userPostService', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
+		getHiddenVisitorIds.mockResolvedValue([]);
 	});
 
 	describe('ownership checks (shared by caption edit and delete)', () => {
@@ -491,7 +498,7 @@ describe('userPostService', () => {
 			await getFollowedUsersPosts(OWNER_ID);
 
 			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
-			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['p2', 'p1']);
+			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['p2', 'p1'], []);
 		});
 
 		it('returns an empty list when the user follows nobody', async () => {

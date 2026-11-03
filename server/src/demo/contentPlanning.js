@@ -186,5 +186,6 @@ module.exports = {
 	createPhotoLookup,
 	pickWeighted,
 	createCaptionPicker,
+	pickEngagers,
 	planPostEngagement,
 };

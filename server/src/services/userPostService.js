@@ -7,9 +7,11 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { createPostNotFoundError } = require('../utils/notFoundErrors');
 const { asFieldError } = require('../utils/fieldErrors');
+const { reactToUpload } = require('../demo/userReactions');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const { getUserRowsInOrder } = require('./userRowService');
+const { createPostVisibility, getHiddenVisitorIds, withoutHiddenIds } = require('./visitorVisibilityService');
 
 const AUTHOR_POPULATE = {
 	path: 'userId',
@@ -101,6 +103,8 @@ const addUserPost = async ({ caption, imageFile }, userId) => {
 			},
 		});
 
+		reactToUpload(userPost);
+
 		return userPost;
 	} catch (error) {
 		await rollbackAddedUserPost({ userPost, imageIdentifier: uploadedImage.imageIdentifier });
@@ -129,10 +133,12 @@ const getFollowedUsersPosts = async (userId) => {
 
 		const postIds = followedUsersPostDocs.map((post) => post._id);
 
-		const previewComments = await commentService.getPreviewCommentsForPosts(postIds);
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const applyVisibility = await createPostVisibility(postIds, hiddenVisitorIds);
+		const previewComments = await commentService.getPreviewCommentsForPosts(postIds, hiddenVisitorIds);
 
 		return followedUsersPostDocs.map((post) => ({
-			...post.toObject(),
+			...applyVisibility(post.toObject()),
 			previewComments: previewComments[post._id.toString()] || [],
 		}));
 	} catch (error) {
@@ -144,7 +150,7 @@ const getFollowedUsersPosts = async (userId) => {
 	}
 };
 
-const updateUserPostLikes = async ({ userPostId, likesUpdate }) => {
+const updateUserPostLikes = async ({ userPostId, likesUpdate, viewerId }) => {
 	if (!mongoose.isObjectIdOrHexString(userPostId)) {
 		throw createPostNotFoundError();
 	}
@@ -155,12 +161,14 @@ const updateUserPostLikes = async ({ userPostId, likesUpdate }) => {
 		throw createPostNotFoundError();
 	}
 
-	return updatedUserPost;
+	const applyVisibility = await createPostVisibility([updatedUserPost._id], await getHiddenVisitorIds(viewerId));
+
+	return applyVisibility(updatedUserPost);
 };
 
 const likeUserPost = async ({ userPostId, userWhoLikedId }) => {
 	try {
-		return await updateUserPostLikes({ userPostId, likesUpdate: { $addToSet: { likes: userWhoLikedId } } });
+		return await updateUserPostLikes({ userPostId, likesUpdate: { $addToSet: { likes: userWhoLikedId } }, viewerId: userWhoLikedId });
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -172,7 +180,7 @@ const likeUserPost = async ({ userPostId, userWhoLikedId }) => {
 
 const unlikeUserPost = async ({ userPostId, userWhoUnlikedId }) => {
 	try {
-		return await updateUserPostLikes({ userPostId, likesUpdate: { $pull: { likes: userWhoUnlikedId } } });
+		return await updateUserPostLikes({ userPostId, likesUpdate: { $pull: { likes: userWhoUnlikedId } }, viewerId: userWhoUnlikedId });
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -182,7 +190,7 @@ const unlikeUserPost = async ({ userPostId, userWhoUnlikedId }) => {
 	}
 };
 
-const getUserPostLikes = async ({ userPostId }) => {
+const getUserPostLikes = async ({ userPostId, requesterId }) => {
 	try {
 		if (!mongoose.isObjectIdOrHexString(userPostId)) {
 			throw createPostNotFoundError();
@@ -194,7 +202,9 @@ const getUserPostLikes = async ({ userPostId }) => {
 			throw createPostNotFoundError();
 		}
 
-		return await getUserRowsInOrder([...userPost.likes].reverse());
+		const visibleLikes = withoutHiddenIds(userPost.likes, await getHiddenVisitorIds(requesterId));
+
+		return await getUserRowsInOrder([...visibleLikes].reverse());
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
