@@ -11,7 +11,7 @@ const { reactToUpload } = require('../demo/userReactions');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const { getUserRowsInOrder } = require('./userRowService');
-const { createPostVisibility, getHiddenVisitorIds, withoutHiddenIds } = require('./visitorVisibilityService');
+const { assertPostNotHidden, createPostVisibility, getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
 
 const AUTHOR_POPULATE = {
 	path: 'userId',
@@ -30,6 +30,10 @@ const findOwnedUserPost = async ({ userPostId, userId }) => {
 	}
 
 	if (!userPost.userId || userPost.userId.toString() !== String(userId)) {
+		if (userPost.userId && isHiddenId(userPost.userId, await getHiddenVisitorIds(userId))) {
+			throw createPostNotFoundError();
+		}
+
 		throw new AppError('You can only change your own posts', 403, { code: ERROR_CODES.POST_FORBIDDEN });
 	}
 
@@ -45,8 +49,12 @@ const findOwnedUserPost = async ({ userPostId, userId }) => {
 const getAllUserPosts = async (userId) => {
 	try {
 		const userPosts = await UserPostModel.find({ userId });
+		const applyVisibility = await createPostVisibility(
+			userPosts.map((userPost) => userPost._id),
+			await getHiddenVisitorIds(userId),
+		);
 
-		return userPosts;
+		return userPosts.map((userPost) => applyVisibility(userPost));
 	} catch (error) {
 		throw new AppError('Could not load user posts', 500, { cause: error });
 	}
@@ -119,28 +127,61 @@ const addUserPost = async ({ caption, imageFile }, userId) => {
 	}
 };
 
-const getFollowedUsersPosts = async (userId) => {
+const FEED_CURSOR_SEPARATOR = '_';
+
+const toFeedCursor = (post) => `${post.createdAt.getTime()}${FEED_CURSOR_SEPARATOR}${post._id}`;
+
+const parseFeedCursor = (cursor) => {
+	if (cursor === undefined) {
+		return null;
+	}
+
+	const [timestamp, postId] = typeof cursor === 'string' ? cursor.split(FEED_CURSOR_SEPARATOR) : [];
+	const createdAt = new Date(Number(timestamp));
+
+	if (!timestamp || Number.isNaN(createdAt.getTime()) || !mongoose.isObjectIdOrHexString(postId)) {
+		throw new AppError('cursor must be a feed cursor', 400, { code: ERROR_CODES.BAD_REQUEST });
+	}
+
+	return { createdAt, postId: new mongoose.Types.ObjectId(postId) };
+};
+
+const getFollowedUsersPosts = async (userId, { cursor } = {}) => {
 	try {
+		const parsedCursor = parseFeedCursor(cursor);
 		const currentUser = await UserModel.findById(userId).select({ following: 1 });
 
 		if (!currentUser) {
 			throw new AppError('Unauthorized', 401, { code: ERROR_CODES.UNAUTHENTICATED });
 		}
 
-		const followedUsersPostDocs = await UserPostModel.find({ userId: { $in: currentUser.following } })
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const filter = { userId: { $in: withoutHiddenIds(currentUser.following, hiddenVisitorIds) } };
+
+		if (parsedCursor) {
+			filter.$or = [{ createdAt: { $lt: parsedCursor.createdAt } }, { createdAt: parsedCursor.createdAt, _id: { $lt: parsedCursor.postId } }];
+		}
+
+		const fetchedPostDocs = await UserPostModel.find(filter)
 			.sort({ createdAt: -1, _id: -1 })
+			.limit(constants.FEED_POSTS_PAGE_SIZE + 1)
 			.populate(AUTHOR_POPULATE);
+		const hasMore = fetchedPostDocs.length > constants.FEED_POSTS_PAGE_SIZE;
+		const followedUsersPostDocs = fetchedPostDocs.slice(0, constants.FEED_POSTS_PAGE_SIZE);
 
 		const postIds = followedUsersPostDocs.map((post) => post._id);
 
-		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
 		const applyVisibility = await createPostVisibility(postIds, hiddenVisitorIds);
 		const previewComments = await commentService.getPreviewCommentsForPosts(postIds, hiddenVisitorIds);
 
-		return followedUsersPostDocs.map((post) => ({
-			...applyVisibility(post.toObject()),
-			previewComments: previewComments[post._id.toString()] || [],
-		}));
+		return {
+			posts: followedUsersPostDocs.map((post) => ({
+				...applyVisibility(post.toObject()),
+				previewComments: previewComments[post._id.toString()] || [],
+			})),
+			hasMore,
+			nextCursor: hasMore ? toFeedCursor(followedUsersPostDocs[followedUsersPostDocs.length - 1]) : null,
+		};
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -155,13 +196,15 @@ const updateUserPostLikes = async ({ userPostId, likesUpdate, viewerId }) => {
 		throw createPostNotFoundError();
 	}
 
-	const updatedUserPost = await UserPostModel.findOneAndUpdate({ _id: userPostId }, likesUpdate, { new: true });
+	const hiddenVisitorIds = await getHiddenVisitorIds(viewerId);
+	const filter = hiddenVisitorIds.length ? { _id: userPostId, userId: { $nin: hiddenVisitorIds } } : { _id: userPostId };
+	const updatedUserPost = await UserPostModel.findOneAndUpdate(filter, likesUpdate, { new: true });
 
 	if (!updatedUserPost) {
 		throw createPostNotFoundError();
 	}
 
-	const applyVisibility = await createPostVisibility([updatedUserPost._id], await getHiddenVisitorIds(viewerId));
+	const applyVisibility = await createPostVisibility([updatedUserPost._id], hiddenVisitorIds);
 
 	return applyVisibility(updatedUserPost);
 };
@@ -202,7 +245,11 @@ const getUserPostLikes = async ({ userPostId, requesterId }) => {
 			throw createPostNotFoundError();
 		}
 
-		const visibleLikes = withoutHiddenIds(userPost.likes, await getHiddenVisitorIds(requesterId));
+		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+
+		await assertPostNotHidden(userPostId, hiddenVisitorIds);
+
+		const visibleLikes = withoutHiddenIds(userPost.likes, hiddenVisitorIds);
 
 		return await getUserRowsInOrder([...visibleLikes].reverse());
 	} catch (error) {
@@ -226,7 +273,9 @@ const updateUserPostCaption = async ({ userPostId, userId, caption }) => {
 
 		await userPost.save();
 
-		return userPost;
+		const applyVisibility = await createPostVisibility([userPost._id], await getHiddenVisitorIds(userId));
+
+		return applyVisibility(userPost);
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;

@@ -63,6 +63,7 @@ module.exports = {
 
 	VISITOR_EMAIL_DOMAIN: 'visitor.demo.invalid',
 	VISITOR_LIFETIME_MS: DAY_MS,
+	VISITOR_MAX_ACCOUNTS: 300,
 	VISITOR_USERNAME_INFIX: '_demo_',
 	VISITOR_USERNAME_NUMBER: [1, 99],
 	VISITOR_USERNAME_ATTEMPTS: 100,
@@ -125,7 +126,6 @@ module.exports = {
 	VISITOR_STARTER_POST_LIKES: [5, 10],
 	VISITOR_STARTER_POST_COMMENTS: [0, 1],
 	VISITOR_START_REACTIONS: { likes: [1, 5], comments: [0, 2], followers: [1, 3] },
-	VISITOR_SHARED_IMAGE_PREFIXES: ['demo-users/visitor-avatars/'],
 	VISITOR_POST_COPY_FOLDER: 'demo-users/visitor-post-copies',
 
 	IMMEDIATE_REACTION_WINDOW_MS: 10 * 60 * 1000,

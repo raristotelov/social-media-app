@@ -17,6 +17,9 @@ Routes `/user-feed` and `/user/:userId/posts` (`client/src/Router.jsx`). Liking 
 - A guest who opens `/user-feed` by URL is redirected to `/log-in` and returned to `/user-feed` after logging in.
 - Shows posts from the people the user follows, newest first.
 - `FeedView` fetches its own posts from `GET /user-posts/followed-users-posts`, sorted newest first on the server. It no longer reads `followedUsersPosts` from the logged-in user.
+- Paged, 30 posts per page. Response `{ posts, hasMore, nextCursor }`; the next page is `?cursor=<nextCursor>`. The cursor is `<createdAt ms>_<postId>` of the last post (keyset on `createdAt`, `_id`), so new posts never shift later pages. A malformed cursor is a 400 `BAD_REQUEST`.
+- The first page loads with the page; more load on scroll near the bottom (`useFeedPosts` + `useLoadMoreOnScroll`, as Popular). The loader and "Couldn't load more posts · Try again" are Popular's footer. Visitors' posts and old follows of visitors stay filtered on every page.
+- The suggestions carousel stays after the 5th post (or at the end when there are fewer); a reload (e.g. after following from the empty feed) returns to page one.
 - `followedUsersPosts` is removed from the profile response (it is currently built for every profile request).
 - Known bug to fix: the feed is not sorted by date today (the server groups by followed user; the client re-sort after a like subtracts date strings).
 - Empty state: only the "Your feed is empty / Follow people to see their posts here" message, positioned as designed. The space where stories and suggestions sit stays blank until their tickets.

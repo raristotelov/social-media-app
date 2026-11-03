@@ -9,6 +9,7 @@ const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const { cloudinary } = require('../config/cloudinary');
 const constants = require('../config/constants');
+const { ERROR_CODES } = require('../config/errorCodes');
 const { discardUploadedImage } = require('../services/imageStorageService');
 const AppError = require('../utils/AppError');
 const config = require('./demoConfig');
@@ -19,10 +20,15 @@ const { planStarterReactions } = require('./reactionPlanning');
 const { removeUsersWithContent } = require('./removeUsersWithContent');
 const { createUsernameCandidate, pickPersonasToFollow, pickFollowBacks, planStarterPosts, planStarterEngagement } = require('./visitorPlanning');
 
-const DUPLICATE_KEY_ERROR_CODE = 11000;
 const PASSWORD_BYTES = 32;
 
-const isDuplicateKeyError = (error) => error?.code === DUPLICATE_KEY_ERROR_CODE;
+const isDuplicateKeyError = (error) => error?.code === constants.DUPLICATE_KEY_ERROR_CODE;
+
+const assertDemoHasRoom = async () => {
+	if ((await UserModel.countDocuments({ accountType: 'demo' })) >= config.VISITOR_MAX_ACCOUNTS) {
+		throw new AppError('The demo is at capacity', 429, { code: ERROR_CODES.DEMO_UNAVAILABLE });
+	}
+};
 
 const toProfilePicture = (avatar) => (avatar ? { imageUrl: avatar.imageUrl, imageIdentifier: avatar.imageIdentifier } : undefined);
 
@@ -154,6 +160,8 @@ const fillVisitorContent = async ({ user, followedIds, followBackIds, personaIds
 };
 
 const createDemoVisitor = async ({ now = new Date(), random = Math.random } = {}) => {
+	await assertDemoHasRoom();
+
 	const data = await loadVisitorData();
 	const personas = await DemoAccountStateModel.find().select({ userId: 1, tier: 1 }).lean();
 	const personaIds = personas.map((persona) => persona.userId);

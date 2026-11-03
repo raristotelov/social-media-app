@@ -2,13 +2,13 @@
 	box-sizing: border-box;
 	width: calc(100% - 48px);
 	max-width: 900px;
-	padding: calc(var(--header-height) + 46px) 0 40px;
+	padding: 46px 0 40px;
 
 	font-family: 'Mada';
 }
 
 .popular-posts-wrapper-empty {
-	padding-top: calc(var(--header-height) + 268px);
+	padding-top: 268px;
 
 	text-align: center;
 }
@@ -30,11 +30,11 @@
 	.popular-posts-wrapper {
 		width: 100%;
 		max-width: none;
-		padding: var(--header-height) 0 var(--tab-bar-height);
+		padding: 0 0 var(--tab-bar-height);
 	}
 
 	.popular-posts-wrapper-empty {
-		padding: calc(var(--header-height) + 255px) 16px var(--tab-bar-height);
+		padding: 255px 16px var(--tab-bar-height);
 	}
 
 	.popular-posts-grid {

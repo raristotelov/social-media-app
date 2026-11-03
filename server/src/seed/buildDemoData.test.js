@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { buildDemoData, DEMO_EMAIL_DOMAIN } = require('./buildDemoData');
+const { buildDemoData } = require('./buildDemoData');
 
 const DATA_DIRECTORY = path.join(__dirname, 'data');
 const NON_BANK_FILES = [
@@ -133,9 +133,7 @@ describe('buildDemoData', () => {
 		});
 
 		it('should give every account an @demo.invalid email equal to its username', () => {
-			const mismatches = data.users.filter(
-				(user) => user.email !== `${user.username}@${DEMO_EMAIL_DOMAIN}` || !user.email.endsWith('@demo.invalid'),
-			);
+			const mismatches = data.users.filter((user) => user.email !== `${user.username}@demo.invalid`);
 
 			expect(mismatches).toEqual([]);
 		});

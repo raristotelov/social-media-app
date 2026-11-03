@@ -1,9 +1,8 @@
-import { useContext, useRef, useState } from 'react';
+import { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
-import useDemoStripOffset from '../../hooks/useDemoStripOffset';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import useSessionFlag from '../../hooks/useSessionFlag';
 import { demoLogin } from '../../services/userService';
@@ -29,12 +28,8 @@ const DemoStrip = () => {
 	const [isNoticeDismissed, dismissNotice] = useSessionFlag(DEMO_NOTICE_DISMISSED_KEY);
 	const [isStarting, setIsStarting] = useState(false);
 
-	const stripRef = useRef(null);
-
 	const isGuest = !jwtToken;
 	const isVisible = isGuest ? !isGuestStripDismissed : isDemoVisitor(loggedInUser) && !isNoticeDismissed;
-
-	useDemoStripOffset(stripRef, isVisible);
 
 	const startDemo = async () => {
 		setIsStarting(true);
@@ -59,7 +54,7 @@ const DemoStrip = () => {
 	const noticeRest = isMobile ? DEMO_STRIP_COPY.NOTICE_REST_MOBILE : DEMO_STRIP_COPY.NOTICE_REST;
 
 	return (
-		<div className={isGuest ? 'demo-strip demo-strip-guest' : 'demo-strip'} ref={stripRef}>
+		<div className={isGuest ? 'demo-strip demo-strip-guest' : 'demo-strip'}>
 			{isGuest ? (
 				<>
 					<p className='demo-strip-message'>{isMobile ? DEMO_STRIP_COPY.GUEST_MOBILE : DEMO_STRIP_COPY.GUEST}</p>

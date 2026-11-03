@@ -1,6 +1,6 @@
 # Demo Entry
 
-Status: In Development
+Status: Complete
 
 The "Try the demo" strip for guests (#17). Demo account behaviour: [demo-content/overview.md](../demo-content/overview.md#demo-accounts-17). Tokens: [style-guide.md](../style-guide.md). File layout and breakpoints: [design-system.md](../design-system.md).
 

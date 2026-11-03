@@ -1,17 +1,17 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import useFeedPosts from '../../hooks/useFeedPosts';
+import useLoadMoreOnScroll from '../../hooks/useLoadMoreOnScroll';
 import useMediaQuery from '../../hooks/useMediaQuery';
 import useStoryTray from '../../hooks/useStoryTray';
-import { getFollowedUsersPosts } from '../../services/userPostService';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';
 import { DESKTOP_MEDIA_QUERY } from '../../constants/layout';
 import { CAROUSEL_POSTS_BEFORE } from '../../constants/suggestions';
-import { isUnauthenticatedError } from '../../utils/errors';
 
 import EmptyFeedSuggestions from '../EmptyFeedSuggestions/EmptyFeedSuggestions';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 import PageLoadError from '../PageLoadError/PageLoadError';
+import LoadMoreFooter from '../LoadMoreFooter/LoadMoreFooter';
 import StoriesTray from '../StoriesTray/StoriesTray';
 import SuggestionsCarousel from '../SuggestionsCarousel/SuggestionsCarousel';
 import SuggestionsSidebar from '../SuggestionsSidebar/SuggestionsSidebar';
@@ -22,78 +22,29 @@ import './FeedView.css';
 const CAROUSEL_KEY = 'suggestions-carousel';
 
 const FeedView = () => {
-	const [posts, setPosts] = useState([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [hasLoadFailed, setHasLoadFailed] = useState(false);
 	const [isEmptyFeedVisit, setIsEmptyFeedVisit] = useState(false);
-	const [reloadCount, setReloadCount] = useState(0);
-	const hasLoadedPostsRef = useRef(false);
 
-	const { jwtToken, endSession } = useContext(LoggedInUserContext);
+	const {
+		posts,
+		isLoading,
+		hasLoadFailed,
+		isLoadingMore,
+		hasLoadMoreFailed,
+		canLoadMore,
+		reload: reloadPosts,
+		loadMore,
+		updatePost,
+	} = useFeedPosts();
 	const { entries: trayEntries, isLoaded: isTrayLoaded, reload: reloadTray } = useStoryTray();
 	const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
 
-	const jwtTokenRef = useRef(jwtToken);
+	useLoadMoreOnScroll({ onLoadMore: loadMore, isEnabled: canLoadMore });
 
 	useEffect(() => {
-		jwtTokenRef.current = jwtToken;
-	}, [jwtToken]);
-
-	useEffect(() => {
-		let isCurrentRequest = true;
-
-		if (!hasLoadedPostsRef.current) {
-			setIsLoading(true);
+		if (!isLoading && !hasLoadFailed && !posts.length) {
+			setIsEmptyFeedVisit(true);
 		}
-
-		getFollowedUsersPosts({ jwtToken: jwtTokenRef.current })
-			.then((result) => {
-				if (!isCurrentRequest) {
-					return;
-				}
-
-				hasLoadedPostsRef.current = true;
-
-				setPosts(result);
-				setHasLoadFailed(false);
-
-				if (!result.length) {
-					setIsEmptyFeedVisit(true);
-				}
-			})
-			.catch((error) => {
-				if (!isCurrentRequest) {
-					return;
-				}
-
-				if (isUnauthenticatedError(error)) {
-					endSession();
-
-					return;
-				}
-
-				if (!hasLoadedPostsRef.current) {
-					setHasLoadFailed(true);
-				}
-			})
-			.finally(() => {
-				if (isCurrentRequest) {
-					setIsLoading(false);
-				}
-			});
-
-		return () => {
-			isCurrentRequest = false;
-		};
-	}, [endSession, reloadCount]);
-
-	const reloadPosts = useCallback(() => {
-		setReloadCount((count) => count + 1);
-	}, []);
-
-	const updatePost = useCallback((postId, changes) => {
-		setPosts((state) => state.map((post) => (post._id === postId ? { ...post, ...changes } : post)));
-	}, []);
+	}, [isLoading, hasLoadFailed, posts.length]);
 
 	if (hasLoadFailed) {
 		return <PageLoadError onActionClick={reloadPosts} isRetrying={isLoading} messages={LOAD_ERROR_MESSAGES.FEED} />;
@@ -124,6 +75,10 @@ const FeedView = () => {
 			{isEmptyFeedVisit ? <EmptyFeedSuggestions onFollowChange={reloadPosts} /> : null}
 
 			{!isLoading && posts.length ? <div className='feed-posts'>{postItems}</div> : null}
+
+			{!isLoading && posts.length ? (
+				<LoadMoreFooter isLoadingMore={isLoadingMore} hasLoadMoreFailed={hasLoadMoreFailed} onRetryClick={loadMore} />
+			) : null}
 
 			{!isLoading && !isEmptyFeedVisit && isDesktop ? <SuggestionsSidebar /> : null}
 		</section>

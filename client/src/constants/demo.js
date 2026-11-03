@@ -6,8 +6,6 @@ export const GUEST_STRIP_DISMISSED_KEY = 'demo-strip-dismissed';
 
 export const DEMO_NOTICE_DISMISSED_KEY = 'demo-notice-dismissed';
 
-export const DEMO_STRIP_OFFSET_CSS_VARIABLE = '--demo-strip-offset';
-
 export const DEMO_STRIP_COPY = Object.freeze({
 	GUEST: 'Explore the app without signing up',
 	GUEST_MOBILE: 'Explore without signing up',

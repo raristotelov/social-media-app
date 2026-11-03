@@ -59,10 +59,44 @@ describe('userPostService', () => {
 			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/user-posts\/followed-users-posts$/));
 		});
 
-		it('resolves with the posts', async () => {
-			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue([{ _id: 'post1' }]) });
+		it('resolves with the page', async () => {
+			const page = { posts: [{ _id: 'post1' }], hasMore: true, nextCursor: '1_abc' };
 
-			await expect(getFollowedUsersPosts({ jwtToken: 'token123' })).resolves.toEqual([{ _id: 'post1' }]);
+			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue(page) });
+
+			await expect(getFollowedUsersPosts({ jwtToken: 'token123' })).resolves.toEqual(page);
+		});
+
+		it('sends no query string for the first page', async () => {
+			const get = jest.fn().mockResolvedValue({});
+
+			requestFactory.mockReturnValue({ get });
+
+			await getFollowedUsersPosts({ jwtToken: 'token123', cursor: null });
+
+			expect(get).toHaveBeenCalledWith(expect.not.stringContaining('?'));
+		});
+
+		it('sends the cursor of the page to continue from', async () => {
+			const get = jest.fn().mockResolvedValue({});
+
+			requestFactory.mockReturnValue({ get });
+
+			await getFollowedUsersPosts({ jwtToken: 'token123', cursor: '1793000000000_64b7f0a1c2d3e4f5a6b7c8d1' });
+
+			expect(get).toHaveBeenCalledWith(
+				expect.stringMatching(/\/user-posts\/followed-users-posts\?cursor=1793000000000_64b7f0a1c2d3e4f5a6b7c8d1$/),
+			);
+		});
+
+		it('encodes a cursor so no character can break the query', async () => {
+			const get = jest.fn().mockResolvedValue({});
+
+			requestFactory.mockReturnValue({ get });
+
+			await getFollowedUsersPosts({ jwtToken: 'token123', cursor: 'a&b=c#d' });
+
+			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\?cursor=a%26b%3Dc%23d$/));
 		});
 	});
 

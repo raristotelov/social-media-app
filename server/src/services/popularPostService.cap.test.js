@@ -20,6 +20,7 @@ const loadServiceWithCap = (cap, rankedPosts, firstPost) => {
 	jest.doMock('./visitorVisibilityService', () => ({
 		getHiddenVisitorIds: jest.fn().mockResolvedValue([]),
 		withoutHiddenIds: (ids) => ids,
+		isHiddenId: () => false,
 		createPostVisibility: jest.fn().mockResolvedValue((post) => post),
 	}));
 

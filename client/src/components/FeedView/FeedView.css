@@ -2,7 +2,7 @@
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 500px;
-	padding: calc(var(--header-height) + 46px) 0 60px;
+	padding: 46px 0 60px;
 }
 
 .feed-posts {
@@ -19,7 +19,7 @@
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 500px;
-	padding: calc(var(--header-height) + 93px) 0 60px;
+	padding: 93px 0 60px;
 
 	display: flex;
 	flex-direction: column;
@@ -75,7 +75,7 @@
 @media (max-width: 599px) {
 	.feed-wrapper {
 		max-width: none;
-		padding: var(--header-height) 0 var(--tab-bar-height);
+		padding: 0 0 var(--tab-bar-height);
 	}
 
 	.feed-posts {
@@ -86,7 +86,7 @@
 
 	.feed-empty {
 		max-width: none;
-		padding: var(--header-height) 0 var(--tab-bar-height);
+		padding: 0 0 var(--tab-bar-height);
 	}
 
 	.feed-empty .feed-posts {

@@ -2,17 +2,17 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import PopularPostsFooter from './PopularPostsFooter';
+import LoadMoreFooter from './LoadMoreFooter';
 
 const renderFooter = (props = {}) => {
 	const onRetryClick = jest.fn();
 
-	const rendered = render(<PopularPostsFooter isLoadingMore={false} hasLoadMoreFailed={false} onRetryClick={onRetryClick} {...props} />);
+	const rendered = render(<LoadMoreFooter isLoadingMore={false} hasLoadMoreFailed={false} onRetryClick={onRetryClick} {...props} />);
 
 	return { ...rendered, onRetryClick };
 };
 
-describe('PopularPostsFooter', () => {
+describe('LoadMoreFooter', () => {
 	describe('when nothing is happening', () => {
 		it('renders nothing', () => {
 			const { container } = renderFooter();

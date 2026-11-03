@@ -38,7 +38,7 @@ const PopularPostsLayout = () => {
 	}
 
 	if (isLoading) {
-		return <LoadingSpinner isFullPage />;
+		return <LoadingSpinner isFullPage isBelowHeader />;
 	}
 
 	const outletContext = { posts, updatePost, isLoadingMore, hasLoadMoreFailed, onRetryLoadMoreClick: loadMore };

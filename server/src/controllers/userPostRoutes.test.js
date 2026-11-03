@@ -81,7 +81,7 @@ describe('user post routes', () => {
 			const response = await fetch(`${baseUrl}/user-posts/followed-users-posts`, { headers: authHeaders() });
 
 			expect(response.status).toBe(200);
-			expect(userPostService.getFollowedUsersPosts).toHaveBeenCalledWith(USER_ID);
+			expect(userPostService.getFollowedUsersPosts).toHaveBeenCalledWith(USER_ID, { cursor: undefined });
 			await expect(response.json()).resolves.toEqual([{ _id: POST_ID }]);
 		});
 

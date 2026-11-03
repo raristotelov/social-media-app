@@ -5,7 +5,7 @@ import useGoBackOrTo from '../../hooks/useGoBackOrTo';
 import usePostHashSync from '../../hooks/usePostHashSync';
 import { POPULAR_POSTS_BAR_LABEL, POPULAR_POSTS_PATH } from '../../constants/popularPosts';
 
-import PopularPostsFooter from '../PopularPostsFooter/PopularPostsFooter';
+import LoadMoreFooter from '../LoadMoreFooter/LoadMoreFooter';
 import PostsBar from '../PostsBar/PostsBar';
 import UserPost from '../UserPost/UserPost';
 
@@ -28,7 +28,7 @@ const PopularPostsPostsView = () => {
 				))}
 			</div>
 
-			<PopularPostsFooter isLoadingMore={isLoadingMore} hasLoadMoreFailed={hasLoadMoreFailed} onRetryClick={onRetryLoadMoreClick} />
+			<LoadMoreFooter isLoadingMore={isLoadingMore} hasLoadMoreFailed={hasLoadMoreFailed} onRetryClick={onRetryLoadMoreClick} />
 		</section>
 	);
 };

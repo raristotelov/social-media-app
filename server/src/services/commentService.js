@@ -8,7 +8,13 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { createPostNotFoundError, createCommentNotFoundError } = require('../utils/notFoundErrors');
 const { getUserRowsInOrder } = require('./userRowService');
-const { getHiddenVisitorIds, withoutHiddenCommentLikes, withoutHiddenIds } = require('./visitorVisibilityService');
+const {
+	assertCommentNotHidden,
+	assertPostNotHidden,
+	getHiddenVisitorIds,
+	withoutHiddenCommentLikes,
+	withoutHiddenIds,
+} = require('./visitorVisibilityService');
 
 const AUTHOR_POPULATE = {
 	path: 'userId',
@@ -59,8 +65,13 @@ const addComment = async ({ userPostId, userId, text, parentCommentId, mentioned
 
 		await assertPostExists(userPostId);
 
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+
+		await assertPostNotHidden(userPostId, hiddenVisitorIds);
+
 		if (parentCommentId) {
 			await assertValidReplyParent({ parentCommentId, userPostId });
+			await assertCommentNotHidden(parentCommentId, hiddenVisitorIds);
 		}
 
 		const trimmedText = text.trim();
@@ -93,6 +104,9 @@ const getCommentsForPost = async ({ userPostId, requesterId }) => {
 		await assertPostExists(userPostId);
 
 		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+
+		await assertPostNotHidden(userPostId, hiddenVisitorIds);
+
 		const filter = hiddenVisitorIds.length ? { userPostId, userId: { $nin: hiddenVisitorIds } } : { userPostId };
 		const comments = await CommentModel.find(filter).sort({ createdAt: 1 }).populate([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
 
@@ -129,13 +143,17 @@ const updateCommentLikes = async ({ commentId, likesUpdate, viewerId }) => {
 		throw createCommentNotFoundError();
 	}
 
+	const hiddenVisitorIds = await getHiddenVisitorIds(viewerId);
+
+	await assertCommentNotHidden(commentId, hiddenVisitorIds);
+
 	const updatedComment = await CommentModel.findByIdAndUpdate(commentId, likesUpdate, { new: true });
 
 	if (!updatedComment) {
 		throw createCommentNotFoundError();
 	}
 
-	return withoutHiddenCommentLikes(updatedComment, await getHiddenVisitorIds(viewerId));
+	return withoutHiddenCommentLikes(updatedComment, hiddenVisitorIds);
 };
 
 const likeComment = async ({ commentId, userId }) => {
@@ -174,7 +192,11 @@ const getCommentLikes = async ({ commentId, requesterId }) => {
 			throw createCommentNotFoundError();
 		}
 
-		const visibleLikes = withoutHiddenIds(comment.likes, await getHiddenVisitorIds(requesterId));
+		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+
+		await assertCommentNotHidden(commentId, hiddenVisitorIds);
+
+		const visibleLikes = withoutHiddenIds(comment.likes, hiddenVisitorIds);
 
 		return await getUserRowsInOrder([...visibleLikes].reverse());
 	} catch (error) {

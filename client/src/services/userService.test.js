@@ -1,9 +1,41 @@
 import { requestFactory } from './requester';
-import { changePassword, getUsersProfileData, getFollowers, getFollowing, updateUserProfileData } from './userService';
+import { changePassword, demoLogin, getUsersProfileData, getFollowers, getFollowing, updateUserProfileData } from './userService';
 
 jest.mock('./requester');
 
 describe('userService', () => {
+	describe('demoLogin', () => {
+		let post;
+
+		beforeEach(() => {
+			post = jest.fn().mockResolvedValue('demoJwt');
+			requestFactory.mockReturnValue({ post });
+		});
+
+		it('posts to the demo login endpoint without a body', async () => {
+			await demoLogin();
+
+			expect(post).toHaveBeenCalledTimes(1);
+			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/users\/demo-login$/));
+		});
+
+		it('sends no token, because the visitor is not logged in yet', async () => {
+			await demoLogin();
+
+			expect(requestFactory).toHaveBeenCalledWith();
+		});
+
+		it('resolves with the token from the server', async () => {
+			await expect(demoLogin()).resolves.toBe('demoJwt');
+		});
+
+		it('rejects with the request error so the strip can show it', async () => {
+			post.mockRejectedValue({ code: 'TOO_MANY_REQUESTS', status: 429 });
+
+			await expect(demoLogin()).rejects.toMatchObject({ status: 429, code: 'TOO_MANY_REQUESTS' });
+		});
+	});
+
 	describe('changePassword', () => {
 		let patch;
 

@@ -20,7 +20,7 @@ router.post('/', verifyJwtToken, uploadImage(constants.POST_IMAGE_FIELD), async 
 });
 
 router.get('/followed-users-posts', verifyJwtToken, async (req, res) => {
-	const followedUsersPostsData = await userPostService.getFollowedUsersPosts(res.userId);
+	const followedUsersPostsData = await userPostService.getFollowedUsersPosts(res.userId, { cursor: req.query.cursor });
 
 	return res.json(followedUsersPostsData);
 });

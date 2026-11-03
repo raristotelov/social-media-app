@@ -51,4 +51,34 @@ describe('UserModel', () => {
 			expect(user.validateSync().errors.suggestionsCarouselDismissedUntil).toBeDefined();
 		});
 	});
+
+	describe('accountType', () => {
+		it('is a regular user by default', () => {
+			const user = new UserModel(validUserData);
+
+			expect(user.accountType).toBe('user');
+		});
+
+		it.each(['user', 'persona', 'demo'])('accepts %s', (accountType) => {
+			const user = new UserModel({ ...validUserData, accountType });
+
+			expect(user.validateSync()).toBeUndefined();
+		});
+
+		it('rejects any other value', () => {
+			const user = new UserModel({ ...validUserData, accountType: 'admin' });
+
+			expect(user.validateSync().errors.accountType).toBeDefined();
+		});
+
+		it('is indexed, because every visibility rule looks accounts up by it', () => {
+			expect(UserModel.schema.path('accountType').options.index).toBe(true);
+		});
+
+		it('does not depend on the email: a visitor-looking email still defaults to a regular user', () => {
+			const user = new UserModel({ ...validUserData, email: 'someone@visitor.demo.invalid' });
+
+			expect(user.accountType).toBe('user');
+		});
+	});
 });

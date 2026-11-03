@@ -14,7 +14,7 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { createPostNotFoundError } = require('../utils/notFoundErrors');
 const commentService = require('./commentService');
-const { createPostVisibility, getHiddenVisitorIds, withoutHiddenIds } = require('./visitorVisibilityService');
+const { createPostVisibility, getHiddenVisitorIds, isHiddenId } = require('./visitorVisibilityService');
 
 const AUTHOR_POPULATE = {
 	path: 'userId',
@@ -39,7 +39,7 @@ const getExcludedAuthorIds = async (userId, hiddenVisitorIds) => {
 	return [currentUser._id, ...(currentUser.following ?? []), ...hiddenVisitorIds];
 };
 
-const findFirstPost = async ({ firstPostId, viewerId }) => {
+const findFirstPost = async ({ firstPostId, hiddenVisitorIds }) => {
 	if (!firstPostId) {
 		return null;
 	}
@@ -54,9 +54,7 @@ const findFirstPost = async ({ firstPostId, viewerId }) => {
 		throw createPostNotFoundError();
 	}
 
-	const hiddenVisitorIds = await getHiddenVisitorIds(viewerId);
-
-	if (withoutHiddenIds([firstPost.userId], hiddenVisitorIds).length === 0) {
+	if (isHiddenId(firstPost.userId, hiddenVisitorIds)) {
 		throw createPostNotFoundError();
 	}
 
@@ -128,8 +126,8 @@ const withCommentData = async (posts, hiddenVisitorIds) => {
 	}));
 };
 
-const loadPopularPage = async ({ userId, snapshotTime, firstPost, shownPostIds }) => {
-	const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+const loadPopularPage = async ({ userId, snapshotTime, firstPost, shownPostIds, hiddenVisitorIds: loadedHiddenVisitorIds }) => {
+	const hiddenVisitorIds = loadedHiddenVisitorIds ?? (await getHiddenVisitorIds(userId));
 	const excludedAuthorIds = await getExcludedAuthorIds(userId, hiddenVisitorIds);
 
 	const rankedLimit = POPULAR_POSTS_PAGE_SIZE - (firstPost ? 1 : 0);
@@ -147,10 +145,12 @@ const loadPopularPage = async ({ userId, snapshotTime, firstPost, shownPostIds }
 
 const getPopularPosts = async ({ userId, firstPostId }) => {
 	try {
-		const firstPost = await findFirstPost({ firstPostId, viewerId: userId });
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const firstPost = await findFirstPost({ firstPostId, hiddenVisitorIds });
 
 		return await loadPopularPage({
 			userId,
+			hiddenVisitorIds,
 			snapshotTime: new Date(),
 			firstPost,
 			shownPostIds: firstPost ? [firstPost._id] : [],

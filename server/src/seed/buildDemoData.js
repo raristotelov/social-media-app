@@ -203,6 +203,5 @@ const buildDemoData = ({ users, assignments, photosManifest, captionBanks, repli
 };
 
 module.exports = {
-	DEMO_EMAIL_DOMAIN: config.DEMO_EMAIL_DOMAIN,
 	buildDemoData,
 };

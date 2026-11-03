@@ -35,6 +35,7 @@ Every error code the server sends and the copy the client shows for it. The clie
 | `STORY_FORBIDDEN` | 403 | List viewers of or delete someone else's story (#13) | The action's fallback (no dedicated copy yet) |
 | `PROFILE_FORBIDDEN` | 403 | Profile update, follow / unfollow for someone else's account | You can only change your own profile |
 | `TOO_MANY_REQUESTS` | 429 | "Try the demo" more than 5 times per hour from one IP | Too many demo accounts from this connection. Try again later. |
+| `DEMO_UNAVAILABLE` | 429 | "Try the demo" while 300 demo accounts already exist | The demo is busy right now. Try again later. |
 | `BAD_REQUEST` | 400 | Malformed request body; 4xx errors not yet given their own code | The action's fallback (below) |
 | `INTERNAL_ERROR` | 500 | Anywhere | The action's fallback (below) |
 
@@ -82,4 +83,4 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Comments (inline) | Couldn't load comments · Try again |
 | Followers / following / story viewers / likes popup (inline) (#13, #5) | Couldn't load this list · Try again |
 | Popular (full page) (#3) | Couldn't load popular posts / Check your connection and try again. / Retry |
-| Popular, next batch (inline) (#3) | Couldn't load more posts · Try again |
+| Popular and feed, next batch (inline), shared (#3, #17) | Couldn't load more posts · Try again |

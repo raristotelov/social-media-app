@@ -14,7 +14,7 @@ const { reactToSignUp } = require('../demo/userReactions');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const { USER_ROW_PROJECTION, getUserRowsInOrder } = require('./userRowService');
-const { createPostVisibility, getHiddenVisitorIds, withoutHiddenIds } = require('./visitorVisibilityService');
+const { assertUserNotHidden, createPostVisibility, getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
 
 const necessaryUserFields = ['_id', 'email', 'accountType', 'username', 'bio', 'theme', 'profilePicture', 'posts', 'followers', 'following'];
 
@@ -271,7 +271,10 @@ const getUsersProfileDataBySearchWord = async ({ searchWord, requesterId }) => {
 			match._id = { $nin: hiddenVisitorIds };
 		}
 
-		const users = await UserModel.aggregate([{ $match: match }, { $project: SEARCH_ROW_PROJECTION }]);
+		const projection = hiddenVisitorIds.length
+			? { ...SEARCH_ROW_PROJECTION, followersCount: { $size: { $setDifference: [{ $ifNull: ['$followers', []] }, hiddenVisitorIds] } } }
+			: SEARCH_ROW_PROJECTION;
+		const users = await UserModel.aggregate([{ $match: match }, { $project: projection }]);
 
 		return users;
 	} catch (error) {
@@ -291,7 +294,7 @@ const getFollowListByUserId = async ({ userId, listField, requesterId }) => {
 
 		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
 
-		if (withoutHiddenIds([user._id], hiddenVisitorIds).length === 0) {
+		if (isHiddenId(user._id, hiddenVisitorIds)) {
 			throw createUserNotFoundError();
 		}
 
@@ -418,11 +421,15 @@ const followUser = async (userId, userIdToFollow) => {
 	try {
 		await assertUsersExist([userId, userIdToFollow]);
 
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+
+		assertUserNotHidden(userIdToFollow, hiddenVisitorIds);
+
 		const currentlyLoggedUser = await UserModel.findOneAndUpdate({ _id: userId }, { $addToSet: { following: userIdToFollow } }, { new: true });
 
 		await UserModel.updateOne({ _id: userIdToFollow }, { $addToSet: { followers: userId } }, { new: true });
 
-		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser, await getHiddenVisitorIds(userId));
+		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser, hiddenVisitorIds);
 
 		return updatedUserData;
 	} catch (error) {
@@ -438,11 +445,15 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 	try {
 		await assertUsersExist([userId, userIdToUnfollow]);
 
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+
+		assertUserNotHidden(userIdToUnfollow, hiddenVisitorIds);
+
 		const currentlyLoggedUser = await UserModel.findOneAndUpdate({ _id: userId }, { $pull: { following: userIdToUnfollow } }, { new: true });
 
 		await UserModel.updateOne({ _id: userIdToUnfollow }, { $pull: { followers: userId } }, { new: true });
 
-		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser, await getHiddenVisitorIds(userId));
+		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser, hiddenVisitorIds);
 
 		return updatedUserData;
 	} catch (error) {

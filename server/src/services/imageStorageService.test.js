@@ -295,6 +295,42 @@ describe('imageStorageService', () => {
 
 			expect(cloudinary.uploader.destroy).not.toHaveBeenCalled();
 		});
+
+		describe('the shared demo visitor avatars', () => {
+			it('never deletes a photo from the shared avatar pool', async () => {
+				await expect(deleteImage('demo-users/visitor-avatars/avatar-7')).resolves.toEqual({ result: 'skipped' });
+
+				expect(cloudinary.uploader.destroy).not.toHaveBeenCalled();
+			});
+
+			it('skips the shared avatar even when Cloudinary is not configured', async () => {
+				isConfigured.mockReturnValue(false);
+
+				await expect(deleteImage('demo-users/visitor-avatars/avatar-7')).resolves.toEqual({ result: 'skipped' });
+			});
+
+			it('deletes the own copy of a visitor starter photo', async () => {
+				cloudinary.uploader.destroy.mockResolvedValue({ result: 'ok' });
+
+				await expect(deleteImage('demo-users/visitor-post-copies/copy-4')).resolves.toEqual({ result: 'ok' });
+
+				expect(cloudinary.uploader.destroy).toHaveBeenCalledWith('demo-users/visitor-post-copies/copy-4', { invalidate: true });
+			});
+
+			it('deletes an image that only has a similar name to the avatar pool', async () => {
+				cloudinary.uploader.destroy.mockResolvedValue({ result: 'ok' });
+
+				await deleteImage('user-images/visitor-avatars/avatar-7');
+
+				expect(cloudinary.uploader.destroy).toHaveBeenCalledWith('user-images/visitor-avatars/avatar-7', { invalidate: true });
+			});
+
+			it('discards nothing from the shared avatar pool either', async () => {
+				await discardUploadedImage('demo-users/visitor-avatars/avatar-7');
+
+				expect(cloudinary.uploader.destroy).not.toHaveBeenCalled();
+			});
+		});
 	});
 
 	describe('discardUploadedImage', () => {

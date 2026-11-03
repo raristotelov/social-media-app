@@ -1,5 +1,3 @@
-const mongoose = require('mongoose');
-
 const { cloudinary } = require('../config/cloudinary');
 const constants = require('../config/constants');
 const CommentModel = require('../models/commentModel');
@@ -9,6 +7,7 @@ const DemoScheduledEventModel = require('../models/demoScheduledEventModel');
 const StoryModel = require('../models/storyModel');
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
+const objectIdFromDate = require('../utils/objectIdFromDate');
 const config = require('./demoConfig');
 const { createPhotoLookup, createCaptionPicker, planPostEngagement, pickWeighted } = require('./contentPlanning');
 const { loadDemoData } = require('./loadDemoData');
@@ -18,7 +17,6 @@ const { applyDueEvents } = require('./scheduledEvents');
 
 const POSTING_HOURS_PER_DAY = config.LAST_POSTING_HOUR - config.FIRST_POSTING_HOUR + 1;
 const AVERAGE_STORIES_PER_DAY = (config.STORIES_PER_DAY[0] + config.STORIES_PER_DAY[1]) / 2;
-const SECOND_MS = 1000;
 const HOURS_PER_DAY = 24;
 
 const floorToHour = (date) => new Date(Math.floor(date.getTime() / config.HOUR_MS) * config.HOUR_MS);
@@ -252,13 +250,11 @@ const runFollows = async (context, run, hourStart, random) => {
 	}
 };
 
-const objectIdAt = (date) => mongoose.Types.ObjectId.createFromTime(Math.floor(date.getTime() / SECOND_MS));
-
 const runSignUpFollows = async (context, hourStart, random) => {
 	const windowStart = new Date(hourStart.getTime() - config.SIGN_UP_FOLLOWS.days * config.DAY_MS);
 	const windowEnd = new Date(hourStart.getTime() + config.HOUR_MS);
 	const signUps = await UserModel.find({
-		_id: { $gte: objectIdAt(windowStart), $lt: objectIdAt(windowEnd) },
+		_id: { $gte: objectIdFromDate(windowStart), $lt: objectIdFromDate(windowEnd) },
 		accountType: 'user',
 	})
 		.select({ followers: 1 })
