@@ -54,6 +54,8 @@ const buildPost = (id, username, overrides = {}) => ({
 
 const feedPosts = [buildPost('post3', 'janedoe'), buildPost('post2', 'alice'), buildPost('post1', 'janedoe')];
 
+const feedPage = (posts) => ({ posts, hasMore: false, nextCursor: null });
+
 const buildDeferred = () => {
 	const deferred = {};
 
@@ -109,7 +111,7 @@ describe('FeedView', () => {
 		];
 
 		it('is shown above the posts', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			getStoryTray.mockResolvedValue(trayEntries);
 			renderFeed();
 
@@ -120,7 +122,7 @@ describe('FeedView', () => {
 		});
 
 		it('loads the tray with the token', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findAllByRole('article');
@@ -129,7 +131,7 @@ describe('FeedView', () => {
 		});
 
 		it('shows the people with an active story', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			getStoryTray.mockResolvedValue(trayEntries);
 			renderFeed();
 
@@ -169,7 +171,7 @@ describe('FeedView', () => {
 		});
 
 		it('removes the spinner and keeps the tray once the posts arrive', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			getStoryTray.mockResolvedValue(trayEntries);
 			renderFeed();
 
@@ -189,7 +191,7 @@ describe('FeedView', () => {
 		});
 
 		it('makes one tray request across a feed load error and its retry, and shows the tray again after it', async () => {
-			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPosts);
+			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage(feedPosts));
 			getStoryTray.mockResolvedValue(trayEntries);
 			renderFeed();
 
@@ -201,7 +203,7 @@ describe('FeedView', () => {
 		});
 
 		it('is shown on the empty feed too, so someone who follows nobody can post a story', async () => {
-			getFollowedUsersPosts.mockResolvedValue([]);
+			getFollowedUsersPosts.mockResolvedValue(feedPage([]));
 			renderFeed();
 
 			expect(await screen.findByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
@@ -209,7 +211,7 @@ describe('FeedView', () => {
 		});
 
 		it('lets someone with an empty feed open the Create popup on the Story tab', async () => {
-			getFollowedUsersPosts.mockResolvedValue([]);
+			getFollowedUsersPosts.mockResolvedValue(feedPage([]));
 			renderFeed();
 
 			userEvent.click(await screen.findByRole('button', { name: 'Add to your story' }));
@@ -227,7 +229,7 @@ describe('FeedView', () => {
 		});
 
 		it('leaves the posts and shows no error when the tray fails to load', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			getStoryTray.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			renderFeed();
 
@@ -248,13 +250,13 @@ describe('FeedView', () => {
 
 			expect(document.querySelector('.loading-spinner')).toBeInTheDocument();
 
-			request.resolve(feedPosts);
+			request.resolve(feedPage(feedPosts));
 			await screen.findAllByRole('article');
 			expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
 		});
 
 		it('fetches the posts of the followed users with the token', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findAllByRole('article');
@@ -263,14 +265,14 @@ describe('FeedView', () => {
 		});
 
 		it('renders every post it received', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 		});
 
 		it('renders the posts in the order the server sent them, newest first', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findAllByRole('article');
@@ -278,7 +280,7 @@ describe('FeedView', () => {
 		});
 
 		it('shows the author of each post, linked to their profile', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			const articles = await screen.findAllByRole('article');
@@ -287,7 +289,7 @@ describe('FeedView', () => {
 		});
 
 		it('shows the posts it fetched, not a list kept on the logged-in user', async () => {
-			getFollowedUsersPosts.mockResolvedValue([buildPost('fresh', 'janedoe')]);
+			getFollowedUsersPosts.mockResolvedValue(feedPage([buildPost('fresh', 'janedoe')]));
 			renderFeed({ user: { ...loggedInUser, followedUsersPosts: [buildPost('stale', 'old')] } });
 
 			await screen.findAllByRole('article');
@@ -295,7 +297,7 @@ describe('FeedView', () => {
 		});
 
 		it('does not show the empty message or the load error when there are posts', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findAllByRole('article');
@@ -306,7 +308,7 @@ describe('FeedView', () => {
 
 	describe('an empty feed', () => {
 		beforeEach(() => {
-			getFollowedUsersPosts.mockResolvedValue([]);
+			getFollowedUsersPosts.mockResolvedValue(feedPage([]));
 		});
 
 		it('shows "Your feed is empty"', async () => {
@@ -369,7 +371,7 @@ describe('FeedView', () => {
 		});
 
 		it('fetches the feed again when Retry is clicked and shows the posts once the request succeeds', async () => {
-			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPosts);
+			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage(feedPosts));
 			renderFeed();
 
 			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
@@ -380,7 +382,7 @@ describe('FeedView', () => {
 		});
 
 		it('shows the empty message when the retry finds no posts', async () => {
-			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce([]);
+			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage([]));
 			renderFeed();
 
 			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
@@ -409,7 +411,7 @@ describe('FeedView', () => {
 
 			await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled());
 
-			retryRequest.resolve(feedPosts);
+			retryRequest.resolve(feedPage(feedPosts));
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 		});
 
@@ -424,7 +426,7 @@ describe('FeedView', () => {
 
 	describe('interacting with posts', () => {
 		it('shows the new like count on the post that was liked', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			likeUserPost.mockResolvedValue({ _id: 'post2', likes: ['user1'] });
 			renderFeed();
 
@@ -436,7 +438,7 @@ describe('FeedView', () => {
 		});
 
 		it('leaves the other posts unchanged when one is liked', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			likeUserPost.mockResolvedValue({ _id: 'post2', likes: ['user1'] });
 			renderFeed();
 
@@ -450,7 +452,7 @@ describe('FeedView', () => {
 		});
 
 		it('keeps the posts in the same order after a like', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			likeUserPost.mockResolvedValue({ _id: 'post1', likes: ['user1'] });
 			renderFeed();
 
@@ -471,7 +473,7 @@ describe('FeedView', () => {
 				userId: { _id: 'user1', username: 'johndoe' },
 			};
 
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			addComment.mockResolvedValue(added);
 			renderFeed();
 
@@ -486,7 +488,7 @@ describe('FeedView', () => {
 		});
 
 		it('shows the like failure as a toast without changing the post', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			likeUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			renderFeed();
 
@@ -499,7 +501,7 @@ describe('FeedView', () => {
 		});
 
 		it('shows no post actions on the feed posts', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findAllByRole('article');
@@ -512,7 +514,7 @@ describe('FeedView', () => {
 
 		beforeEach(() => {
 			setViewport(true);
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			mockSuggestionsByPlacement({ sidebar: { suggestions: sidebarSuggestions, reserve: [], isCarouselDismissed: false } });
 		});
 
@@ -610,7 +612,7 @@ describe('FeedView', () => {
 		});
 
 		it('inserts the carousel after the 5th post', async () => {
-			getFollowedUsersPosts.mockResolvedValue(sixPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(sixPosts));
 			renderFeed();
 
 			await screen.findByRole('region', { name: 'Suggested for you' });
@@ -619,7 +621,7 @@ describe('FeedView', () => {
 		});
 
 		it('inserts the carousel after the last post when there are fewer than 5', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findByRole('region', { name: 'Suggested for you' });
@@ -628,7 +630,7 @@ describe('FeedView', () => {
 		});
 
 		it('inserts the carousel after the 5th post when there are exactly 5', async () => {
-			getFollowedUsersPosts.mockResolvedValue(sixPosts.slice(0, 5));
+			getFollowedUsersPosts.mockResolvedValue(feedPage(sixPosts.slice(0, 5)));
 			renderFeed();
 
 			await screen.findByRole('region', { name: 'Suggested for you' });
@@ -637,7 +639,7 @@ describe('FeedView', () => {
 		});
 
 		it('shows the carousel once only', async () => {
-			getFollowedUsersPosts.mockResolvedValue(sixPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(sixPosts));
 			renderFeed();
 
 			await screen.findByRole('region', { name: 'Suggested for you' });
@@ -646,7 +648,7 @@ describe('FeedView', () => {
 		});
 
 		it('requests only the carousel placement and shows no sidebar', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findByRole('region', { name: 'Suggested for you' });
@@ -657,7 +659,7 @@ describe('FeedView', () => {
 
 		it('is hidden when there are no suggestions', async () => {
 			mockSuggestionsByPlacement({});
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findAllByRole('article');
@@ -669,7 +671,7 @@ describe('FeedView', () => {
 
 		it('is hidden when it was dismissed on the server', async () => {
 			mockSuggestionsByPlacement({ carousel: { suggestions: [], reserve: [], isCarouselDismissed: true } });
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findAllByRole('article');
@@ -680,7 +682,7 @@ describe('FeedView', () => {
 
 		it('is hidden, with no error and no toast, when the suggestions fail to load', async () => {
 			getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
@@ -691,7 +693,7 @@ describe('FeedView', () => {
 		});
 
 		it('is dismissed with the ✕, which tells the server', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
@@ -702,7 +704,7 @@ describe('FeedView', () => {
 		});
 
 		it('removes a followed card without reloading the feed', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			userEvent.click(await screen.findByRole('button', { name: 'Follow name-c1' }));
@@ -712,7 +714,7 @@ describe('FeedView', () => {
 		});
 
 		it('does not refetch the feed when the token changes after a carousel follow', async () => {
-			getFollowedUsersPosts.mockResolvedValue(feedPosts);
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			const { rerenderWithToken } = renderFeed();
 
 			await screen.findAllByRole('article');
@@ -728,7 +730,7 @@ describe('FeedView', () => {
 		});
 
 		it('shows the posts and the carousel after a failed first load is retried', async () => {
-			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPosts);
+			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage(feedPosts));
 			renderFeed();
 
 			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
@@ -747,7 +749,7 @@ describe('FeedView', () => {
 		const getSuggestionsList = () => screen.findByRole('region', { name: 'Suggested for you' });
 
 		beforeEach(() => {
-			getFollowedUsersPosts.mockResolvedValue([]);
+			getFollowedUsersPosts.mockResolvedValue(feedPage([]));
 			mockSuggestionsByPlacement({ 'empty-feed': { suggestions: listSuggestions, reserve: [], isCarouselDismissed: false } });
 		});
 
@@ -835,7 +837,7 @@ describe('FeedView', () => {
 
 		it('shows the list after a failed first load is retried and finds no posts', async () => {
 			getFollowedUsersPosts.mockReset();
-			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce([]);
+			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage([]));
 			renderFeed();
 
 			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
@@ -847,7 +849,7 @@ describe('FeedView', () => {
 			const followedPosts = [buildPost('fresh1', 'name-p1')];
 
 			it('turns the button into Unfollow and loads the followed user posts below the list', async () => {
-				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				renderFeed();
 
 				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
@@ -863,7 +865,7 @@ describe('FeedView', () => {
 			});
 
 			it('reloads the posts with the latest token after the token changed', async () => {
-				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				const { rerenderWithToken } = renderFeed();
 
 				await screen.findByRole('button', { name: 'Follow name-p1' });
@@ -878,7 +880,7 @@ describe('FeedView', () => {
 			});
 
 			it('keeps the message and the full list of 8 on screen after posts appear', async () => {
-				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				renderFeed();
 
 				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
@@ -889,7 +891,7 @@ describe('FeedView', () => {
 			});
 
 			it('shows no sidebar or carousel once the posts appear', async () => {
-				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				renderFeed();
 
 				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
@@ -903,7 +905,7 @@ describe('FeedView', () => {
 			it('reloads the posts quietly: no spinner and no flash of the list while they load', async () => {
 				const reload = buildDeferred();
 
-				getFollowedUsersPosts.mockResolvedValueOnce([]).mockReturnValueOnce(reload.promise);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockReturnValueOnce(reload.promise);
 				renderFeed();
 
 				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
@@ -912,12 +914,12 @@ describe('FeedView', () => {
 				expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
 				expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
 
-				reload.resolve(followedPosts);
+				reload.resolve(feedPage(followedPosts));
 				await screen.findAllByRole('article');
 			});
 
 			it('keeps the list and shows no error when the quiet reload fails', async () => {
-				getFollowedUsersPosts.mockResolvedValueOnce([]).mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
 				renderFeed();
 
 				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
@@ -930,7 +932,7 @@ describe('FeedView', () => {
 			});
 
 			it('ends the session when the quiet reload fails with UNAUTHENTICATED', async () => {
-				getFollowedUsersPosts.mockResolvedValueOnce([]).mockRejectedValueOnce({ code: 'UNAUTHENTICATED', status: 401 });
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockRejectedValueOnce({ code: 'UNAUTHENTICATED', status: 401 });
 				const { endSession } = renderFeed();
 
 				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
@@ -954,7 +956,7 @@ describe('FeedView', () => {
 			const followedPosts = [buildPost('fresh1', 'name-p1')];
 
 			const followFirstUser = async () => {
-				getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce(followedPosts);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				const rendered = renderFeed();
 
 				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
@@ -965,7 +967,7 @@ describe('FeedView', () => {
 
 			it('turns the button back into Follow and sends the unfollow request', async () => {
 				await followFirstUser();
-				getFollowedUsersPosts.mockResolvedValueOnce([]);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([]));
 
 				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
@@ -975,7 +977,7 @@ describe('FeedView', () => {
 
 			it('reloads the posts once more after the unfollow', async () => {
 				await followFirstUser();
-				getFollowedUsersPosts.mockResolvedValueOnce([]);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([]));
 
 				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
@@ -985,7 +987,7 @@ describe('FeedView', () => {
 
 			it('removes their posts and keeps the message and the list', async () => {
 				await followFirstUser();
-				getFollowedUsersPosts.mockResolvedValueOnce([]);
+				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([]));
 
 				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
@@ -1007,14 +1009,14 @@ describe('FeedView', () => {
 		});
 
 		it('shows the normal feed on the next visit', async () => {
-			getFollowedUsersPosts.mockResolvedValueOnce([]).mockResolvedValueOnce([buildPost('fresh1', 'name-p1')]);
+			getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage([buildPost('fresh1', 'name-p1')]));
 			const { unmount } = renderFeed();
 
 			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 			await screen.findAllByRole('article');
 			unmount();
 
-			getFollowedUsersPosts.mockResolvedValue([buildPost('fresh1', 'name-p1')]);
+			getFollowedUsersPosts.mockResolvedValue(feedPage([buildPost('fresh1', 'name-p1')]));
 			mockSuggestionsByPlacement({});
 			renderFeed();
 

@@ -4,6 +4,8 @@ Status: Draft
 
 Making the app look live for a portfolio visitor: a seed with history, plus ongoing simulated activity (#16). Demo visitor accounts are [#17](https://github.com/raristotelov/social-media-app/issues/17).
 
+How it works in detail: [seed.md](seed.md) (the three seed scripts) and [activity-job.md](activity-job.md) (the hourly job).
+
 ## Decisions
 
 - **Personas are themed, not faces.** Each creator has a main subject (hiking trails, mountains, a pet, and so on). No AI-generated people anywhere in the app.
@@ -30,44 +32,45 @@ Making the app look live for a portfolio visitor: a seed with history, plus ongo
 
 ## Scheduling
 
-- An hourly GitHub Actions scheduled workflow (free in this public repo), scheduled away from the top of the hour, calls a token-protected endpoint on the server, which runs the activity job. The job, its state and all secrets live on the server; GitHub holds only the token. The call usually wakes the sleeping Render service, so the workflow waits through the boot and retries. Each run creates the activity due for that hour, so things appear gradually through the day; the daily minimums are checked across the day's runs.
-- Catch-up on wake: when the server starts, it fills in any hours the job missed (up to the last 72), so a disabled or dropped workflow doesn't leave gaps. Stories are only created for hours within the last 24h.
-- The rolling window never takes an account below its tier's minimum (creators 20 posts, casual posters 5), so a long outage can't empty profiles.
-- Posting hours are 08:00–22:00 UTC.
-- Endpoint: `POST /internal/demo-activity` with `Authorization: Bearer <DEMO_ACTIVITY_TOKEN>`; answers 202 and runs in the background; 404 when the token isn't configured. Workflow: `.github/workflows/demo-activity.yml`, needing the `DEMO_ACTIVITY_URL` and `DEMO_ACTIVITY_TOKEN` repository secrets.
-- Engagement on new posts is planned when the post is created and stored as scheduled events (`demoscheduledevents`); each run applies the ones that are due.
+- An hourly GitHub Actions workflow (free in this public repo) calls a token-protected endpoint on the server, which runs the activity job. The job, its state and all secrets live on the server; GitHub holds only the token.
+- The server also catches up on missed hours when it starts, so a dropped or disabled workflow doesn't leave gaps.
+- The rolling window never takes an account below its tier's minimum, so a long outage can't empty profiles.
+- Exact timing, steps and numbers: [activity-job.md](activity-job.md).
 
 ## Accounts
 
 - 500 demo accounts, in three tiers. Likes and follows come from these accounts, so the count sets the ceiling on engagement.
   - 50 creators: themed personas posting often, each with a full photo pool.
   - 100 casual posters: a handful of photos each, posting now and then.
-  - 350 lurkers: mostly like, comment and follow. Each gets a permanent backlog from the seed, dated across the past year and never removed by the rolling window: 70 lurkers each at 1, 2, 3, 4 and 5 posts. 117 lurkers also post occasionally (every 1–3 months), from 3 extra photos each; the rest never post again. Generic everyday subjects. 175 keep the default avatar.
+  - 350 lurkers: mostly like, comment and follow. Each gets a permanent backlog from the seed, dated across the past year and never removed by the rolling window: 70 lurkers each at 1, 2, 3, 4 and 5 posts. 117 lurkers also post occasionally (once every 60 days on average), from 3 extra photos each; the rest never post again. Generic everyday subjects. 175 keep the default avatar.
 - Every account has at least one post.
 - Usernames: about half with underscores, a quarter with dots, a quarter plain (some with digits). Creators are handle-style, everyone else name-ish.
 - Bios: every creator; 180 of the 450 others (60 casual posters, 120 lurkers); the rest have none.
 - Avatars are faceless (the persona's subject, gear, a silhouette) or the default placeholder.
   - 325 avatars: 50 creators, 100 casual posters, 175 lurkers.
   - Creators: Wikimedia CC0 / public domain photos, cropped square; in `~/Downloads/SocialMediaApp Demo User Photos/creator-avatars`.
-  - Casual posters and lurkers: a separate everyday-pool photo, cropped square, never used as a post. Each was reviewed and is pinned in `server/src/seed/data/avatarChoices.json`; rejected photos are listed in `avatarExclusions.json`.
+  - Casual posters and lurkers: a separate everyday-pool photo, cropped square, never used as a post. Each was reviewed and is pinned in `server/src/seed/data/avatarChoices.json`, and the lurkers pinned there are the ones that get an avatar; rejected photos are listed in `avatarExclusions.json`.
 
 ## Daily activity
 
-- Posts: creators 2–3 a week, casual posters about every 2 weeks, active lurkers every 1–3 months — roughly 25–30 a day, at random times between morning and late evening.
-- Stories: about 25–40 a day, mostly creators, some casual posters and a few of the lurkers who still post; they expire after 24h as usual. Each story reuses one of the account's own photos as a fresh Cloudinary copy, so the normal expiry cleanup deletes the copy and never the post's image.
-- Likes: most in the first 2 days, then 1–3 more over the following week; creators' posts get more.
-- Comments: a few per post, some with replies, tapering off over days.
-- Follows: a slow daily trickle, mostly towards creators, with an occasional unfollow.
-- Every day has something new of every kind: the job guarantees a minimum of 10 posts, 15 stories and 5 new follows, plus new likes and comments (which come with every new post), even when the random draw comes out quiet.
+- On average about 27 posts, 32.5 stories, 15 follows and 2 unfollows a day, mostly from and towards creators; every new post brings its own likes and comments over the following week.
+- Every day has at least 10 posts, 15 stories and 5 follows, even when the random draw comes out quiet.
+- Stories reuse the account's own photos as fresh Cloudinary copies, so story expiry never deletes a post's image.
+- Exact rules: [activity-job.md](activity-job.md).
 
 ## Demo accounts (#17)
 
 - Created the moment a visitor clicks "Try the demo", one per visitor, and logged in straight away. No shared accounts.
-- Email domain `@visitor.demo.invalid`, so the seed's clean-up (which matches `@demo.invalid` exactly) never removes visitors.
-- Arrives ready-made: follows a set of personas (so the feed is full), has a few followers, and 2–3 posts dated over the past weeks with likes and comments already on them.
-- Demo post photos come from a separate generic pool.
+- `accountType` on the user: `user` (default, real sign-ups), `persona` (seeded accounts), `demo` (visitors). Every demo rule keys off it, never off email; it can't be set through sign-up or edit-profile. The seed's clean-up removes only `persona`, so it never touches visitors. Visitors keep a placeholder email `<username>@visitor.demo.invalid`.
+- `POST /users/demo-login` is limited to 5 requests per IP per hour (429 `TOO_MANY_REQUESTS`).
+- Username: a random common first name, `_demo_`, and a number 1–99 (`john_demo_2`), retried if taken. Changeable in Edit Profile like any user's.
+- Arrives ready-made: follows 40 personas, mostly creators (so the feed is full); 15–30 personas follow back; 2–3 posts dated over the past weeks, from the 31 `visitor-posts` photos (a source library: each post gets its own Cloudinary copy), each already with 5–10 likes and 0–1 comments.
+- First 10 minutes after creation: 1–5 more likes and 0–2 comments across the starter posts, and 1–3 new followers, spaced out one at a time, so there's live activity (and notifications, once they exist) without spamming.
 - Starts with an avatar picked at random from a pool of 20 faceless photos (`demo-users/visitor-avatars/`); visitors may share one.
-- Removed after 24h with everything they created (#17). The visitor is told this; otherwise the account behaves like any normal user's.
+- Removed after 24h with everything they created (#17): posts, comments, likes, follows, stories and their Cloudinary images. The hourly activity job does it, so a visitor can last up to an hour longer, or more while the server sleeps. The visitor is told this in a dismissible strip above the header on every page ([pages/demo-entry.md](../pages/demo-entry.md)). Otherwise the account behaves like any normal user's.
+- Invisible to every other person (real users and other visitors): never in search, Popular or suggestions, and left out of other accounts' follower and following lists. A direct link to a visitor's profile or post shows anyone else the normal 404 page. Personas can still follow, like and comment on a visitor; that only shows on the visitor's side.
+- Counts follow the same rule: each viewer sees follower / following counts without other visitors but including themselves, so a visitor following a persona sees its count go up while everyone else's stays the same. The same goes for a visitor's post likes, comments (and their replies and comment likes), likes lists, comment counts and story viewers on other accounts' content.
+- Reason: visitors need no account, so anyone could post anything; hiding keeps it from every other viewer. Real sign-ups stay visible like any user; new sign-ups and their posts are checked by hand in the database.
 - No site-wide "simulated content" note. The README explains how the demo content works (wording to be discussed with the wider README rewrite, #52).
 
 ## Re-running the seed
@@ -77,8 +80,8 @@ Making the app look live for a portfolio visitor: a seed with history, plus ongo
 ## Reactions to visitors (#17)
 
 - Applies to demo visitors and to people who sign up normally.
-- Over time, some personas follow them.
-- When they post, a few personas like it and some comment over the following minutes, mostly from their followers; after that the hourly job keeps adding engagement for a few days, as for persona posts.
+- Personas follow normal sign-ups too: 1–3 in the first 10 minutes after sign-up, then about 1 a day for their first week (hourly job), so a new user reaches 5–10 followers.
+- When they post, 25–35% of their current followers (at least 3) like it and 1–3 personas comment within the first 10 minutes, mostly from their followers. After that, 1–5 more likes and 0–2 comments over the next 2 days, stored as scheduled events and applied by the hourly job (so they arrive in hourly batches).
 - Comments on visitors' posts come from a generic comment bank, since the photo's content is unknown.
 - Triggered by the server when the post is created (the server is awake while the visitor is active), with delayed reactions in-process. A restart drops pending reactions; acceptable.
 
@@ -95,11 +98,9 @@ Making the app look live for a portfolio visitor: a seed with history, plus ongo
   | Likes per post | 30–120 | 5–30 | 0–10 |
   | Comments per post | 3–12, some with replies | 0–4, occasionally with replies | 0–2 |
 
-- The seed also creates 30 stories spread over the past 24 hours (18 creators, 9 casual posters, 3 lurkers who still post), so the tray isn't empty.
-- Persona passwords are random, unusable hashes; personas never log in.
-- Re-running finds demo accounts by their `@demo.invalid` email and removes their likes, comments and follows on real users' content too.
-- Photos on hand (counted 2026-10-29): 2,317 creator (34–50 per folder; everything that passed review is kept), 2,625 everyday, 31 demo-visitor, 50 creator avatars. 5,023 in total.
-- Everyday pool use: casual posters 800 (8 each), lurker backlogs 1,050, occasional lurker posts 351 (117 × 3), avatars 275 (100 casual posters + 175 lurkers). 2,476 used, 149 spare.
+- The seed also creates 30 stories over the past 24 hours, so the tray isn't empty. Full seed behaviour: [seed.md](seed.md).
+- Photos on hand (counted 2026-11-02, after removing 28 byte-identical duplicates): 2,316 creator (34–50 per folder; everything that passed review is kept), 2,598 everyday, 31 demo-visitor, 50 creator avatars. 4,995 in total.
+- Everyday pool use: casual posters 800 (8 each), lurker backlogs 1,050, occasional lurker posts 351 (117 × 3), avatars 275 (100 casual posters + 175 lurkers). 2,476 used, 122 spare.
 
 ## Photo collection
 
@@ -111,11 +112,7 @@ Making the app look live for a portfolio visitor: a seed with history, plus ongo
 
 ## Scripts
 
-Run in `server/`, in this order; the photo folder is `~/Downloads/SocialMediaApp Demo User Photos`.
-
-1. `npm run seed:assign -- "<photo folder>"` — local only. Decides once which account gets which photo (creator swaps, everyday photos, avatars) with a fixed random seed, writes `server/src/seed/data/assignments.json`, and crops the regular-user avatars into `regular-user-avatars/`. Stops if a photo would be used twice or if the avatar folder holds crops not in the assignment.
-2. `npm run seed:upload -- "<photo folder>"` — resizes each photo to 1080px on the long side (JPEG quality 85), skips byte-identical files, uploads to Cloudinary under `demo-users/`, and writes `server/src/seed/data/photos.json` as it goes. A re-run skips what is already uploaded.
-3. `npm run seed:demo` — clears existing demo content and builds the demo data in the database `MONGODB_URI` points to, including the 30 starter stories (Cloudinary copies) and the activity job's starting state.
+`seed:assign`, `seed:upload`, `seed:demo`, run in that order in `server/`: [seed.md](seed.md).
 
 ## Storage
 
@@ -127,7 +124,7 @@ Run in `server/`, in this order; the photo folder is `~/Downloads/SocialMediaApp
   - `avatarChoices.json` / `avatarExclusions.json` — reviewed regular-user avatars and rejected photos.
   - `photos.json` — generated by the upload: each photo's Cloudinary id, URL and size.
   - One caption file per folder (owner captions, guest captions, comments) plus a shared `replies.json`.
-- Running state, in MongoDB: `demoaccountstates` (each account's photo queue, posted photos and previous captions), `demoscheduledevents` (pending likes and comments) and `demoactivityruns` (last completed hour and the day's follow count).
+- Running state, in MongoDB: `demoaccountstates`, `demoscheduledevents` and `demoactivityruns` ([activity-job.md](activity-job.md#state-in-mongodb)).
 
 ## Free-tier fit (checked 2026-10-26)
 

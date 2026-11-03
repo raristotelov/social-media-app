@@ -21,8 +21,16 @@ const TEST_TIMEOUT_MS = 30 * 1000;
 
 jest.setTimeout(TEST_TIMEOUT_MS);
 
+const ACCOUNT_TYPES_BY_DOMAIN = { 'demo.invalid': 'persona', 'visitor.demo.invalid': 'demo' };
+
 const createUser = (username, { domain = 'example.com', ...extra } = {}) =>
-	UserModel.create({ email: `${username}@${domain}`, username, password: 'hashed-password', ...extra });
+	UserModel.create({
+		email: `${username}@${domain}`,
+		accountType: ACCOUNT_TYPES_BY_DOMAIN[domain] || 'user',
+		username,
+		password: 'hashed-password',
+		...extra,
+	});
 
 const createPost = (author, extra = {}) =>
 	UserPostModel.create({
@@ -366,6 +374,30 @@ describe('clearDemoContent against a real database', () => {
 
 			expect(await UserModel.findById(real._id)).not.toBeNull();
 			expect(await UserPostModel.findById(realPost._id)).not.toBeNull();
+		});
+	});
+
+	describe('which accounts count as demo content', () => {
+		it('should key on the persona account type, not on the email', async () => {
+			const lookalike = await createUser('lookalike', { domain: 'demo.invalid', accountType: 'user' });
+			const persona = await createUser('real_persona', { domain: 'example.com', accountType: 'persona' });
+
+			const result = await clearDemoContent();
+
+			expect(result).toBe(1);
+			expect(await UserModel.findById(lookalike._id)).not.toBeNull();
+			expect(await UserModel.findById(persona._id)).toBeNull();
+		});
+
+		it('should never remove a visitor, however old, and never delete their images', async () => {
+			const visitor = await createUser('old_demo_1', { domain: 'visitor.demo.invalid', _id: mongoose.Types.ObjectId.createFromTime(1) });
+			const post = await createPost(visitor);
+
+			await clearDemoContent();
+
+			expect(await UserModel.findById(visitor._id)).not.toBeNull();
+			expect(await UserPostModel.findById(post._id)).not.toBeNull();
+			expect(deleteImage).not.toHaveBeenCalled();
 		});
 	});
 

@@ -2,7 +2,7 @@
 	box-sizing: border-box;
 	width: 100%;
 	max-width: 500px;
-	padding: calc(var(--header-height) + 46px) 0 60px;
+	padding: 46px 0 60px;
 
 	display: flex;
 	flex-direction: column;
@@ -24,7 +24,7 @@
 @media (max-width: 599px) {
 	.profile-posts-view {
 		max-width: none;
-		padding: var(--header-height) 0 var(--tab-bar-height);
+		padding: 0 0 var(--tab-bar-height);
 		gap: 0;
 	}
 

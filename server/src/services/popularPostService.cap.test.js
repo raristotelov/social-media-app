@@ -17,6 +17,12 @@ const loadServiceWithCap = (cap, rankedPosts, firstPost) => {
 	jest.doMock('../models/userModel', () => ({ findById: jest.fn() }));
 	jest.doMock('../models/commentModel', () => ({ collection: { name: 'comments' } }));
 	jest.doMock('./commentService', () => ({ getPreviewCommentsForPosts: jest.fn().mockResolvedValue({}) }));
+	jest.doMock('./visitorVisibilityService', () => ({
+		getHiddenVisitorIds: jest.fn().mockResolvedValue([]),
+		withoutHiddenIds: (ids) => ids,
+		isHiddenId: () => false,
+		createPostVisibility: jest.fn().mockResolvedValue((post) => post),
+	}));
 
 	return require('./popularPostService');
 };

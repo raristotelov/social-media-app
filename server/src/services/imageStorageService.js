@@ -6,6 +6,8 @@ const { detectImageType } = require('../utils/imageType');
 
 const ALLOWED_IMAGE_FORMATS = ['jpg', 'png', 'webp'];
 
+const isSharedImage = (imageIdentifier) => constants.SHARED_IMAGE_PREFIXES.some((prefix) => imageIdentifier.startsWith(prefix));
+
 const uploadBuffer = (buffer, options) =>
 	new Promise((resolve, reject) => {
 		const uploadStream = cloudinary.uploader.upload_stream(
@@ -62,7 +64,7 @@ const uploadImage = async ({ file, fieldName }) => {
 };
 
 const deleteImage = async (imageIdentifier) => {
-	if (!imageIdentifier) {
+	if (!imageIdentifier || isSharedImage(imageIdentifier)) {
 		return { result: 'skipped' };
 	}
 

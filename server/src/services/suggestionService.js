@@ -1,5 +1,3 @@
-const mongoose = require('mongoose');
-
 const UserModel = require('../models/userModel');
 const { ERROR_CODES } = require('../config/errorCodes');
 const {
@@ -10,7 +8,9 @@ const {
 	CAROUSEL_DISMISS_DURATION_MS,
 } = require('../config/suggestions');
 const AppError = require('../utils/AppError');
+const objectIdFromDate = require('../utils/objectIdFromDate');
 const { selectSuggestions } = require('../utils/suggestionSelection');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 
 const FOLLOWERS_COUNT = { $size: { $ifNull: ['$followers', []] } };
 
@@ -19,8 +19,6 @@ const SUGGESTION_ROW_PROJECTION = {
 	username: 1,
 	'profilePicture.imageUrl': 1,
 };
-
-const MS_PER_SECOND = 1000;
 
 const POOL_SIZE_FACTOR = 2;
 
@@ -51,12 +49,10 @@ const getPopularPool = ({ excludedIds, poolSize }) =>
 	]);
 
 const getNewPool = ({ excludedIds, poolSize }) => {
-	const joinedAfterSeconds = Math.floor((Date.now() - NEW_USER_WINDOW_MS) / MS_PER_SECOND);
-
 	return UserModel.aggregate([
 		{
 			$match: {
-				_id: { $nin: excludedIds, $gte: mongoose.Types.ObjectId.createFromTime(joinedAfterSeconds) },
+				_id: { $nin: excludedIds, $gte: objectIdFromDate(new Date(Date.now() - NEW_USER_WINDOW_MS)) },
 				'posts.0': { $exists: true },
 			},
 		},
@@ -150,7 +146,8 @@ const getSuggestions = async ({ userId, placement }) => {
 		}
 
 		const followingIds = currentUser.following ?? [];
-		const excludedIds = [currentUser._id, ...followingIds];
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const excludedIds = [currentUser._id, ...followingIds, ...hiddenVisitorIds];
 		const size = Object.values(mix).reduce((total, groupCount) => total + groupCount, 0);
 		const poolSize = (size + reserveSize) * POOL_SIZE_FACTOR;
 

@@ -2,7 +2,7 @@ import { useOutletContext } from 'react-router-dom';
 
 import { POPULAR_EMPTY_MESSAGE, POPULAR_POSTS_VIEW_PATH } from '../../constants/popularPosts';
 
-import PopularPostsFooter from '../PopularPostsFooter/PopularPostsFooter';
+import LoadMoreFooter from '../LoadMoreFooter/LoadMoreFooter';
 import UserProfilePost from '../UserProfilePost/UserProfilePost';
 
 import './PopularPostsView.css';
@@ -26,7 +26,7 @@ const PopularPostsView = () => {
 				))}
 			</div>
 
-			<PopularPostsFooter isLoadingMore={isLoadingMore} hasLoadMoreFailed={hasLoadMoreFailed} onRetryClick={onRetryLoadMoreClick} />
+			<LoadMoreFooter isLoadingMore={isLoadingMore} hasLoadMoreFailed={hasLoadMoreFailed} onRetryClick={onRetryLoadMoreClick} />
 		</section>
 	);
 };

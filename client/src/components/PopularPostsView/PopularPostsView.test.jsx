@@ -91,7 +91,7 @@ const getTileLinks = () => Array.from(document.querySelectorAll('.profile-post-l
 
 const getTileStatTexts = (tileIndex) => Array.from(getTiles()[tileIndex].querySelectorAll('.profile-post-stat')).map((stat) => stat.textContent);
 
-const getInlineError = () => document.querySelector('.popular-posts-load-error');
+const getInlineError = () => document.querySelector('.load-more-error');
 
 describe('PopularPostsView', () => {
 	beforeEach(() => {

@@ -1,0 +1,100 @@
+.demo-strip {
+	position: relative;
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 48px;
+	padding: 6px 56px;
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+
+	background-color: var(--text-primary);
+	font-family: 'Mada';
+	font-size: 15px;
+	color: var(--background-surface);
+}
+
+.demo-strip-message {
+	min-width: 0;
+	margin: 0;
+}
+
+.demo-strip-message strong {
+	font-weight: bold;
+}
+
+.demo-strip-button {
+	flex-shrink: 0;
+
+	padding: 6px 16px;
+	border: none;
+	border-radius: 16px;
+
+	background-color: var(--brand-red);
+	font-family: 'Mada';
+	font-size: 15px;
+	font-weight: bold;
+	color: var(--static-white);
+}
+
+.demo-strip-button:hover {
+	cursor: pointer;
+}
+
+.demo-strip-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+.demo-strip-close {
+	position: absolute;
+	top: 50%;
+	right: 24px;
+
+	padding: 0;
+	border: none;
+	background-color: transparent;
+	line-height: 0;
+	transform: translateY(-50%);
+	color: var(--background-surface);
+}
+
+.demo-strip-close:hover {
+	cursor: pointer;
+	opacity: 0.5;
+}
+
+.demo-strip-close:focus-visible {
+	outline: 2px solid var(--background-surface);
+	outline-offset: 2px;
+}
+
+@media (max-width: 599px) {
+	.demo-strip {
+		min-height: 44px;
+		padding: 6px 48px 6px 16px;
+
+		justify-content: flex-start;
+		gap: 12px;
+
+		font-size: 14px;
+	}
+
+	.demo-strip-button {
+		padding: 5px 12px;
+		border-radius: 14px;
+		font-size: 14px;
+	}
+
+	.demo-strip-close {
+		right: 16px;
+	}
+}
+
+@media (max-width: 339px) {
+	.demo-strip-guest .demo-strip-message {
+		display: none;
+	}
+}

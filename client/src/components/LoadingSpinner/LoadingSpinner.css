@@ -30,3 +30,7 @@
 	padding: 0;
 	align-content: center;
 }
+
+.spinner-container-below-header {
+	min-height: calc(100vh - var(--header-height));
+}

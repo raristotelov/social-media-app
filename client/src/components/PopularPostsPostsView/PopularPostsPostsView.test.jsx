@@ -527,7 +527,7 @@ describe('PopularPostsPostsView', () => {
 			renderPosts({ entries: ['/popular-posts/posts#p1'] });
 
 			expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
-			expect(document.querySelector('.popular-posts-load-error')).toHaveTextContent("Couldn't load more posts");
+			expect(document.querySelector('.load-more-error')).toHaveTextContent("Couldn't load more posts");
 			expect(getRenderedPostIds()).toEqual(['p1', 'p2']);
 		});
 
@@ -540,7 +540,7 @@ describe('PopularPostsPostsView', () => {
 			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(getRenderedPostIds()).toEqual(['p1', 'p2', 'p3']));
-			expect(document.querySelector('.popular-posts-load-error')).not.toBeInTheDocument();
+			expect(document.querySelector('.load-more-error')).not.toBeInTheDocument();
 		});
 	});
 

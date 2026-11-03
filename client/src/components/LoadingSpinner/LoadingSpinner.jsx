@@ -1,9 +1,13 @@
 import './LoadingSpinner.css';
 
 export default function LoadingSpinner(props) {
-	const { isFullPage } = props;
+	const { isFullPage, isBelowHeader } = props;
 
-	const containerClassName = isFullPage ? 'spinner-container spinner-container-full-page' : 'spinner-container';
+	let containerClassName = isFullPage ? 'spinner-container spinner-container-full-page' : 'spinner-container';
+
+	if (isFullPage && isBelowHeader) {
+		containerClassName = `${containerClassName} spinner-container-below-header`;
+	}
 
 	return (
 		<div className={containerClassName}>

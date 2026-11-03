@@ -3,6 +3,8 @@ import { ACTION_FALLBACK_MESSAGES, CRASH_MESSAGES, ERROR_MESSAGES, LOAD_ERROR_ME
 
 describe('ERROR_MESSAGES', () => {
 	it.each([
+		['TOO_MANY_REQUESTS', 'Too many demo accounts from this connection. Try again later.'],
+		['DEMO_UNAVAILABLE', 'The demo is busy right now. Try again later.'],
 		['WRONG_CREDENTIALS', 'Wrong email or password'],
 		['EMAIL_REQUIRED', 'Email is required'],
 		['EMAIL_INVALID', 'Please provide a valid email address'],
@@ -37,7 +39,7 @@ describe('ERROR_MESSAGES', () => {
 	);
 
 	it('has copy for exactly the codes the spec documents, and no other', () => {
-		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(22);
+		expect(Object.keys(ERROR_MESSAGES)).toHaveLength(24);
 	});
 });
 
@@ -96,7 +98,7 @@ describe('LOAD_ERROR_MESSAGES', () => {
 	});
 
 	it('has the documented inline next batch load error copy', () => {
-		expect(LOAD_ERROR_MESSAGES.POPULAR_NEXT_BATCH).toEqual({
+		expect(LOAD_ERROR_MESSAGES.NEXT_BATCH).toEqual({
 			MESSAGE: "Couldn't load more posts",
 			RETRY_LABEL: 'Try again',
 		});

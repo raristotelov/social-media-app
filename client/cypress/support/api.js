@@ -128,7 +128,7 @@ export const getCommentsViaApi = (userPostId) =>
 export const getFollowedUsersPostsViaApi = (jwtToken) =>
 	cy
 		.request({ method: 'GET', url: `${serverUrl}/user-posts/followed-users-posts`, headers: authHeaders(jwtToken) })
-		.then((response) => response.body);
+		.then((response) => response.body.posts);
 
 export const uploadStoryViaApi = (jwtToken) => uploadImageViaApi({ method: 'POST', url: `${serverUrl}/stories`, jwtToken, imageField: 'image' });
 

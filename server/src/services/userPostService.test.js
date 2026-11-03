@@ -3,12 +3,19 @@ jest.mock('../models/userPostModel');
 jest.mock('./commentService');
 jest.mock('./imageStorageService');
 jest.mock('./userRowService');
+jest.mock('../demo/userReactions');
+jest.mock('./visitorVisibilityService', () => ({
+	...jest.requireActual('./visitorVisibilityService'),
+	getHiddenVisitorIds: jest.fn(),
+}));
 
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
+const { reactToUpload } = require('../demo/userReactions');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const { getUserRowsInOrder } = require('./userRowService');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
 const {
@@ -49,6 +56,7 @@ const givenPostOwnedByCaller = (post = buildPost()) => {
 describe('userPostService', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
+		getHiddenVisitorIds.mockResolvedValue([]);
 	});
 
 	describe('ownership checks (shared by caption edit and delete)', () => {
@@ -200,6 +208,49 @@ describe('userPostService', () => {
 
 			expect(imageStorageService.discardUploadedImage).not.toHaveBeenCalled();
 			expect(UserPostModel.deleteOne).not.toHaveBeenCalled();
+		});
+
+		describe('the reactions to the upload', () => {
+			it('plans them for the saved post once it is stored', async () => {
+				buildUserPostModelMock();
+
+				const result = await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID);
+
+				expect(reactToUpload).toHaveBeenCalledTimes(1);
+				expect(reactToUpload).toHaveBeenCalledWith(result);
+			});
+
+			it('plans them for an upload by any account, since the post is the only thing handed over', async () => {
+				buildUserPostModelMock();
+
+				await addUserPost({ caption: 'Sunset', imageFile }, 'aDemoVisitorId');
+
+				expect(reactToUpload).toHaveBeenCalledWith(expect.objectContaining({ userId: 'aDemoVisitorId' }));
+			});
+
+			it('does not wait for them before answering', async () => {
+				buildUserPostModelMock();
+				reactToUpload.mockReturnValue(new Promise(() => {}));
+
+				await expect(addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID)).resolves.toMatchObject({ _id: 'newPost1' });
+			});
+
+			it('plans nothing when the upload fails', async () => {
+				buildUserPostModelMock();
+				imageStorageService.uploadImage.mockRejectedValue(new AppError('Could not upload image', 502));
+
+				await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID).catch(() => null);
+
+				expect(reactToUpload).not.toHaveBeenCalled();
+			});
+
+			it('plans nothing when the post cannot be saved', async () => {
+				buildUserPostModelMock(jest.fn().mockRejectedValue(new Error('connection lost')));
+
+				await addUserPost({ caption: 'Sunset', imageFile }, OWNER_ID).catch(() => null);
+
+				expect(reactToUpload).not.toHaveBeenCalled();
+			});
 		});
 
 		it('propagates an upload failure unchanged and saves nothing', async () => {
@@ -407,14 +458,15 @@ describe('userPostService', () => {
 
 		const givenFeed = ({ following = FOLLOWED_IDS, posts = [], previewComments = {} } = {}) => {
 			const populate = jest.fn().mockResolvedValue(posts);
-			const sort = jest.fn().mockReturnValue({ populate });
+			const limit = jest.fn().mockReturnValue({ populate });
+			const sort = jest.fn().mockReturnValue({ limit });
 			const select = jest.fn().mockResolvedValue({ following });
 
 			UserModel.findById = jest.fn().mockReturnValue({ select });
 			UserPostModel.find = jest.fn().mockReturnValue({ sort });
 			commentService.getPreviewCommentsForPosts.mockResolvedValue(previewComments);
 
-			return { sort, populate, select };
+			return { sort, limit, populate, select };
 		};
 
 		it('reads only the followed user ids of the requesting user', async () => {
@@ -453,7 +505,7 @@ describe('userPostService', () => {
 		it('returns the posts in the order the query gave them, with the author populated', async () => {
 			givenFeed({ posts: [buildPostDoc('p3', 'carol'), buildPostDoc('p2', 'bob'), buildPostDoc('p1', 'alice')] });
 
-			const feed = await getFollowedUsersPosts(OWNER_ID);
+			const { posts: feed } = await getFollowedUsersPosts(OWNER_ID);
 
 			expect(feed.map((post) => post._id)).toEqual(['p3', 'p2', 'p1']);
 			expect(feed.map((post) => post.userId.username)).toEqual(['carol', 'bob', 'alice']);
@@ -462,7 +514,7 @@ describe('userPostService', () => {
 		it('returns the comment count stored on each post, without counting comments again', async () => {
 			givenFeed({ posts: [buildPostDoc('p2', 'alice', 4), buildPostDoc('p1', 'alice', 0)] });
 
-			const feed = await getFollowedUsersPosts(OWNER_ID);
+			const { posts: feed } = await getFollowedUsersPosts(OWNER_ID);
 
 			expect(feed.map((post) => post.commentsCount)).toEqual([4, 0]);
 		});
@@ -470,7 +522,9 @@ describe('userPostService', () => {
 		it('keeps the stored comment count when the post also has preview comments', async () => {
 			givenFeed({ posts: [buildPostDoc('p1', 'alice', 9)], previewComments: { p1: [{ _id: 'c1' }] } });
 
-			const [post] = await getFollowedUsersPosts(OWNER_ID);
+			const {
+				posts: [post],
+			} = await getFollowedUsersPosts(OWNER_ID);
 
 			expect(post).toMatchObject({ commentsCount: 9, previewComments: [{ _id: 'c1' }] });
 		});
@@ -480,7 +534,7 @@ describe('userPostService', () => {
 
 			givenFeed({ posts: [buildPostDoc('p2'), buildPostDoc('p1')], previewComments: { p2: preview } });
 
-			const feed = await getFollowedUsersPosts(OWNER_ID);
+			const { posts: feed } = await getFollowedUsersPosts(OWNER_ID);
 
 			expect(feed.map((post) => post.previewComments)).toEqual([preview, []]);
 		});
@@ -491,19 +545,19 @@ describe('userPostService', () => {
 			await getFollowedUsersPosts(OWNER_ID);
 
 			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
-			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['p2', 'p1']);
+			expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['p2', 'p1'], []);
 		});
 
 		it('returns an empty list when the user follows nobody', async () => {
 			givenFeed({ following: [] });
 
-			await expect(getFollowedUsersPosts(OWNER_ID)).resolves.toEqual([]);
+			await expect(getFollowedUsersPosts(OWNER_ID)).resolves.toEqual({ posts: [], hasMore: false, nextCursor: null });
 		});
 
 		it('returns an empty list when the followed users have no posts', async () => {
 			givenFeed({ posts: [] });
 
-			await expect(getFollowedUsersPosts(OWNER_ID)).resolves.toEqual([]);
+			await expect(getFollowedUsersPosts(OWNER_ID)).resolves.toEqual({ posts: [], hasMore: false, nextCursor: null });
 		});
 
 		describe('when the user of the token no longer exists', () => {

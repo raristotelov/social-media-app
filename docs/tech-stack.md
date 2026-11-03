@@ -25,6 +25,11 @@ Overview of the technologies used across the social media app. Versions reflect 
 
 - **MongoDB** via **Mongoose** 8 (ODM). Runs locally (`mongodb-community`) or via MongoDB Atlas; connection string in `MONGODB_URI`.
 
+## Migrations
+
+- `migrate-mongo` (server devDependency). Config: `server/migrate-mongo-config.js` (reads `MONGODB_URI`). Files: `server/src/migrations/`. Applied ones are tracked in the `changelog` collection.
+- Run from `server/`: `npm run migrate:up` · `migrate:down` · `migrate:status`. Run `migrate:up` against the target database before deploying.
+
 ## Image Storage
 
 - **Cloudinary** — image uploads and on-the-fly optimization/resizing, uploaded unsigned from the client.

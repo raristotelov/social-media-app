@@ -6,8 +6,13 @@ jest.mock('./imageStorageService', () => ({
 	deleteImage: jest.fn(),
 	discardUploadedImage: jest.fn(),
 }));
+jest.mock('./visitorVisibilityService', () => ({
+	...jest.requireActual('./visitorVisibilityService'),
+	getHiddenVisitorIds: jest.fn(),
+}));
 
 const StoryModel = require('../models/storyModel');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 const StoryViewModel = require('../models/storyViewModel');
 const UserModel = require('../models/userModel');
 const imageStorageService = require('./imageStorageService');
@@ -44,6 +49,7 @@ describe('storyService', () => {
 
 	beforeEach(() => {
 		jest.resetAllMocks();
+		getHiddenVisitorIds.mockResolvedValue([]);
 		jest.useFakeTimers({ now: NOW });
 		consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 	});

@@ -27,10 +27,12 @@ export const deleteUserPost = ({ userPostId, jwtToken }) => {
 	return request.delete(`${serverUrl}/user-posts/${userPostId}`);
 };
 
-export const getFollowedUsersPosts = ({ jwtToken }) => {
+export const getFollowedUsersPosts = ({ jwtToken, cursor }) => {
 	const request = requestFactory(jwtToken);
 
-	return request.get(`${serverUrl}/user-posts/followed-users-posts`);
+	const queryString = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+
+	return request.get(`${serverUrl}/user-posts/followed-users-posts${queryString}`);
 };
 
 export const getPopularPosts = ({ jwtToken, firstPostId }) => {

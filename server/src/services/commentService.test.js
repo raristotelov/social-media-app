@@ -2,8 +2,13 @@ jest.mock('../models/commentModel');
 jest.mock('../models/userPostModel');
 jest.mock('../models/userModel');
 jest.mock('./userRowService');
+jest.mock('./visitorVisibilityService', () => ({
+	...jest.requireActual('./visitorVisibilityService'),
+	getHiddenVisitorIds: jest.fn(),
+}));
 
 const CommentModel = require('../models/commentModel');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 const UserPostModel = require('../models/userPostModel');
 const UserModel = require('../models/userModel');
 const { ERROR_CODES } = require('../config/errorCodes');
@@ -29,6 +34,7 @@ const MENTIONED_USER_POPULATE = { path: 'mentionedUserId', select: 'username' };
 describe('commentService', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
+		getHiddenVisitorIds.mockResolvedValue([]);
 	});
 
 	describe('addComment', () => {

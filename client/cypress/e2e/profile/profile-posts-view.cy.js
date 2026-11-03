@@ -390,7 +390,7 @@ describe('profile posts view', () => {
 			cy.visit(`${gridPath()}/posts`);
 
 			cy.get('.user-post').should('have.length', 3);
-			cy.get('.posts-bar').should('have.css', 'position', 'fixed').and('not.have.class', 'posts-bar-hidden');
+			cy.get('.posts-bar').should('have.css', 'position', 'sticky').and('not.have.class', 'posts-bar-hidden');
 
 			cy.scrollTo(0, 900);
 

@@ -52,5 +52,7 @@ const UserPostSchema = new mongoose.Schema({
 	},
 });
 
+UserPostSchema.index({ userId: 1, createdAt: -1, _id: -1 });
+
 const model = mongoose.model('UserImage', UserPostSchema);
 module.exports = model;

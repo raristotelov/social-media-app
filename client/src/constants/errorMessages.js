@@ -23,6 +23,8 @@ export const ERROR_MESSAGES = Object.freeze({
 	[ERROR_CODES.COMMENT_TEXT_REQUIRED]: "Comment can't be empty",
 	[ERROR_CODES.COMMENT_NOT_FOUND]: 'This comment no longer exists',
 	[ERROR_CODES.PROFILE_FORBIDDEN]: 'You can only change your own profile',
+	[ERROR_CODES.TOO_MANY_REQUESTS]: 'Too many demo accounts from this connection. Try again later.',
+	[ERROR_CODES.DEMO_UNAVAILABLE]: 'The demo is busy right now. Try again later.',
 });
 
 export const VALIDATION_MESSAGES = Object.freeze({
@@ -34,6 +36,7 @@ export const VALIDATION_MESSAGES = Object.freeze({
 export const ACTION_FALLBACK_MESSAGES = Object.freeze({
 	LOG_IN: "Couldn't log in. Try again.",
 	SIGN_UP: "Couldn't sign up. Try again.",
+	START_DEMO: "Couldn't start the demo. Try again.",
 	SAVE_PROFILE: "Couldn't save your profile. Try again.",
 	CHANGE_PASSWORD: "Couldn't change your password. Try again.",
 	EDIT_CAPTION: "Couldn't save the caption. Try again.",
@@ -76,7 +79,7 @@ export const LOAD_ERROR_MESSAGES = Object.freeze({
 		DESCRIPTION: 'This link may be broken, or the page may have been removed.',
 		ACTION_LABEL: 'Go home',
 	}),
-	POPULAR_NEXT_BATCH: Object.freeze({
+	NEXT_BATCH: Object.freeze({
 		MESSAGE: "Couldn't load more posts",
 		RETRY_LABEL: 'Try again',
 	}),

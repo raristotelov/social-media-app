@@ -20,7 +20,7 @@ router.post('/', verifyJwtToken, uploadImage(constants.POST_IMAGE_FIELD), async 
 });
 
 router.get('/followed-users-posts', verifyJwtToken, async (req, res) => {
-	const followedUsersPostsData = await userPostService.getFollowedUsersPosts(res.userId);
+	const followedUsersPostsData = await userPostService.getFollowedUsersPosts(res.userId, { cursor: req.query.cursor });
 
 	return res.json(followedUsersPostsData);
 });
@@ -44,8 +44,8 @@ router.post('/popular', readOptionalJwtToken, async (req, res) => {
 	return res.json(popularPostsData);
 });
 
-router.get('/:userPostId/likes', async (req, res) => {
-	const likes = await userPostService.getUserPostLikes({ userPostId: req.params.userPostId });
+router.get('/:userPostId/likes', readOptionalJwtToken, async (req, res) => {
+	const likes = await userPostService.getUserPostLikes({ userPostId: req.params.userPostId, requesterId: res.userId });
 
 	return res.json(likes);
 });

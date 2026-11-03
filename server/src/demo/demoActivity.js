@@ -7,14 +7,17 @@ const DemoScheduledEventModel = require('../models/demoScheduledEventModel');
 const StoryModel = require('../models/storyModel');
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
+const objectIdFromDate = require('../utils/objectIdFromDate');
 const config = require('./demoConfig');
 const { createPhotoLookup, createCaptionPicker, planPostEngagement, pickWeighted } = require('./contentPlanning');
 const { loadDemoData } = require('./loadDemoData');
 const { pickOne, shuffle } = require('./random');
+const { removeExpiredVisitors } = require('./removeExpiredVisitors');
+const { applyDueEvents } = require('./scheduledEvents');
 
 const POSTING_HOURS_PER_DAY = config.LAST_POSTING_HOUR - config.FIRST_POSTING_HOUR + 1;
 const AVERAGE_STORIES_PER_DAY = (config.STORIES_PER_DAY[0] + config.STORIES_PER_DAY[1]) / 2;
-const EVENT_BATCH_SIZE = 1000;
+const HOURS_PER_DAY = 24;
 
 const floorToHour = (date) => new Date(Math.floor(date.getTime() / config.HOUR_MS) * config.HOUR_MS);
 
@@ -247,6 +250,35 @@ const runFollows = async (context, run, hourStart, random) => {
 	}
 };
 
+const runSignUpFollows = async (context, hourStart, random) => {
+	const windowStart = new Date(hourStart.getTime() - config.SIGN_UP_FOLLOWS.days * config.DAY_MS);
+	const windowEnd = new Date(hourStart.getTime() + config.HOUR_MS);
+	const signUps = await UserModel.find({
+		_id: { $gte: objectIdFromDate(windowStart), $lt: objectIdFromDate(windowEnd) },
+		accountType: 'user',
+	})
+		.select({ followers: 1 })
+		.lean();
+
+	for (const signUp of signUps) {
+		if (random() >= config.SIGN_UP_FOLLOWS.perDay / HOURS_PER_DAY) {
+			continue;
+		}
+
+		const followerIds = new Set((signUp.followers || []).map(String));
+		const persona = pickByTier(
+			context.states.filter((state) => !followerIds.has(String(state.userId))),
+			config.FOLLOW_TIER_WEIGHTS,
+			random,
+		);
+
+		if (persona) {
+			await UserModel.updateOne({ _id: signUp._id }, { $addToSet: { followers: persona.userId } });
+			await UserModel.updateOne({ _id: persona.userId }, { $addToSet: { following: signUp._id } });
+		}
+	}
+};
+
 const countCreatedToday = async (Model, context, hourStart) =>
 	Model.countDocuments({
 		userId: { $in: context.allAccountIds },
@@ -295,63 +327,10 @@ const runHour = async (context, run, hourStart, now, random) => {
 	}
 
 	await runFollows(context, run, hourStart, random);
+	await runSignUpFollows(context, hourStart, random);
 
 	if (isLastPostingHour(hourStart)) {
 		await topUpDailyMinimums(context, run, hourStart, storiesAllowed, random);
-	}
-};
-
-const applyComment = async (event) => {
-	if (!(await UserPostModel.exists({ _id: event.userPostId }))) {
-		return;
-	}
-
-	if (event.parentCommentId && !(await CommentModel.exists({ _id: event.parentCommentId }))) {
-		return;
-	}
-
-	if (await CommentModel.exists({ _id: event.commentId })) {
-		return;
-	}
-
-	await CommentModel.create({
-		_id: event.commentId,
-		userPostId: event.userPostId,
-		userId: event.userId,
-		text: event.text,
-		parentCommentId: event.parentCommentId || null,
-		mentionedUserId: event.mentionedUserId || null,
-		createdAt: event.dueAt,
-	});
-	await UserPostModel.updateOne({ _id: event.userPostId }, { $inc: { commentsCount: 1 } });
-};
-
-const applyEvent = async (event) => {
-	if (event.type === 'postLike') {
-		await UserPostModel.updateOne({ _id: event.userPostId, likes: { $ne: event.userId } }, { $push: { likes: event.userId } });
-	} else if (event.type === 'comment') {
-		await applyComment(event);
-	} else if (event.type === 'commentLike') {
-		await CommentModel.updateOne({ _id: event.commentId, likes: { $ne: event.userId } }, { $push: { likes: event.userId } });
-	}
-};
-
-const applyDueEvents = async (now) => {
-	for (;;) {
-		const events = await DemoScheduledEventModel.find({ dueAt: { $lte: now } })
-			.sort({ dueAt: 1 })
-			.limit(EVENT_BATCH_SIZE)
-			.lean();
-
-		if (!events.length) {
-			return;
-		}
-
-		for (const event of events) {
-			await applyEvent(event);
-		}
-
-		await DemoScheduledEventModel.deleteMany({ _id: { $in: events.map((event) => event._id) } });
 	}
 };
 
@@ -398,6 +377,8 @@ const applyRollingWindow = async (context, now) => {
 };
 
 const runDemoActivity = async ({ now = new Date(), random = Math.random } = {}) => {
+	await removeExpiredVisitors(now);
+
 	const run = await DemoActivityRunModel.findOne();
 
 	if (!run) {

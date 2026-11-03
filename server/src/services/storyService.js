@@ -9,8 +9,7 @@ const AppError = require('../utils/AppError');
 const { createStoryNotFoundError, createUserNotFoundError } = require('../utils/notFoundErrors');
 const { asFieldError } = require('../utils/fieldErrors');
 const imageStorageService = require('./imageStorageService');
-
-const DUPLICATE_KEY_ERROR_CODE = 11000;
+const { getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
 
 const STORY_AUTHOR_SELECT = { username: 1, 'profilePicture.imageUrl': 1 };
 
@@ -35,14 +34,14 @@ const toStoryAuthorData = (user) => ({
 	profilePicture: user.profilePicture?.imageUrl ? { imageUrl: user.profilePicture.imageUrl } : undefined,
 });
 
-const findActiveStory = async (storyId) => {
+const findActiveStory = async (storyId, viewerId) => {
 	if (!mongoose.isObjectIdOrHexString(storyId)) {
 		throw createStoryNotFoundError();
 	}
 
 	const story = await StoryModel.findOne({ _id: storyId, ...getActiveStoriesFilter() });
 
-	if (!story) {
+	if (!story || isHiddenId(story.userId, await getHiddenVisitorIds(viewerId))) {
 		throw createStoryNotFoundError();
 	}
 
@@ -50,7 +49,7 @@ const findActiveStory = async (storyId) => {
 };
 
 const findOwnedActiveStory = async ({ storyId, userId }) => {
-	const story = await findActiveStory(storyId);
+	const story = await findActiveStory(storyId, userId);
 
 	if (String(story.userId) !== String(userId)) {
 		throw new AppError('You can only change your own stories', 403, { code: ERROR_CODES.STORY_FORBIDDEN });
@@ -112,7 +111,7 @@ const getStoryTray = async (userId) => {
 			throw new AppError('Unauthorized', 401, { code: ERROR_CODES.UNAUTHENTICATED });
 		}
 
-		const authorIds = [currentUser._id, ...currentUser.following];
+		const authorIds = [currentUser._id, ...withoutHiddenIds(currentUser.following, await getHiddenVisitorIds(userId))];
 
 		const activeStories = await StoryModel.find({ userId: { $in: authorIds }, ...getActiveStoriesFilter() })
 			.select({ userId: 1, createdAt: 1 })
@@ -167,8 +166,14 @@ const getStoryTray = async (userId) => {
 	}
 };
 
-const getViewersCountsByStoryId = async (storyIds) => {
-	const counts = await StoryViewModel.aggregate([{ $match: { storyId: { $in: storyIds } } }, { $group: { _id: '$storyId', count: { $sum: 1 } } }]);
+const getViewersCountsByStoryId = async (storyIds, hiddenVisitorIds) => {
+	const match = { storyId: { $in: storyIds } };
+
+	if (hiddenVisitorIds.length) {
+		match.viewerId = { $nin: hiddenVisitorIds };
+	}
+
+	const counts = await StoryViewModel.aggregate([{ $match: match }, { $group: { _id: '$storyId', count: { $sum: 1 } } }]);
 
 	return new Map(counts.map((entry) => [String(entry._id), entry.count]));
 };
@@ -189,7 +194,9 @@ const getUserStories = async ({ authorId, requesterId }) => {
 
 		const author = await UserModel.findById(authorId).select(STORY_AUTHOR_SELECT).lean();
 
-		if (!author) {
+		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+
+		if (!author || isHiddenId(author._id, hiddenVisitorIds)) {
 			throw createUserNotFoundError();
 		}
 
@@ -197,7 +204,7 @@ const getUserStories = async ({ authorId, requesterId }) => {
 
 		const isOwnStories = String(authorId) === String(requesterId);
 		const storyIds = stories.map((story) => story._id);
-		const viewersCounts = isOwnStories ? await getViewersCountsByStoryId(storyIds) : null;
+		const viewersCounts = isOwnStories ? await getViewersCountsByStoryId(storyIds, hiddenVisitorIds) : null;
 		const watchedStoryIds = isOwnStories ? null : await getWatchedStoryIds({ storyIds, viewerId: requesterId });
 
 		return {
@@ -220,7 +227,7 @@ const getUserStories = async ({ authorId, requesterId }) => {
 
 const recordStoryView = async ({ storyId, viewerId }) => {
 	try {
-		const story = await findActiveStory(storyId);
+		const story = await findActiveStory(storyId, viewerId);
 
 		if (String(story.userId) === String(viewerId)) {
 			return;
@@ -229,7 +236,7 @@ const recordStoryView = async ({ storyId, viewerId }) => {
 		try {
 			await StoryViewModel.updateOne({ storyId: story._id, viewerId }, { $setOnInsert: { createdAt: new Date() } }, { upsert: true });
 		} catch (error) {
-			if (error?.code !== DUPLICATE_KEY_ERROR_CODE) {
+			if (error?.code !== constants.DUPLICATE_KEY_ERROR_CODE) {
 				throw error;
 			}
 		}
@@ -246,7 +253,9 @@ const getStoryViewers = async ({ storyId, userId }) => {
 	try {
 		const story = await findOwnedActiveStory({ storyId, userId });
 
-		const views = await StoryViewModel.find({ storyId: story._id, viewerId: { $ne: userId } })
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const viewerFilter = hiddenVisitorIds.length ? { $nin: [userId, ...hiddenVisitorIds] } : { $ne: userId };
+		const views = await StoryViewModel.find({ storyId: story._id, viewerId: viewerFilter })
 			.sort({ createdAt: -1, _id: -1 })
 			.populate({ path: 'viewerId', select: STORY_AUTHOR_SELECT });
 

@@ -8,6 +8,13 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { createPostNotFoundError, createCommentNotFoundError } = require('../utils/notFoundErrors');
 const { getUserRowsInOrder } = require('./userRowService');
+const {
+	assertCommentNotHidden,
+	assertPostNotHidden,
+	getHiddenVisitorIds,
+	withoutHiddenCommentLikes,
+	withoutHiddenIds,
+} = require('./visitorVisibilityService');
 
 const AUTHOR_POPULATE = {
 	path: 'userId',
@@ -58,8 +65,13 @@ const addComment = async ({ userPostId, userId, text, parentCommentId, mentioned
 
 		await assertPostExists(userPostId);
 
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+
+		await assertPostNotHidden(userPostId, hiddenVisitorIds);
+
 		if (parentCommentId) {
 			await assertValidReplyParent({ parentCommentId, userPostId });
+			await assertCommentNotHidden(parentCommentId, hiddenVisitorIds);
 		}
 
 		const trimmedText = text.trim();
@@ -87,11 +99,16 @@ const addComment = async ({ userPostId, userId, text, parentCommentId, mentioned
 };
 
 // Returns top-level comments for a post, each with a nested `replies` array.
-const getCommentsForPost = async ({ userPostId }) => {
+const getCommentsForPost = async ({ userPostId, requesterId }) => {
 	try {
 		await assertPostExists(userPostId);
 
-		const comments = await CommentModel.find({ userPostId }).sort({ createdAt: 1 }).populate([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
+		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+
+		await assertPostNotHidden(userPostId, hiddenVisitorIds);
+
+		const filter = hiddenVisitorIds.length ? { userPostId, userId: { $nin: hiddenVisitorIds } } : { userPostId };
+		const comments = await CommentModel.find(filter).sort({ createdAt: 1 }).populate([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
 
 		const topLevel = [];
 		const repliesByParent = {};
@@ -100,7 +117,7 @@ const getCommentsForPost = async ({ userPostId }) => {
 			if (comment.parentCommentId) {
 				const key = comment.parentCommentId.toString();
 				repliesByParent[key] = repliesByParent[key] || [];
-				repliesByParent[key].push(comment.toObject());
+				repliesByParent[key].push(withoutHiddenCommentLikes(comment.toObject(), hiddenVisitorIds));
 			} else {
 				topLevel.push(comment);
 			}
@@ -108,7 +125,7 @@ const getCommentsForPost = async ({ userPostId }) => {
 
 		return topLevel
 			.map((comment) => ({
-				...comment.toObject(),
+				...withoutHiddenCommentLikes(comment.toObject(), hiddenVisitorIds),
 				replies: repliesByParent[comment._id.toString()] || [],
 			}))
 			.sort(compareTopLevelComments);
@@ -121,10 +138,14 @@ const getCommentsForPost = async ({ userPostId }) => {
 	}
 };
 
-const updateCommentLikes = async ({ commentId, likesUpdate }) => {
+const updateCommentLikes = async ({ commentId, likesUpdate, viewerId }) => {
 	if (!mongoose.isObjectIdOrHexString(commentId)) {
 		throw createCommentNotFoundError();
 	}
+
+	const hiddenVisitorIds = await getHiddenVisitorIds(viewerId);
+
+	await assertCommentNotHidden(commentId, hiddenVisitorIds);
 
 	const updatedComment = await CommentModel.findByIdAndUpdate(commentId, likesUpdate, { new: true });
 
@@ -132,12 +153,12 @@ const updateCommentLikes = async ({ commentId, likesUpdate }) => {
 		throw createCommentNotFoundError();
 	}
 
-	return updatedComment;
+	return withoutHiddenCommentLikes(updatedComment, hiddenVisitorIds);
 };
 
 const likeComment = async ({ commentId, userId }) => {
 	try {
-		return await updateCommentLikes({ commentId, likesUpdate: { $addToSet: { likes: userId } } });
+		return await updateCommentLikes({ commentId, likesUpdate: { $addToSet: { likes: userId } }, viewerId: userId });
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -149,7 +170,7 @@ const likeComment = async ({ commentId, userId }) => {
 
 const unlikeComment = async ({ commentId, userId }) => {
 	try {
-		return await updateCommentLikes({ commentId, likesUpdate: { $pull: { likes: userId } } });
+		return await updateCommentLikes({ commentId, likesUpdate: { $pull: { likes: userId } }, viewerId: userId });
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -159,7 +180,7 @@ const unlikeComment = async ({ commentId, userId }) => {
 	}
 };
 
-const getCommentLikes = async ({ commentId }) => {
+const getCommentLikes = async ({ commentId, requesterId }) => {
 	try {
 		if (!mongoose.isObjectIdOrHexString(commentId)) {
 			throw createCommentNotFoundError();
@@ -171,7 +192,13 @@ const getCommentLikes = async ({ commentId }) => {
 			throw createCommentNotFoundError();
 		}
 
-		return await getUserRowsInOrder([...comment.likes].reverse());
+		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+
+		await assertCommentNotHidden(commentId, hiddenVisitorIds);
+
+		const visibleLikes = withoutHiddenIds(comment.likes, hiddenVisitorIds);
+
+		return await getUserRowsInOrder([...visibleLikes].reverse());
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -181,10 +208,16 @@ const getCommentLikes = async ({ commentId }) => {
 	}
 };
 
-const getPreviewCommentsForPosts = async (userPostIds) => {
+const getPreviewCommentsForPosts = async (userPostIds, hiddenVisitorIds = []) => {
 	try {
+		const match = { userPostId: { $in: userPostIds }, parentCommentId: null };
+
+		if (hiddenVisitorIds.length) {
+			match.userId = { $nin: hiddenVisitorIds };
+		}
+
 		const previewGroups = await CommentModel.aggregate([
-			{ $match: { userPostId: { $in: userPostIds }, parentCommentId: null } },
+			{ $match: match },
 			{ $addFields: { likesCount: { $size: { $ifNull: ['$likes', []] } } } },
 			{ $sort: { likesCount: -1, createdAt: -1, _id: -1 } },
 			{ $group: { _id: '$userPostId', comments: { $push: '$$ROOT' } } },
@@ -200,7 +233,9 @@ const getPreviewCommentsForPosts = async (userPostIds) => {
 		const populatedCommentsById = new Map(populatedComments.map((comment) => [String(comment._id), comment]));
 
 		return previewGroups.reduce((map, group) => {
-			map[group._id.toString()] = group.comments.map((comment) => populatedCommentsById.get(String(comment._id)));
+			map[group._id.toString()] = group.comments.map((comment) =>
+				withoutHiddenCommentLikes(populatedCommentsById.get(String(comment._id)), hiddenVisitorIds),
+			);
 
 			return map;
 		}, {});

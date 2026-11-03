@@ -1,4 +1,5 @@
 jest.mock('../models/userModel');
+jest.mock('./visitorVisibilityService');
 
 const mongoose = require('mongoose');
 
@@ -6,6 +7,7 @@ const UserModel = require('../models/userModel');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { getSuggestions, dismissCarousel } = require('./suggestionService');
+const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 
 const NOW = new Date('2026-10-22T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -71,6 +73,7 @@ describe('suggestionService', () => {
 
 		UserModel.findById.mockImplementation(() => buildLeanQuery(currentUser));
 		UserModel.aggregate.mockImplementation(async (pipeline) => pools[getPoolName(pipeline)]);
+		getHiddenVisitorIds.mockResolvedValue([]);
 	});
 
 	afterEach(() => {

@@ -14,6 +14,7 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { createPostNotFoundError } = require('../utils/notFoundErrors');
 const commentService = require('./commentService');
+const { createPostVisibility, getHiddenVisitorIds, isHiddenId } = require('./visitorVisibilityService');
 
 const AUTHOR_POPULATE = {
 	path: 'userId',
@@ -24,9 +25,9 @@ const POPULAR_SCORE_FIELDS_TO_DROP = { storedCommentsCount: 0, likesCount: 0, ag
 
 const createBadRequestError = (message) => new AppError(message, 400, { code: ERROR_CODES.BAD_REQUEST });
 
-const getExcludedAuthorIds = async (userId) => {
+const getExcludedAuthorIds = async (userId, hiddenVisitorIds) => {
 	if (!userId) {
-		return [];
+		return hiddenVisitorIds;
 	}
 
 	const currentUser = await UserModel.findById(userId).select({ following: 1 }).lean();
@@ -35,10 +36,10 @@ const getExcludedAuthorIds = async (userId) => {
 		throw new AppError('Unauthorized', 401, { code: ERROR_CODES.UNAUTHENTICATED });
 	}
 
-	return [currentUser._id, ...(currentUser.following ?? [])];
+	return [currentUser._id, ...(currentUser.following ?? []), ...hiddenVisitorIds];
 };
 
-const findFirstPost = async (firstPostId) => {
+const findFirstPost = async ({ firstPostId, hiddenVisitorIds }) => {
 	if (!firstPostId) {
 		return null;
 	}
@@ -50,6 +51,10 @@ const findFirstPost = async (firstPostId) => {
 	const firstPost = await UserPostModel.findById(firstPostId).lean();
 
 	if (!firstPost) {
+		throw createPostNotFoundError();
+	}
+
+	if (isHiddenId(firstPost.userId, hiddenVisitorIds)) {
 		throw createPostNotFoundError();
 	}
 
@@ -108,27 +113,29 @@ const getRankedPosts = ({ snapshotTime, excludedAuthorIds, shownPostIds, limit }
 		{ $project: POPULAR_SCORE_FIELDS_TO_DROP },
 	]);
 
-const withCommentData = async (posts) => {
+const withCommentData = async (posts, hiddenVisitorIds) => {
 	const populatedPosts = await UserPostModel.populate(posts, AUTHOR_POPULATE);
 	const postIds = populatedPosts.map((post) => post._id);
 
-	const previewComments = await commentService.getPreviewCommentsForPosts(postIds);
+	const applyVisibility = await createPostVisibility(postIds, hiddenVisitorIds);
+	const previewComments = await commentService.getPreviewCommentsForPosts(postIds, hiddenVisitorIds);
 
 	return populatedPosts.map((post) => ({
-		...post,
+		...applyVisibility(post),
 		previewComments: previewComments[post._id.toString()] || [],
 	}));
 };
 
-const loadPopularPage = async ({ userId, snapshotTime, firstPost, shownPostIds }) => {
-	const excludedAuthorIds = await getExcludedAuthorIds(userId);
+const loadPopularPage = async ({ userId, snapshotTime, firstPost, shownPostIds, hiddenVisitorIds: loadedHiddenVisitorIds }) => {
+	const hiddenVisitorIds = loadedHiddenVisitorIds ?? (await getHiddenVisitorIds(userId));
+	const excludedAuthorIds = await getExcludedAuthorIds(userId, hiddenVisitorIds);
 
 	const rankedLimit = POPULAR_POSTS_PAGE_SIZE - (firstPost ? 1 : 0);
 
 	const rankedPosts = await getRankedPosts({ snapshotTime, excludedAuthorIds, shownPostIds, limit: rankedLimit });
 
 	const returnedRankedPosts = rankedPosts.slice(0, rankedLimit);
-	const posts = await withCommentData([...(firstPost ? [firstPost] : []), ...returnedRankedPosts]);
+	const posts = await withCommentData([...(firstPost ? [firstPost] : []), ...returnedRankedPosts], hiddenVisitorIds);
 
 	const shownTotal = shownPostIds.length + returnedRankedPosts.length;
 	const hasMore = rankedPosts.length > rankedLimit && shownTotal < MAX_SHOWN_POST_IDS;
@@ -138,10 +145,12 @@ const loadPopularPage = async ({ userId, snapshotTime, firstPost, shownPostIds }
 
 const getPopularPosts = async ({ userId, firstPostId }) => {
 	try {
-		const firstPost = await findFirstPost(firstPostId);
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const firstPost = await findFirstPost({ firstPostId, hiddenVisitorIds });
 
 		return await loadPopularPage({
 			userId,
+			hiddenVisitorIds,
 			snapshotTime: new Date(),
 			firstPost,
 			shownPostIds: firstPost ? [firstPost._id] : [],

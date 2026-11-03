@@ -5,6 +5,7 @@ const { userService } = require('../services');
 const verifyJwtToken = require('../middlewares/verifyJwtToken');
 const readOptionalJwtToken = require('../middlewares/readOptionalJwtToken');
 const verifyProfileOwner = require('../middlewares/verifyProfileOwner');
+const demoLoginRateLimit = require('../middlewares/demoLoginRateLimit');
 const uploadImage = require('../middlewares/uploadImage');
 const constants = require('../config/constants');
 
@@ -18,6 +19,12 @@ router.post('/login', async (req, res) => {
 	const userData = await userService.login(req.body);
 
 	return res.json(userData);
+});
+
+router.post('/demo-login', demoLoginRateLimit, async (req, res) => {
+	const jwt = await userService.demoLogin();
+
+	return res.json(jwt);
 });
 
 router.patch('/password', verifyJwtToken, async (req, res) => {
@@ -37,7 +44,7 @@ router.get('/', readOptionalJwtToken, async (req, res) => {
 	if (userIds) {
 		usersAccountData = await userService.getUsersProfileDataByUserIds({ userIds, requesterId: res.userId });
 	} else if (searchWord) {
-		usersAccountData = await userService.getUsersProfileDataBySearchWord({ searchWord });
+		usersAccountData = await userService.getUsersProfileDataBySearchWord({ searchWord, requesterId: res.userId });
 	}
 
 	return res.json(usersAccountData);

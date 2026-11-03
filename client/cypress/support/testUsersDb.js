@@ -207,9 +207,41 @@ const deleteTestUser = (email) => {
 	});
 };
 
+const demoVisitorEmailPattern = /^[a-z]+_demo_\d{1,2}@visitor\.demo\.invalid$/;
+
+let removeUsersWithContent;
+
+const getRemoveUsersWithContent = () => {
+	if (!removeUsersWithContent) {
+		loadServerEnv();
+
+		({ removeUsersWithContent } = require(path.join(SERVER_ROOT, 'src/demo/removeUsersWithContent')));
+	}
+
+	return removeUsersWithContent;
+};
+
+const deleteDemoVisitor = (userId) =>
+	withConnection(async () => {
+		const visitor = await UserModel.findOne({ _id: userId, accountType: 'demo' }).select({ _id: 1, email: 1 });
+
+		if (!visitor) {
+			return null;
+		}
+
+		if (!demoVisitorEmailPattern.test(visitor.email)) {
+			throw new Error(`Refusing to delete "${visitor.email}": only demo visitor accounts may be removed.`);
+		}
+
+		await getRemoveUsersWithContent()([visitor._id], { deleteUploadedImages: true });
+
+		return null;
+	});
+
 module.exports = {
 	cleanTestUsers,
 	deleteTestUser,
+	deleteDemoVisitor,
 	getCloudinaryFolder,
 	cloudinaryAssetExists,
 };

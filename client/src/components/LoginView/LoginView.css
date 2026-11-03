@@ -1,8 +1,8 @@
 .login-wrapper {
 	/* .routes-wrapper is display: flex, so this must fill the row rather than shrink to content. */
 	width: 100%;
-	min-height: 100vh;
-	padding: var(--header-height) 16px 0;
+	min-height: calc(100vh - var(--header-height));
+	padding: 0 16px;
 	box-sizing: border-box;
 
 	display: flex;

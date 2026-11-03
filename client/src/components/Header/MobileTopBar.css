@@ -1,13 +1,21 @@
-.mobile-top-bar {
+.mobile-top-bar-slot {
 	display: none;
 }
 
 @media (max-width: 599px) {
+	.mobile-top-bar-slot {
+		display: block;
+		position: sticky;
+		top: 0;
+		z-index: 2;
+
+		height: var(--header-height);
+	}
+
 	.mobile-top-bar {
-		position: fixed;
+		position: absolute;
 		top: 0;
 		left: 0;
-		z-index: 2;
 
 		box-sizing: border-box;
 		width: 100%;

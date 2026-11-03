@@ -4,20 +4,31 @@ jest.mock('./commentService');
 jest.mock('./imageStorageService');
 jest.mock('bcrypt');
 jest.mock('jsonwebtoken');
+jest.mock('../demo/createDemoVisitor');
+jest.mock('../demo/userReactions');
+jest.mock('./visitorVisibilityService', () => ({
+	...jest.requireActual('./visitorVisibilityService'),
+	getHiddenVisitorIds: jest.fn(),
+	createPostVisibility: jest.fn(),
+}));
 
 const bcrypt = require('bcrypt');
 const JWT = require('jsonwebtoken');
 
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
+const { createDemoVisitor } = require('../demo/createDemoVisitor');
+const { reactToSignUp } = require('../demo/userReactions');
 const imageStorageService = require('./imageStorageService');
 const commentService = require('./commentService');
+const { createPostVisibility, getHiddenVisitorIds } = require('./visitorVisibilityService');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
 const {
 	login,
 	signUp,
+	demoLogin,
 	changePassword,
 	updateUserProfileData,
 	followUser,
@@ -31,6 +42,8 @@ const {
 describe('userService', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
+		getHiddenVisitorIds.mockResolvedValue([]);
+		createPostVisibility.mockResolvedValue((post) => post);
 	});
 
 	describe('login', () => {
@@ -1280,7 +1293,7 @@ describe('userService', () => {
 					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
 
 					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
-					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2']);
+					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2'], []);
 				});
 			});
 
@@ -1387,7 +1400,7 @@ describe('userService', () => {
 					await getUsersProfileDataByUserIds({ userIds: [OWNER_ID, OTHER_ID] });
 
 					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledTimes(1);
-					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2']);
+					expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1', 'post2'], []);
 				});
 			});
 
@@ -1641,6 +1654,439 @@ describe('userService', () => {
 			UserModel.aggregate = jest.fn().mockRejectedValue(dbError);
 
 			await expect(getList({ userId: PROFILE_ID })).rejects.toMatchObject({ statusCode: 500, cause: dbError });
+		});
+	});
+
+	describe('demoLogin', () => {
+		const VISITOR = { _id: '64b7f0a1c2d3e4f5a6b7c9a1', username: 'john_demo_2' };
+
+		let consoleErrorSpy;
+
+		beforeEach(() => {
+			JWT.sign.mockReturnValue('visitor.jwt.token');
+			consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			consoleErrorSpy.mockRestore();
+		});
+
+		it('creates a visitor and returns a JWT signed for that visitor, the same way a login does', async () => {
+			createDemoVisitor.mockResolvedValue(VISITOR);
+
+			const result = await demoLogin();
+
+			expect(result).toBe('visitor.jwt.token');
+			expect(JWT.sign).toHaveBeenCalledWith({ userId: VISITOR._id, username: VISITOR.username }, process.env.JWT_SECRET, {
+				expiresIn: constants.JWT_EXPIRY,
+			});
+		});
+
+		it('takes no credentials', async () => {
+			createDemoVisitor.mockResolvedValue(VISITOR);
+
+			await demoLogin();
+
+			expect(createDemoVisitor).toHaveBeenCalledWith();
+		});
+
+		it('creates a new visitor on every call', async () => {
+			createDemoVisitor.mockResolvedValueOnce(VISITOR).mockResolvedValueOnce({ _id: '64b7f0a1c2d3e4f5a6b7c9a2', username: 'mary_demo_9' });
+
+			await demoLogin();
+			await demoLogin();
+
+			expect(createDemoVisitor).toHaveBeenCalledTimes(2);
+			expect(JWT.sign.mock.calls[0][0].userId).not.toBe(JWT.sign.mock.calls[1][0].userId);
+		});
+
+		it('does not look anything up by email or password', async () => {
+			createDemoVisitor.mockResolvedValue(VISITOR);
+			UserModel.findOne = jest.fn();
+
+			await demoLogin();
+
+			expect(UserModel.findOne).not.toHaveBeenCalled();
+			expect(bcrypt.compare).not.toHaveBeenCalled();
+		});
+
+		it('lets an AppError from creating the visitor through as it is', async () => {
+			const appError = new AppError('Could not find a free demo username', 503);
+
+			createDemoVisitor.mockRejectedValue(appError);
+
+			await expect(demoLogin()).rejects.toBe(appError);
+		});
+
+		it('wraps any other failure in a 500 AppError that keeps the cause', async () => {
+			const cause = new Error('cloudinary down');
+
+			createDemoVisitor.mockRejectedValue(cause);
+
+			await expect(demoLogin()).rejects.toMatchObject({ statusCode: 500, cause });
+		});
+
+		it('signs no token when the visitor could not be created', async () => {
+			createDemoVisitor.mockRejectedValue(new Error('cloudinary down'));
+
+			await demoLogin().catch(() => null);
+
+			expect(JWT.sign).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('the account type', () => {
+		const USER_ID = '64b7f0a1c2d3e4f5a6b7c8a1';
+
+		const buildUserModelMock = (saveImplementation) => {
+			UserModel.mockImplementation(function UserModelMock(data) {
+				Object.assign(this, data);
+				this._id = USER_ID;
+				this.save = saveImplementation;
+			});
+		};
+
+		beforeEach(() => {
+			bcrypt.hash.mockResolvedValue('hashedPassword123');
+			JWT.sign.mockReturnValue('signed.jwt.token');
+		});
+
+		describe('signing up', () => {
+			it('builds the user from the email, username and hashed password only, ignoring an account type in the body', async () => {
+				buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+
+				await signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1', accountType: 'demo' });
+
+				expect(UserModel).toHaveBeenCalledWith({ email: 'a@b.com', username: 'newuser', password: 'hashedPassword123' });
+			});
+
+			it('starts the reactions to the sign-up for the new user', async () => {
+				buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+
+				await signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' });
+
+				expect(reactToSignUp).toHaveBeenCalledWith(USER_ID);
+			});
+
+			it('starts no reactions when the user could not be saved', async () => {
+				buildUserModelMock(jest.fn().mockRejectedValue(new Error('connection lost')));
+
+				await signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' }).catch(() => null);
+
+				expect(reactToSignUp).not.toHaveBeenCalled();
+			});
+
+			it('starts no reactions when the password is rejected', async () => {
+				await signUp({ email: 'a@b.com', username: 'newuser', password: 'short' }).catch(() => null);
+
+				expect(reactToSignUp).not.toHaveBeenCalled();
+			});
+
+			it('does not wait for the reactions to be planned before answering', async () => {
+				buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+				reactToSignUp.mockReturnValue(new Promise(() => {}));
+
+				await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' })).resolves.toBe('signed.jwt.token');
+			});
+		});
+
+		describe('editing the profile', () => {
+			it.each(['demo', 'persona', 'user'])(
+				'rejects accountType %s with a 400 BAD_REQUEST and neither reads nor writes',
+				async (accountType) => {
+					UserModel.findOne = jest.fn();
+					UserModel.findOneAndUpdate = jest.fn();
+
+					await expect(updateUserProfileData(USER_ID, { bio: 'New bio', accountType })).rejects.toMatchObject({
+						statusCode: 400,
+						code: ERROR_CODES.BAD_REQUEST,
+					});
+
+					expect(UserModel.findOne).not.toHaveBeenCalled();
+					expect(UserModel.findOneAndUpdate).not.toHaveBeenCalled();
+				},
+			);
+
+			it('returns the account type of the user among the profile data', async () => {
+				UserModel.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: USER_ID, username: 'visitor', accountType: 'demo' });
+
+				const result = await updateUserProfileData(USER_ID, { bio: 'New bio' });
+
+				expect(result.user.accountType).toBe('demo');
+			});
+		});
+	});
+
+	describe('hiding demo visitors', () => {
+		const VIEWER_ID = '64b7f0a1c2d3e4f5a6b7c8a1';
+		const HIDDEN_ID = '64b7f0a1c2d3e4f5a6b7c9b1';
+		const VISIBLE_ID = '64b7f0a1c2d3e4f5a6b7c9b2';
+		const TARGET_ID = '64b7f0a1c2d3e4f5a6b7c9b3';
+
+		beforeEach(() => {
+			JWT.sign.mockReturnValue('signed.jwt.token');
+		});
+
+		describe('search', () => {
+			it('asks for the visitors hidden from the viewer', async () => {
+				UserModel.aggregate = jest.fn().mockResolvedValue([]);
+
+				await getUsersProfileDataBySearchWord({ searchWord: 'jan', requesterId: VIEWER_ID });
+
+				expect(getHiddenVisitorIds).toHaveBeenCalledWith(VIEWER_ID);
+			});
+
+			it('leaves the hidden visitors out of the match', async () => {
+				getHiddenVisitorIds.mockResolvedValue([HIDDEN_ID]);
+				UserModel.aggregate = jest.fn().mockResolvedValue([]);
+
+				await getUsersProfileDataBySearchWord({ searchWord: 'jan', requesterId: VIEWER_ID });
+
+				const match = UserModel.aggregate.mock.calls[0][0].find((stage) => stage.$match).$match;
+
+				expect(match).toEqual({ username: { $regex: '^jan', $options: 'i' }, _id: { $nin: [HIDDEN_ID] } });
+			});
+
+			it('adds no id condition when nobody is hidden', async () => {
+				UserModel.aggregate = jest.fn().mockResolvedValue([]);
+
+				await getUsersProfileDataBySearchWord({ searchWord: 'jan' });
+
+				const match = UserModel.aggregate.mock.calls[0][0].find((stage) => stage.$match).$match;
+
+				expect(match).not.toHaveProperty('_id');
+			});
+
+			it('wraps a failure while finding the hidden visitors in a 500', async () => {
+				const dbError = new Error('connection lost');
+
+				getHiddenVisitorIds.mockRejectedValue(dbError);
+
+				await expect(getUsersProfileDataBySearchWord({ searchWord: 'jan' })).rejects.toMatchObject({ statusCode: 500, cause: dbError });
+			});
+		});
+
+		describe('profiles by id', () => {
+			it('rejects with a 404 USER_NOT_FOUND, without loading anything, when a requested profile is a hidden visitor', async () => {
+				getHiddenVisitorIds.mockResolvedValue([HIDDEN_ID]);
+				UserModel.find = jest.fn();
+
+				await expect(getUsersProfileDataByUserIds({ userIds: [HIDDEN_ID], requesterId: VIEWER_ID })).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.USER_NOT_FOUND,
+				});
+
+				expect(UserModel.find).not.toHaveBeenCalled();
+			});
+
+			it('rejects the whole request when one of several requested profiles is a hidden visitor', async () => {
+				getHiddenVisitorIds.mockResolvedValue([HIDDEN_ID]);
+				UserModel.find = jest.fn();
+
+				await expect(getUsersProfileDataByUserIds({ userIds: [VISIBLE_ID, HIDDEN_ID], requesterId: VIEWER_ID })).rejects.toMatchObject({
+					statusCode: 404,
+				});
+			});
+
+			it('asks for the visitors hidden from the requester', async () => {
+				UserModel.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue([]) }) });
+
+				await getUsersProfileDataByUserIds({ userIds: [VISIBLE_ID], requesterId: VIEWER_ID }).catch(() => null);
+
+				expect(getHiddenVisitorIds).toHaveBeenCalledWith(VIEWER_ID);
+			});
+
+			it('takes the hidden visitors out of the followers and following of a profile', async () => {
+				getHiddenVisitorIds.mockResolvedValue([HIDDEN_ID]);
+
+				const data = {
+					_id: VISIBLE_ID,
+					username: 'persona',
+					email: 'p@demo.invalid',
+					posts: [],
+					followers: [HIDDEN_ID, TARGET_ID],
+					following: [HIDDEN_ID],
+				};
+
+				UserModel.find = jest.fn().mockReturnValue({
+					select: jest
+						.fn()
+						.mockReturnValue({ populate: jest.fn().mockResolvedValue([{ _id: VISIBLE_ID, posts: [], toObject: () => ({ ...data }) }]) }),
+				});
+				commentService.getPreviewCommentsForPosts.mockResolvedValue({});
+
+				const [profile] = await getUsersProfileDataByUserIds({ userIds: [VISIBLE_ID], requesterId: VIEWER_ID });
+
+				expect(profile.followers).toEqual([TARGET_ID]);
+				expect(profile.following).toEqual([]);
+			});
+
+			it('hides the account type and email of a profile from everyone but its owner', async () => {
+				const data = {
+					_id: VISIBLE_ID,
+					username: 'persona',
+					email: 'p@demo.invalid',
+					accountType: 'persona',
+					posts: [],
+					followers: [],
+					following: [],
+				};
+
+				UserModel.find = jest.fn().mockReturnValue({
+					select: jest
+						.fn()
+						.mockReturnValue({ populate: jest.fn().mockResolvedValue([{ _id: VISIBLE_ID, posts: [], toObject: () => ({ ...data }) }]) }),
+				});
+				commentService.getPreviewCommentsForPosts.mockResolvedValue({});
+
+				const [profile] = await getUsersProfileDataByUserIds({ userIds: [VISIBLE_ID], requesterId: VIEWER_ID });
+
+				expect(profile).not.toHaveProperty('accountType');
+				expect(profile).not.toHaveProperty('email');
+			});
+
+			it('shows the owner their own account type and email', async () => {
+				const data = {
+					_id: VIEWER_ID,
+					username: 'visitor',
+					email: 'v@visitor.demo.invalid',
+					accountType: 'demo',
+					posts: [],
+					followers: [],
+					following: [],
+				};
+
+				UserModel.find = jest.fn().mockReturnValue({
+					select: jest
+						.fn()
+						.mockReturnValue({ populate: jest.fn().mockResolvedValue([{ _id: VIEWER_ID, posts: [], toObject: () => ({ ...data }) }]) }),
+				});
+				commentService.getPreviewCommentsForPosts.mockResolvedValue({});
+
+				const [profile] = await getUsersProfileDataByUserIds({ userIds: [VIEWER_ID], requesterId: VIEWER_ID });
+
+				expect(profile.accountType).toBe('demo');
+				expect(profile.email).toBe('v@visitor.demo.invalid');
+			});
+
+			it('hands the hidden visitors to the preview comments, so their comments are left out', async () => {
+				getHiddenVisitorIds.mockResolvedValue([HIDDEN_ID]);
+
+				const data = { _id: VISIBLE_ID, username: 'persona', posts: [{ _id: 'post1' }], followers: [], following: [] };
+
+				UserModel.find = jest.fn().mockReturnValue({
+					select: jest.fn().mockReturnValue({
+						populate: jest.fn().mockResolvedValue([{ _id: VISIBLE_ID, posts: [{ _id: 'post1' }], toObject: () => ({ ...data }) }]),
+					}),
+				});
+				commentService.getPreviewCommentsForPosts.mockResolvedValue({});
+
+				await getUsersProfileDataByUserIds({ userIds: [VISIBLE_ID], requesterId: VIEWER_ID });
+
+				expect(commentService.getPreviewCommentsForPosts).toHaveBeenCalledWith(['post1'], [HIDDEN_ID]);
+			});
+
+			it('hands the hidden visitors to the post visibility, so their likes and comment counts are left out', async () => {
+				getHiddenVisitorIds.mockResolvedValue([HIDDEN_ID]);
+
+				const data = { _id: VISIBLE_ID, username: 'persona', posts: [{ _id: 'post1' }], followers: [], following: [] };
+
+				UserModel.find = jest.fn().mockReturnValue({
+					select: jest.fn().mockReturnValue({
+						populate: jest.fn().mockResolvedValue([{ _id: VISIBLE_ID, posts: [{ _id: 'post1' }], toObject: () => ({ ...data }) }]),
+					}),
+				});
+				commentService.getPreviewCommentsForPosts.mockResolvedValue({});
+
+				await getUsersProfileDataByUserIds({ userIds: [VISIBLE_ID], requesterId: VIEWER_ID });
+
+				expect(createPostVisibility).toHaveBeenCalledWith(['post1'], [HIDDEN_ID]);
+			});
+		});
+
+		describe.each([
+			['getFollowers', getFollowers, 'followers'],
+			['getFollowing', getFollowing, 'following'],
+		])('%s', (_name, getList, listField) => {
+			const givenProfile = (listedUserIds) => {
+				UserModel.findById = jest
+					.fn()
+					.mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: TARGET_ID, [listField]: listedUserIds }) });
+				UserModel.aggregate = jest.fn().mockResolvedValue([]);
+			};
+
+			it('rejects with a 404 USER_NOT_FOUND, without reading the list, when the profile is a hidden visitor', async () => {
+				getHiddenVisitorIds.mockResolvedValue([TARGET_ID]);
+				givenProfile([VISIBLE_ID]);
+
+				await expect(getList({ userId: TARGET_ID, requesterId: VIEWER_ID })).rejects.toMatchObject({
+					statusCode: 404,
+					code: ERROR_CODES.USER_NOT_FOUND,
+				});
+
+				expect(UserModel.aggregate).not.toHaveBeenCalled();
+			});
+
+			it('leaves the hidden visitors out of the list', async () => {
+				getHiddenVisitorIds.mockResolvedValue([HIDDEN_ID]);
+				givenProfile([VISIBLE_ID, HIDDEN_ID]);
+
+				await getList({ userId: TARGET_ID, requesterId: VIEWER_ID });
+
+				const [pipeline] = UserModel.aggregate.mock.calls[0];
+				const matchedIds = pipeline.find((stage) => stage.$match).$match._id.$in;
+
+				expect(matchedIds.map(String)).toEqual([VISIBLE_ID]);
+			});
+
+			it('keeps everybody when nobody is hidden', async () => {
+				givenProfile([VISIBLE_ID, HIDDEN_ID]);
+
+				await getList({ userId: TARGET_ID, requesterId: VIEWER_ID });
+
+				const [pipeline] = UserModel.aggregate.mock.calls[0];
+
+				expect(pipeline.find((stage) => stage.$match).$match._id.$in.map(String)).toEqual([VISIBLE_ID, HIDDEN_ID]);
+			});
+
+			it('asks for the visitors hidden from the requester', async () => {
+				givenProfile([]);
+
+				await getList({ userId: TARGET_ID, requesterId: VIEWER_ID });
+
+				expect(getHiddenVisitorIds).toHaveBeenCalledWith(VIEWER_ID);
+			});
+		});
+
+		describe('the profile data answered after an update or a follow', () => {
+			beforeEach(() => {
+				getHiddenVisitorIds.mockResolvedValue([HIDDEN_ID]);
+				UserModel.countDocuments = jest.fn().mockResolvedValue(2);
+				UserModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+				UserModel.findOneAndUpdate = jest.fn().mockResolvedValue({
+					_id: VIEWER_ID,
+					username: 'persona',
+					followers: [HIDDEN_ID, VISIBLE_ID],
+					following: [HIDDEN_ID, TARGET_ID],
+				});
+			});
+
+			it.each([
+				['updating the profile', () => updateUserProfileData(VIEWER_ID, { bio: 'New bio' })],
+				['following somebody', () => followUser(VIEWER_ID, TARGET_ID)],
+				['unfollowing somebody', () => unfollowUser(VIEWER_ID, TARGET_ID)],
+			])('leaves the hidden visitors out of the followers and following after %s', async (_name, action) => {
+				const { user } = await action();
+
+				expect(user.followers).toEqual([VISIBLE_ID]);
+				expect(user.following).toEqual([TARGET_ID]);
+			});
+
+			it('asks for the visitors hidden from the user who acted', async () => {
+				await followUser(VIEWER_ID, TARGET_ID);
+
+				expect(getHiddenVisitorIds).toHaveBeenCalledWith(VIEWER_ID);
+			});
 		});
 	});
 });
