@@ -10,6 +10,7 @@ Colours live as a Figma **variable collection (`Colours`) with Light and Dark mo
 |-------|-------|------|-------|
 | `background/page` | `#F0F0F0` | `#000000` | App canvas behind every page |
 | `background/surface` | `#FFFFFF` | `#161616` | Header, cards, inputs, popups |
+| `background/unread` | `#F0F0F0` | `#262626` | Unread notification rows — lighter than the popup in dark |
 | `text/primary` | `#4B4B4B` | `#F0F0F0` | Primary UI text, nav labels, icon strokes |
 | `text/secondary` | `#8E8E8E` | `#A8A8A8` | Counts, comment metadata, follower lines |
 | `text/muted` | `#B5B5B5` | `#6E6E6E` | Placeholder text, input borders |

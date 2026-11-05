@@ -2,6 +2,7 @@ jest.mock('../models/userModel');
 jest.mock('../models/userPostModel');
 jest.mock('./commentService');
 jest.mock('./imageStorageService');
+jest.mock('./notificationService');
 jest.mock('./userRowService');
 jest.mock('../demo/userReactions');
 jest.mock('./visitorVisibilityService', () => ({

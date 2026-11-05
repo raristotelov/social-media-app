@@ -8,6 +8,7 @@ const {
 	storyController,
 	suggestionController,
 	demoActivityController,
+	notificationController,
 } = require('./controllers');
 
 router.use('/users', userController);
@@ -15,6 +16,7 @@ router.use('/user-posts', userPostController);
 router.use('/comments', commentController);
 router.use('/stories', storyController);
 router.use('/suggestions', suggestionController);
+router.use('/notifications', notificationController);
 router.use('/internal/demo-activity', demoActivityController);
 
 module.exports = router;

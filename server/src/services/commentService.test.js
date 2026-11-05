@@ -1,6 +1,7 @@
 jest.mock('../models/commentModel');
 jest.mock('../models/userPostModel');
 jest.mock('../models/userModel');
+jest.mock('./notificationService');
 jest.mock('./userRowService');
 jest.mock('./visitorVisibilityService', () => ({
 	...jest.requireActual('./visitorVisibilityService'),

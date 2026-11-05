@@ -3,12 +3,15 @@ import { Link, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import NotFoundContext from '../../contexts/NotFoundContext';
+import NotificationsContext from '../../contexts/NotificationsContext';
 import useUserSearch from '../../hooks/useUserSearch';
 
 import Logo from '../Logo/Logo';
 import AccountMenu from '../AccountMenu/AccountMenu';
 import ChangePasswordPopup from '../ChangePasswordPopup/ChangePasswordPopup';
+import NotificationsPopup from '../NotificationsPopup/NotificationsPopup';
 import SearchResults from '../SearchResults/SearchResults';
+import UnreadDot from '../UnreadDot/UnreadDot';
 import MenuIcon from '../icons/Menu';
 import SearchIcon from '../icons/Search';
 
@@ -34,9 +37,11 @@ const POSTS_VIEW_PATH_PATTERN = /^\/(?:user\/[^/]+|popular-posts)\/posts\/?$/;
 const MobileTopBar = ({ logoutHandler }) => {
 	const { loggedInUser } = useContext(LoggedInUserContext);
 	const { isNotFound } = useContext(NotFoundContext);
+	const { unreadCount } = useContext(NotificationsContext);
 	const { pathname } = useLocation();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 	const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+	const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 	const [isSearching, setIsSearching] = useState(false);
 
 	const searchFieldRef = useRef(null);
@@ -107,6 +112,8 @@ const MobileTopBar = ({ logoutHandler }) => {
 							onClick={() => setIsMenuOpen((state) => !state)}
 						>
 							<MenuIcon iconColorProp='currentColor' />
+
+							{unreadCount > 0 ? <UnreadDot className='mobile-top-bar-unread-dot' /> : null}
 						</button>
 					) : null}
 				</div>
@@ -116,11 +123,14 @@ const MobileTopBar = ({ logoutHandler }) => {
 					onClose={() => setIsMenuOpen(false)}
 					logoutHandler={logoutHandler}
 					onChangePasswordClick={() => setIsChangePasswordOpen(true)}
+					onNotificationsClick={() => setIsNotificationsOpen(true)}
 					className='account-menu-sheet'
 					isBottomSheet
 				/>
 
 				{isChangePasswordOpen ? <ChangePasswordPopup onClose={() => setIsChangePasswordOpen(false)} /> : null}
+
+				{isNotificationsOpen ? <NotificationsPopup onClose={() => setIsNotificationsOpen(false)} /> : null}
 			</div>
 		</div>
 	);

@@ -2,6 +2,7 @@
 :root {
 	--background-page: #f0f0f0;
 	--background-surface: #ffffff;
+	--background-unread: #f0f0f0;
 	--text-primary: #4b4b4b;
 	--text-secondary: #8e8e8e;
 	--text-muted: #b5b5b5;
@@ -31,6 +32,7 @@
 :root[data-theme='dark'] {
 	--background-page: #000000;
 	--background-surface: #161616;
+	--background-unread: #262626;
 	--text-primary: #f0f0f0;
 	--text-secondary: #a8a8a8;
 	--text-muted: #6e6e6e;

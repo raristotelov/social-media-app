@@ -49,6 +49,8 @@
 }
 
 .mobile-top-bar-action {
+	position: relative;
+
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -61,6 +63,13 @@
 
 .mobile-top-bar-action:hover {
 	cursor: pointer;
+}
+
+.mobile-top-bar-action .mobile-top-bar-unread-dot {
+	--unread-dot-size: 8px;
+
+	top: 3px;
+	left: 17px;
 }
 
 /* While searching the bar grows to hold the results list beneath the field. */

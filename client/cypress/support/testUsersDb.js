@@ -11,6 +11,7 @@ const UserPostModel = require(path.join(SERVER_ROOT, 'src/models/userPostModel')
 const CommentModel = require(path.join(SERVER_ROOT, 'src/models/commentModel'));
 const StoryModel = require(path.join(SERVER_ROOT, 'src/models/storyModel'));
 const StoryViewModel = require(path.join(SERVER_ROOT, 'src/models/storyViewModel'));
+const NotificationModel = require(path.join(SERVER_ROOT, 'src/models/notificationModel'));
 
 // Take mongoose from a model rather than requiring it here. The models resolve
 // mongoose from server/node_modules, so requiring it from client/node_modules would
@@ -158,6 +159,15 @@ const removeUsersById = async (testUserIds) => {
 
 	const deletedComments = await CommentModel.deleteMany({
 		$or: [{ _id: { $in: commentIdsToDelete } }, { parentCommentId: { $in: commentIdsToDelete } }],
+	});
+
+	await NotificationModel.deleteMany({
+		$or: [
+			{ actorId: { $in: testUserIds } },
+			{ recipientId: { $in: testUserIds } },
+			{ userPostId: { $in: testUserPostIds } },
+			{ commentId: { $in: commentIdsToDelete } },
+		],
 	});
 
 	const deletedPosts = await UserPostModel.deleteMany({ _id: { $in: testUserPostIds } });

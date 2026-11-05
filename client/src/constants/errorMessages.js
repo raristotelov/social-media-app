@@ -83,6 +83,10 @@ export const LOAD_ERROR_MESSAGES = Object.freeze({
 		MESSAGE: "Couldn't load more posts",
 		RETRY_LABEL: 'Try again',
 	}),
+	NOTIFICATIONS_NEXT_BATCH: Object.freeze({
+		MESSAGE: "Couldn't load more notifications",
+		RETRY_LABEL: 'Try again',
+	}),
 	COMMENTS: Object.freeze({
 		MESSAGE: "Couldn't load comments",
 		RETRY_LABEL: 'Try again',

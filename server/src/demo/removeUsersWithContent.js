@@ -5,6 +5,7 @@ const StoryViewModel = require('../models/storyViewModel');
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const { deleteImage } = require('../services/imageStorageService');
+const notificationService = require('../services/notificationService');
 
 const countByPost = (comments) =>
 	comments.reduce((counts, comment) => {
@@ -76,6 +77,9 @@ const removeUsersWithContent = async (userIds, { deleteUploadedImages = false } 
 	await CommentModel.updateMany({ mentionedUserId: { $in: userIds } }, { $set: { mentionedUserId: null } });
 	await UserPostModel.updateMany({ likes: { $in: userIds } }, { $pull: { likes: { $in: userIds } } });
 	await UserPostModel.deleteMany({ _id: { $in: postIds } });
+	await notificationService.removeNotificationsForComments({ commentIds: allRemovedComments.map((comment) => comment._id) });
+	await notificationService.removeNotificationsForPosts({ userPostIds: postIds });
+	await notificationService.removeNotificationsForUsers({ userIds });
 	await UserModel.updateMany(
 		{ $or: [{ followers: { $in: userIds } }, { following: { $in: userIds } }] },
 		{ $pull: { followers: { $in: userIds }, following: { $in: userIds } } },

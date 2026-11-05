@@ -7,6 +7,7 @@ const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { createPostNotFoundError, createCommentNotFoundError } = require('../utils/notFoundErrors');
+const notificationService = require('./notificationService');
 const { getUserRowsInOrder } = require('./userRowService');
 const {
 	assertCommentNotHidden,
@@ -86,6 +87,7 @@ const addComment = async ({ userPostId, userId, text, parentCommentId, mentioned
 
 		await comment.save();
 		await UserPostModel.updateOne({ _id: userPostId }, { $inc: { commentsCount: 1 } });
+		await notificationService.notifyComment({ commentId: comment._id });
 		await comment.populate([AUTHOR_POPULATE, MENTIONED_USER_POPULATE]);
 
 		return comment;
@@ -158,7 +160,11 @@ const updateCommentLikes = async ({ commentId, likesUpdate, viewerId }) => {
 
 const likeComment = async ({ commentId, userId }) => {
 	try {
-		return await updateCommentLikes({ commentId, likesUpdate: { $addToSet: { likes: userId } }, viewerId: userId });
+		const likedComment = await updateCommentLikes({ commentId, likesUpdate: { $addToSet: { likes: userId } }, viewerId: userId });
+
+		await notificationService.notifyCommentLike({ actorId: userId, commentId });
+
+		return likedComment;
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -170,7 +176,11 @@ const likeComment = async ({ commentId, userId }) => {
 
 const unlikeComment = async ({ commentId, userId }) => {
 	try {
-		return await updateCommentLikes({ commentId, likesUpdate: { $pull: { likes: userId } }, viewerId: userId });
+		const unlikedComment = await updateCommentLikes({ commentId, likesUpdate: { $pull: { likes: userId } }, viewerId: userId });
+
+		await notificationService.removeCommentLikeNotification({ actorId: userId, commentId });
+
+		return unlikedComment;
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;

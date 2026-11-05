@@ -2,6 +2,7 @@ import { useState, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import NotificationsContext from '../../contexts/NotificationsContext';
 import useUserSearch from '../../hooks/useUserSearch';
 import { POPULAR_POSTS_PATH, POPULAR_POSTS_VIEW_PATH } from '../../constants/popularPosts';
 
@@ -9,7 +10,9 @@ import Logo from '../Logo/Logo';
 import SearchInput from '../SearchInput/SearchInput';
 import AccountMenu from '../AccountMenu/AccountMenu';
 import ChangePasswordPopup from '../ChangePasswordPopup/ChangePasswordPopup';
+import NotificationsPopup from '../NotificationsPopup/NotificationsPopup';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
+import UnreadDot from '../UnreadDot/UnreadDot';
 import ArrowDown from '../icons/ArrowDown';
 import FlameIcon from '../icons/Flame';
 import HouseIcon from '../icons/House';
@@ -19,11 +22,13 @@ import './MainHeader.css';
 const MainHeader = ({ logoutHandler }) => {
 	const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 	const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+	const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
 	const location = useLocation();
 	const currentPath = location.pathname;
 
 	const { loggedInUser } = useContext(LoggedInUserContext);
+	const { unreadCount } = useContext(NotificationsContext);
 	const { searchWord, setSearchWord, results, isLoading, clearSearch } = useUserSearch();
 
 	const isPopularActive = currentPath === POPULAR_POSTS_PATH || currentPath === POPULAR_POSTS_VIEW_PATH;
@@ -100,6 +105,8 @@ const MainHeader = ({ logoutHandler }) => {
 								<span>{loggedInUser.username}</span>
 
 								<ArrowDown iconColorProp='currentColor' />
+
+								{unreadCount > 0 ? <UnreadDot className='logged-user-unread-dot' /> : null}
 							</button>
 
 							<AccountMenu
@@ -107,6 +114,7 @@ const MainHeader = ({ logoutHandler }) => {
 								onClose={() => setIsAccountMenuOpen(false)}
 								logoutHandler={logoutHandler}
 								onChangePasswordClick={() => setIsChangePasswordOpen(true)}
+								onNotificationsClick={() => setIsNotificationsOpen(true)}
 							/>
 						</div>
 					) : null}
@@ -114,6 +122,8 @@ const MainHeader = ({ logoutHandler }) => {
 			</header>
 
 			{isChangePasswordOpen ? <ChangePasswordPopup onClose={() => setIsChangePasswordOpen(false)} /> : null}
+
+			{isNotificationsOpen ? <NotificationsPopup onClose={() => setIsNotificationsOpen(false)} /> : null}
 		</div>
 	);
 };

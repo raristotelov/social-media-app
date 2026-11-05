@@ -4,16 +4,16 @@ import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 
 import './LoadMoreFooter.css';
 
-const LoadMoreFooter = ({ isLoadingMore, hasLoadMoreFailed, onRetryClick }) => {
+const LoadMoreFooter = ({ isLoadingMore, hasLoadMoreFailed, onRetryClick, messages = LOAD_ERROR_MESSAGES.NEXT_BATCH }) => {
 	if (hasLoadMoreFailed) {
 		return (
 			<p className='load-more-error' role='alert'>
-				<span>{LOAD_ERROR_MESSAGES.NEXT_BATCH.MESSAGE}</span>
+				<span>{messages.MESSAGE}</span>
 
 				<span aria-hidden='true'>·</span>
 
 				<button type='button' className='load-more-error-retry' onClick={onRetryClick}>
-					{LOAD_ERROR_MESSAGES.NEXT_BATCH.RETRY_LABEL}
+					{messages.RETRY_LABEL}
 				</button>
 			</p>
 		);

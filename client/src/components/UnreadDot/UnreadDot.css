@@ -1,0 +1,13 @@
+.unread-dot {
+	position: absolute;
+	z-index: 1;
+
+	width: var(--unread-dot-size, 10px);
+	height: var(--unread-dot-size, 10px);
+
+	border-radius: 50%;
+	background-color: var(--brand-red);
+	box-shadow: 0 0 0 2px var(--background-surface);
+
+	pointer-events: none;
+}

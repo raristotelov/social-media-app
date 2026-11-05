@@ -23,6 +23,7 @@ Index of every doc. Board: "Social Media App Board", GitHub project number 2.
 - [pages/error-pages.md](pages/error-pages.md) — 404 and "Something went wrong".
 - [pages/app-icon.md](pages/app-icon.md) — favicon and home-screen icon.
 - [pages/demo-entry.md](pages/demo-entry.md) — the "Try the demo" strip for guests.
+- [pages/notifications.md](pages/notifications.md) — notifications list and unread indicator.
 
 ## Demo content
 

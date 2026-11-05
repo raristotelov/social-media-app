@@ -1,5 +1,6 @@
 const DemoScheduledEventModel = require('../models/demoScheduledEventModel');
 const UserModel = require('../models/userModel');
+const notificationService = require('../services/notificationService');
 const { applyEvent } = require('./scheduledEvents');
 
 const applyFollow = async (event) => {
@@ -7,6 +8,7 @@ const applyFollow = async (event) => {
 
 	if (matchedCount) {
 		await UserModel.updateOne({ _id: event.userId }, { $addToSet: { following: event.targetUserId } });
+		await notificationService.notifyFollow({ actorId: event.userId, recipientId: event.targetUserId });
 	}
 };
 

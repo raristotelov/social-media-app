@@ -4,6 +4,7 @@ const popularPostService = require('./popularPostService');
 const commentService = require('./commentService');
 const storyService = require('./storyService');
 const suggestionService = require('./suggestionService');
+const notificationService = require('./notificationService');
 
 module.exports = {
 	userService,
@@ -12,4 +13,5 @@ module.exports = {
 	commentService,
 	storyService,
 	suggestionService,
+	notificationService,
 };

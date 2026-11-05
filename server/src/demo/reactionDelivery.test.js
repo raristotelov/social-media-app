@@ -1,5 +1,6 @@
 jest.mock('../models/userModel');
 jest.mock('../models/demoScheduledEventModel');
+jest.mock('../services/notificationService');
 jest.mock('./scheduledEvents');
 
 const DemoScheduledEventModel = require('../models/demoScheduledEventModel');

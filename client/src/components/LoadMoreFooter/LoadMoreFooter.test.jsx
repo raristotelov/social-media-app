@@ -81,6 +81,22 @@ describe('LoadMoreFooter', () => {
 			expect(screen.getByRole('button', { name: 'Try again' })).toHaveAttribute('type', 'button');
 		});
 
+		it('shows the wording it is given instead of the default', () => {
+			renderFooter({
+				hasLoadMoreFailed: true,
+				messages: { MESSAGE: "Couldn't load more notifications", RETRY_LABEL: 'Try again' },
+			});
+
+			expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load more notifications·Try again");
+			expect(screen.queryByText("Couldn't load more posts")).not.toBeInTheDocument();
+		});
+
+		it('uses the given retry label', () => {
+			renderFooter({ hasLoadMoreFailed: true, messages: { MESSAGE: 'Nope', RETRY_LABEL: 'Once more' } });
+
+			expect(screen.getByRole('button', { name: 'Once more' })).toBeInTheDocument();
+		});
+
 		it('shows the error instead of the spinner when both flags are set', () => {
 			const { container } = renderFooter({ hasLoadMoreFailed: true, isLoadingMore: true });
 

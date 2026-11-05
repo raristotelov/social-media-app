@@ -27,7 +27,7 @@ import './UserPost.css';
 
 const HEART_PULSE_DURATION_MS = 500;
 
-const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDeleteClick, onPostChange }) => {
+const UserPost = ({ userPostData, author, showActions = false, commentsOpenRequest = null, onEditClick, onDeleteClick, onPostChange }) => {
 	const [isHeartPulsing, setIsHeartPulsing] = useState(false);
 	const [isCommentsPopupOpen, setIsCommentsPopupOpen] = useState(false);
 	const [isLikesPopupOpen, setIsLikesPopupOpen] = useState(false);
@@ -52,6 +52,12 @@ const UserPost = ({ userPostData, author, showActions = false, onEditClick, onDe
 			clearTimeout(heartPulseTimeoutRef.current);
 		};
 	}, []);
+
+	useEffect(() => {
+		if (commentsOpenRequest) {
+			setIsCommentsPopupOpen(true);
+		}
+	}, [commentsOpenRequest]);
 
 	const triggerHeartPulse = () => {
 		setIsHeartPulsing(true);
