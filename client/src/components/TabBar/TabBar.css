@@ -50,6 +50,17 @@
 	font-weight: 700;
 }
 
+.tab-bar-avatar-wrapper {
+	position: relative;
+
+	line-height: 0;
+}
+
+.tab-bar-avatar-wrapper .tab-bar-unread-dot {
+	top: -1px;
+	right: 0;
+}
+
 .tab-bar-avatar {
 	width: 30px;
 	height: 30px;

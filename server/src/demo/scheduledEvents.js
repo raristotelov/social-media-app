@@ -1,6 +1,7 @@
 const CommentModel = require('../models/commentModel');
 const DemoScheduledEventModel = require('../models/demoScheduledEventModel');
 const UserPostModel = require('../models/userPostModel');
+const notificationService = require('../services/notificationService');
 
 const EVENT_BATCH_SIZE = 1000;
 
@@ -27,15 +28,38 @@ const applyComment = async (event) => {
 		createdAt: event.dueAt,
 	});
 	await UserPostModel.updateOne({ _id: event.userPostId }, { $inc: { commentsCount: 1 } });
+	await notificationService.notifyComment({ commentId: event.commentId });
+};
+
+const applyPostLike = async (event) => {
+	const { modifiedCount } = await UserPostModel.updateOne(
+		{ _id: event.userPostId, likes: { $ne: event.userId } },
+		{ $push: { likes: event.userId } },
+	);
+
+	if (modifiedCount) {
+		await notificationService.notifyPostLike({ actorId: event.userId, userPostId: event.userPostId });
+	}
+};
+
+const applyCommentLike = async (event) => {
+	const { modifiedCount } = await CommentModel.updateOne(
+		{ _id: event.commentId, likes: { $ne: event.userId } },
+		{ $push: { likes: event.userId } },
+	);
+
+	if (modifiedCount) {
+		await notificationService.notifyCommentLike({ actorId: event.userId, commentId: event.commentId });
+	}
 };
 
 const applyEvent = async (event) => {
 	if (event.type === 'postLike') {
-		await UserPostModel.updateOne({ _id: event.userPostId, likes: { $ne: event.userId } }, { $push: { likes: event.userId } });
+		await applyPostLike(event);
 	} else if (event.type === 'comment') {
 		await applyComment(event);
 	} else if (event.type === 'commentLike') {
-		await CommentModel.updateOne({ _id: event.commentId, likes: { $ne: event.userId } }, { $push: { likes: event.userId } });
+		await applyCommentLike(event);
 	}
 };
 

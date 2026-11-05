@@ -7,9 +7,11 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { createPostNotFoundError } = require('../utils/notFoundErrors');
 const { asFieldError } = require('../utils/fieldErrors');
+const { parseKeysetCursor, toKeysetCursor, toKeysetFilter } = require('../utils/keysetCursor');
 const { reactToUpload } = require('../demo/userReactions');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
+const notificationService = require('./notificationService');
 const { getUserRowsInOrder } = require('./userRowService');
 const { assertPostNotHidden, createPostVisibility, getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
 
@@ -127,28 +129,9 @@ const addUserPost = async ({ caption, imageFile }, userId) => {
 	}
 };
 
-const FEED_CURSOR_SEPARATOR = '_';
-
-const toFeedCursor = (post) => `${post.createdAt.getTime()}${FEED_CURSOR_SEPARATOR}${post._id}`;
-
-const parseFeedCursor = (cursor) => {
-	if (cursor === undefined) {
-		return null;
-	}
-
-	const [timestamp, postId] = typeof cursor === 'string' ? cursor.split(FEED_CURSOR_SEPARATOR) : [];
-	const createdAt = new Date(Number(timestamp));
-
-	if (!timestamp || Number.isNaN(createdAt.getTime()) || !mongoose.isObjectIdOrHexString(postId)) {
-		throw new AppError('cursor must be a feed cursor', 400, { code: ERROR_CODES.BAD_REQUEST });
-	}
-
-	return { createdAt, postId: new mongoose.Types.ObjectId(postId) };
-};
-
 const getFollowedUsersPosts = async (userId, { cursor } = {}) => {
 	try {
-		const parsedCursor = parseFeedCursor(cursor);
+		const parsedCursor = parseKeysetCursor(cursor);
 		const currentUser = await UserModel.findById(userId).select({ following: 1 });
 
 		if (!currentUser) {
@@ -159,7 +142,7 @@ const getFollowedUsersPosts = async (userId, { cursor } = {}) => {
 		const filter = { userId: { $in: withoutHiddenIds(currentUser.following, hiddenVisitorIds) } };
 
 		if (parsedCursor) {
-			filter.$or = [{ createdAt: { $lt: parsedCursor.createdAt } }, { createdAt: parsedCursor.createdAt, _id: { $lt: parsedCursor.postId } }];
+			filter.$or = toKeysetFilter(parsedCursor);
 		}
 
 		const fetchedPostDocs = await UserPostModel.find(filter)
@@ -180,7 +163,7 @@ const getFollowedUsersPosts = async (userId, { cursor } = {}) => {
 				previewComments: previewComments[post._id.toString()] || [],
 			})),
 			hasMore,
-			nextCursor: hasMore ? toFeedCursor(followedUsersPostDocs[followedUsersPostDocs.length - 1]) : null,
+			nextCursor: hasMore ? toKeysetCursor(followedUsersPostDocs[followedUsersPostDocs.length - 1]) : null,
 		};
 	} catch (error) {
 		if (error instanceof AppError) {
@@ -211,7 +194,15 @@ const updateUserPostLikes = async ({ userPostId, likesUpdate, viewerId }) => {
 
 const likeUserPost = async ({ userPostId, userWhoLikedId }) => {
 	try {
-		return await updateUserPostLikes({ userPostId, likesUpdate: { $addToSet: { likes: userWhoLikedId } }, viewerId: userWhoLikedId });
+		const likedUserPost = await updateUserPostLikes({
+			userPostId,
+			likesUpdate: { $addToSet: { likes: userWhoLikedId } },
+			viewerId: userWhoLikedId,
+		});
+
+		await notificationService.notifyPostLike({ actorId: userWhoLikedId, userPostId });
+
+		return likedUserPost;
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -223,7 +214,15 @@ const likeUserPost = async ({ userPostId, userWhoLikedId }) => {
 
 const unlikeUserPost = async ({ userPostId, userWhoUnlikedId }) => {
 	try {
-		return await updateUserPostLikes({ userPostId, likesUpdate: { $pull: { likes: userWhoUnlikedId } }, viewerId: userWhoUnlikedId });
+		const unlikedUserPost = await updateUserPostLikes({
+			userPostId,
+			likesUpdate: { $pull: { likes: userWhoUnlikedId } },
+			viewerId: userWhoUnlikedId,
+		});
+
+		await notificationService.removePostLikeNotification({ actorId: userWhoUnlikedId, userPostId });
+
+		return unlikedUserPost;
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -300,6 +299,8 @@ const deleteUserPost = async ({ userPostId, userId }) => {
 		await commentService.deleteCommentsForPost({ userPostId: userPost._id });
 
 		await UserPostModel.deleteOne({ _id: userPost._id });
+
+		await notificationService.removeNotificationsForPosts({ userPostIds: [userPost._id] });
 
 		await UserModel.updateOne({ _id: userId }, { $pull: { posts: userPost._id } });
 	} catch (error) {

@@ -15,6 +15,7 @@ import MobileTopBar from './components/Header/MobileTopBar';
 import TabBar from './components/TabBar/TabBar';
 import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner';
 import NotFoundProvider from './components/NotFoundProvider/NotFoundProvider';
+import NotificationsProvider from './components/NotificationsProvider/NotificationsProvider';
 import Router from './Router';
 
 import './App.css';
@@ -150,15 +151,17 @@ function App() {
 	return (
 		<LoggedInUserContext.Provider value={loggedInUserContextValues}>
 			<NotFoundProvider>
-				<DemoStrip />
+				<NotificationsProvider>
+					<DemoStrip />
 
-				<MainHeader logoutHandler={logoutHandler} />
+					<MainHeader logoutHandler={logoutHandler} />
 
-				<MobileTopBar logoutHandler={logoutHandler} />
+					<MobileTopBar logoutHandler={logoutHandler} />
 
-				<Router />
+					<Router />
 
-				<TabBar />
+					<TabBar />
+				</NotificationsProvider>
 			</NotFoundProvider>
 		</LoggedInUserContext.Provider>
 	);

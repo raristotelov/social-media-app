@@ -1,21 +1,27 @@
 import { useEffect } from 'react';
 
-import { LOAD_MORE_DISTANCE_PX } from '../constants/layout';
+import { LIST_LOAD_MORE_DISTANCE_PX, LOAD_MORE_DISTANCE_PX } from '../constants/layout';
 
 const isNearPageBottom = () => document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) <= LOAD_MORE_DISTANCE_PX;
 
-const useLoadMoreOnScroll = ({ onLoadMore, isEnabled }) => {
+const isNearElementBottom = (element) => element.scrollHeight - (element.scrollTop + element.clientHeight) <= LIST_LOAD_MORE_DISTANCE_PX;
+
+const useLoadMoreOnScroll = ({ onLoadMore, isEnabled, elementRef }) => {
 	useEffect(() => {
-		if (!isEnabled) {
+		const element = elementRef ? elementRef.current : null;
+
+		if (!isEnabled || (elementRef && !element)) {
 			return undefined;
 		}
+
+		const scrollTarget = element || window;
 
 		let pendingFrame = null;
 
 		const loadMoreWhenNearBottom = () => {
 			pendingFrame = null;
 
-			if (isNearPageBottom()) {
+			if (element ? isNearElementBottom(element) : isNearPageBottom()) {
 				onLoadMore();
 			}
 		};
@@ -28,18 +34,18 @@ const useLoadMoreOnScroll = ({ onLoadMore, isEnabled }) => {
 
 		scheduleCheck();
 
-		window.addEventListener('scroll', scheduleCheck, { passive: true });
+		scrollTarget.addEventListener('scroll', scheduleCheck, { passive: true });
 		window.addEventListener('resize', scheduleCheck);
 
 		return () => {
-			window.removeEventListener('scroll', scheduleCheck);
+			scrollTarget.removeEventListener('scroll', scheduleCheck);
 			window.removeEventListener('resize', scheduleCheck);
 
 			if (pendingFrame !== null) {
 				window.cancelAnimationFrame(pendingFrame);
 			}
 		};
-	}, [onLoadMore, isEnabled]);
+	}, [elementRef, onLoadMore, isEnabled]);
 };
 
 export default useLoadMoreOnScroll;

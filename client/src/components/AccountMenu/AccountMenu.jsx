@@ -2,15 +2,18 @@ import { useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import NotificationsContext from '../../contexts/NotificationsContext';
 import useBottomSheetDrag from '../../hooks/useBottomSheetDrag';
 import { updateUserProfileData } from '../../services/userService';
+import { NOTIFICATIONS_BADGE_MAX_COUNT, NOTIFICATIONS_TITLE } from '../../constants/notifications';
 
 import BottomSheetHandle from '../BottomSheetHandle/BottomSheetHandle';
 
 import './AccountMenu.css';
 
-const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, className = '', isBottomSheet = false }) => {
+const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, onNotificationsClick, className = '', isBottomSheet = false }) => {
 	const { loggedInUser, jwtToken, updateLoggedInUser } = useContext(LoggedInUserContext);
+	const { unreadCount } = useContext(NotificationsContext);
 	const menuRef = useRef(null);
 	const bottomSheetDragProps = useBottomSheetDrag(onClose);
 
@@ -61,6 +64,13 @@ const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, cl
 		onChangePasswordClick();
 	};
 
+	const notificationsClickHandler = () => {
+		onClose();
+		onNotificationsClick();
+	};
+
+	const unreadBadgeLabel = unreadCount > NOTIFICATIONS_BADGE_MAX_COUNT ? `${NOTIFICATIONS_BADGE_MAX_COUNT}+` : unreadCount;
+
 	return (
 		<div className={`account-menu ${className}`.trim()} ref={menuRef} {...(isBottomSheet ? bottomSheetDragProps : {})}>
 			{isBottomSheet ? <BottomSheetHandle /> : null}
@@ -68,6 +78,12 @@ const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, cl
 			<Link to={`/user/${loggedInUser._id}`} className='account-menu-row' onClick={onClose}>
 				<span>Profile</span>
 			</Link>
+
+			<button type='button' className='account-menu-row' onClick={notificationsClickHandler}>
+				<span>{NOTIFICATIONS_TITLE}</span>
+
+				{unreadCount > 0 ? <span className='account-menu-badge'>{unreadBadgeLabel}</span> : null}
+			</button>
 
 			<button type='button' className='account-menu-row' onClick={toggleTheme} aria-pressed={isDark}>
 				<span>Dark mode</span>

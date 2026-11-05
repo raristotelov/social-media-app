@@ -8,6 +8,7 @@ const StoryModel = require('../models/storyModel');
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const objectIdFromDate = require('../utils/objectIdFromDate');
+const notificationService = require('../services/notificationService');
 const config = require('./demoConfig');
 const { createPhotoLookup, createCaptionPicker, planPostEngagement, pickWeighted } = require('./contentPlanning');
 const { loadDemoData } = require('./loadDemoData');
@@ -275,6 +276,7 @@ const runSignUpFollows = async (context, hourStart, random) => {
 		if (persona) {
 			await UserModel.updateOne({ _id: signUp._id }, { $addToSet: { followers: persona.userId } });
 			await UserModel.updateOne({ _id: persona.userId }, { $addToSet: { following: signUp._id } });
+			await notificationService.notifyFollow({ actorId: persona.userId, recipientId: signUp._id });
 		}
 	}
 };
@@ -340,6 +342,7 @@ const removePost = async (userPostId) => {
 	await CommentModel.deleteMany({ $or: [{ userPostId }, { parentCommentId: { $in: topLevelIds } }] });
 	await DemoScheduledEventModel.deleteMany({ userPostId });
 	await UserPostModel.deleteOne({ _id: userPostId });
+	await notificationService.removeNotificationsForPosts({ userPostIds: [userPostId] });
 };
 
 const applyRollingWindow = async (context, now) => {

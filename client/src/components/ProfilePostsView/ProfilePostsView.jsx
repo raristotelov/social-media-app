@@ -1,8 +1,9 @@
-import { useCallback, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useCallback, useEffect, useRef } from 'react';
+import { useLocation, useOutletContext } from 'react-router-dom';
 
 import useGoBackOrTo from '../../hooks/useGoBackOrTo';
 import usePostHashSync from '../../hooks/usePostHashSync';
+import { NOTIFICATION_TARGET_STATE_KEY } from '../../constants/notifications';
 
 import PostsBar from '../PostsBar/PostsBar';
 import UserPost from '../UserPost/UserPost';
@@ -13,8 +14,26 @@ const ProfilePostsView = () => {
 	const { userData, userPosts, setUserPosts, isLoggedInUserProfile, onEditPostClick, onDeletePostClick } = useOutletContext();
 
 	const postsListRef = useRef(null);
+	const scrolledNotificationTargetRef = useRef(null);
 
 	usePostHashSync(postsListRef);
+
+	const { state: locationState } = useLocation();
+	const notificationTarget = locationState?.[NOTIFICATION_TARGET_STATE_KEY];
+
+	useEffect(() => {
+		if (!notificationTarget || scrolledNotificationTargetRef.current === notificationTarget) {
+			return;
+		}
+
+		const targetPostElement = document.getElementById(notificationTarget.postId);
+
+		if (targetPostElement) {
+			scrolledNotificationTargetRef.current = notificationTarget;
+
+			targetPostElement.scrollIntoView();
+		}
+	}, [notificationTarget, userPosts]);
 
 	const goBackToProfile = useGoBackOrTo(`/user/${userData._id}`);
 
@@ -35,6 +54,9 @@ const ProfilePostsView = () => {
 						key={post._id}
 						userPostData={post}
 						author={userData}
+						commentsOpenRequest={
+							notificationTarget?.shouldOpenComments && notificationTarget.postId === post._id ? notificationTarget : null
+						}
 						showActions={isLoggedInUserProfile}
 						onEditClick={onEditPostClick}
 						onDeleteClick={onDeletePostClick}

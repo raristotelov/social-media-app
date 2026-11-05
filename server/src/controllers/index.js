@@ -4,6 +4,7 @@ const commentController = require('./commentController');
 const storyController = require('./storyController');
 const suggestionController = require('./suggestionController');
 const demoActivityController = require('./demoActivityController');
+const notificationController = require('./notificationController');
 
 module.exports = {
 	userController,
@@ -12,4 +13,5 @@ module.exports = {
 	storyController,
 	suggestionController,
 	demoActivityController,
+	notificationController,
 };

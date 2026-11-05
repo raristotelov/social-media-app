@@ -84,3 +84,4 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Followers / following / story viewers / likes popup (inline) (#13, #5) | Couldn't load this list · Try again |
 | Popular (full page) (#3) | Couldn't load popular posts / Check your connection and try again. / Retry |
 | Popular and feed, next batch (inline), shared (#3, #17) | Couldn't load more posts · Try again |
+| Notifications list, next batch (inline) (#53) | Couldn't load more notifications · Try again |

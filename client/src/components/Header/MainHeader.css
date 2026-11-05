@@ -180,6 +180,8 @@
 }
 
 .logged-user-avatar {
+	position: relative;
+
 	display: flex;
 	align-items: center;
 	gap: 10px;
@@ -207,7 +209,12 @@
 	border: 0.5px solid var(--border-divider);
 }
 
-.logged-user-avatar span {
+.logged-user-avatar .logged-user-unread-dot {
+	top: 0;
+	left: 27px;
+}
+
+.logged-user-avatar span:not(.unread-dot) {
 	font-family: 'Mada';
 	color: var(--text-primary);
 	font-weight: bold;

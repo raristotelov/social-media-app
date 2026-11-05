@@ -7,6 +7,7 @@ const CommentModel = require('../models/commentModel');
 const DemoAccountStateModel = require('../models/demoAccountStateModel');
 const DemoActivityRunModel = require('../models/demoActivityRunModel');
 const DemoScheduledEventModel = require('../models/demoScheduledEventModel');
+const NotificationModel = require('../models/notificationModel');
 const StoryModel = require('../models/storyModel');
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
@@ -106,6 +107,7 @@ const startDatabase = async () => {
 		StoryModel.init(),
 		DemoAccountStateModel.init(),
 		DemoScheduledEventModel.init(),
+		NotificationModel.init(),
 	]);
 
 	return server;
@@ -125,6 +127,7 @@ const clearDatabase = () =>
 		DemoAccountStateModel.deleteMany({}),
 		DemoScheduledEventModel.deleteMany({}),
 		DemoActivityRunModel.deleteMany({}),
+		NotificationModel.deleteMany({}),
 	]);
 
 const seedDatabase = async (fixture, seedNow) => {

@@ -2,16 +2,19 @@ import { useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
+import NotificationsContext from '../../contexts/NotificationsContext';
 import { POPULAR_POSTS_PATH, POPULAR_POSTS_VIEW_PATH } from '../../constants/popularPosts';
 
 import FlameIcon from '../icons/Flame';
 import HouseIcon from '../icons/House';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
+import UnreadDot from '../UnreadDot/UnreadDot';
 
 import './TabBar.css';
 
 const TabBar = () => {
 	const { loggedInUser } = useContext(LoggedInUserContext);
+	const { unreadCount } = useContext(NotificationsContext);
 	const { pathname } = useLocation();
 
 	const itemClasses = (path, extraClass, additionalActivePaths = []) => {
@@ -46,7 +49,11 @@ const TabBar = () => {
 				</Link>
 
 				<Link to={profilePath} className={itemClasses(profilePath)}>
-					<ProfilePicture className='tab-bar-avatar' imageUrl={loggedInUser.profilePicture?.imageUrl} />
+					<span className='tab-bar-avatar-wrapper'>
+						<ProfilePicture className='tab-bar-avatar' imageUrl={loggedInUser.profilePicture?.imageUrl} />
+
+						{unreadCount > 0 ? <UnreadDot className='tab-bar-unread-dot' /> : null}
+					</span>
 
 					<span className='tab-bar-label'>Profile</span>
 				</Link>

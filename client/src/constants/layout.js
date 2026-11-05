@@ -7,3 +7,5 @@ export const HEADER_HEIGHT_CSS_VARIABLE = '--header-height';
 export const TAB_BAR_HEIGHT_CSS_VARIABLE = '--tab-bar-height';
 
 export const LOAD_MORE_DISTANCE_PX = 800;
+
+export const LIST_LOAD_MORE_DISTANCE_PX = 200;

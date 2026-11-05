@@ -13,6 +13,7 @@ const { createDemoVisitor } = require('../demo/createDemoVisitor');
 const { reactToSignUp } = require('../demo/userReactions');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
+const notificationService = require('./notificationService');
 const { USER_ROW_PROJECTION, getUserRowsInOrder } = require('./userRowService');
 const { assertUserNotHidden, createPostVisibility, getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
 
@@ -429,6 +430,8 @@ const followUser = async (userId, userIdToFollow) => {
 
 		await UserModel.updateOne({ _id: userIdToFollow }, { $addToSet: { followers: userId } }, { new: true });
 
+		await notificationService.notifyFollow({ actorId: userId, recipientId: userIdToFollow });
+
 		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser, hiddenVisitorIds);
 
 		return updatedUserData;
@@ -452,6 +455,8 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 		const currentlyLoggedUser = await UserModel.findOneAndUpdate({ _id: userId }, { $pull: { following: userIdToUnfollow } }, { new: true });
 
 		await UserModel.updateOne({ _id: userIdToUnfollow }, { $pull: { followers: userId } }, { new: true });
+
+		await notificationService.removeFollowNotification({ actorId: userId, recipientId: userIdToUnfollow });
 
 		const updatedUserData = getNeccessaryUserData(currentlyLoggedUser, hiddenVisitorIds);
 
