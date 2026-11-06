@@ -22,7 +22,7 @@ const mongoose = UserModel.base;
 const testEmailPattern = new RegExp(`^${TEST_EMAIL_PREFIX.replace('+', '\\+')}.*${TEST_EMAIL_DOMAIN.replace('.', '\\.')}$`);
 
 const loadServerEnv = () => {
-	require('dotenv').config({ path: path.join(SERVER_ROOT, '.env') });
+	require('dotenv').config({ path: path.join(SERVER_ROOT, '.env'), quiet: true });
 };
 
 const getConnectionString = () => {
