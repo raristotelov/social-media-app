@@ -37,7 +37,7 @@ const ProfileView = () => {
 
 	const { userData, setUserData, userPosts, setUserPosts, isLoggedInUserProfile, profileRequestCount, onEditPostClick, onDeletePostClick } =
 		useOutletContext();
-	const { jwtToken, loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
+	const { loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 	const { endSessionIfUnauthenticated, runWithSessionGuard } = useSessionGuard();
 	const redirectToLogin = useLoginRedirect();
@@ -82,7 +82,6 @@ const ProfileView = () => {
 
 			const updatedUserData = await updateUserProfileData({
 				userId,
-				jwtToken,
 				updatedProfileData,
 			});
 
@@ -137,7 +136,6 @@ const ProfileView = () => {
 			() =>
 				followUser({
 					userId: loggedInUser?._id,
-					jwtToken,
 					userIdToFollow,
 				}),
 			ACTION_FALLBACK_MESSAGES.FOLLOW_USER,
@@ -150,7 +148,6 @@ const ProfileView = () => {
 			() =>
 				unfollowUser({
 					userId: loggedInUser?._id,
-					jwtToken,
 					userIdToUnfollow,
 				}),
 			ACTION_FALLBACK_MESSAGES.UNFOLLOW_USER,

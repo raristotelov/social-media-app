@@ -3,6 +3,7 @@ module.exports = {
 	DUPLICATE_KEY_ERROR_CODE: 11000,
 	SHARED_IMAGE_PREFIXES: ['demo-users/visitor-avatars/'],
 	JWT_EXPIRY: 12 * 60 * 60,
+	AUTH_COOKIE_NAME: 'sessionToken',
 	SALT_ROUNDS: 10,
 	MIN_PASSWORD_LENGTH: 8,
 	// bcrypt only uses the first 72 bytes of a password and truncates the rest silently

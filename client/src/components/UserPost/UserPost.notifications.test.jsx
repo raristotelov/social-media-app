@@ -27,7 +27,7 @@ const post = {
 };
 
 const buildTree = (commentsOpenRequest) => (
-	<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, endSession: jest.fn() }}>
+	<LoggedInUserContext.Provider value={{ loggedInUser, endSession: jest.fn() }}>
 		<ToastProvider>
 			<MemoryRouter>
 				<UserPost userPostData={post} author={author} commentsOpenRequest={commentsOpenRequest} onPostChange={jest.fn()} />

@@ -1,6 +1,13 @@
 const { defineConfig } = require('cypress');
 
-const { cleanTestUsers, deleteTestUser, deleteDemoVisitor, getCloudinaryFolder, cloudinaryAssetExists } = require('./cypress/support/testUsersDb');
+const {
+	cleanTestUsers,
+	deleteTestUser,
+	deleteDemoVisitor,
+	getCloudinaryFolder,
+	cloudinaryAssetExists,
+	signExpiredSessionToken,
+} = require('./cypress/support/testUsersDb');
 
 module.exports = defineConfig({
 	e2e: {
@@ -19,6 +26,7 @@ module.exports = defineConfig({
 				// Resolves true if the public id exists in Cloudinary, false if it is gone.
 				cloudinaryAssetExists,
 				deleteDemoVisitor,
+				signExpiredSessionToken,
 			});
 		},
 	},

@@ -69,7 +69,7 @@ const getRenderedPostIds = () => Array.from(document.querySelectorAll('article.u
 
 const renderFeed = () =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={['/user-feed']}>
 					<FeedView />
@@ -124,7 +124,7 @@ describe('FeedView infinite scroll', () => {
 
 		await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2));
 
-		expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'token123', cursor: 'cursor-1' });
+		expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ cursor: 'cursor-1' });
 	});
 
 	it('shows the next page below the first one, in order, with no post twice', async () => {
@@ -154,7 +154,7 @@ describe('FeedView infinite scroll', () => {
 		await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
 
 		expect(getFollowedUsersPosts).toHaveBeenCalledTimes(3);
-		expect(getFollowedUsersPosts.mock.calls.map(([arguments_]) => arguments_.cursor)).toEqual([undefined, 'c1', 'c2']);
+		expect(getFollowedUsersPosts.mock.calls.map(([arguments_]) => arguments_?.cursor)).toEqual([undefined, 'c1', 'c2']);
 		expect(getRenderedPostIds()).toEqual(['p6', 'p5', 'p4', 'p3', 'p2', 'p1']);
 	});
 
@@ -257,7 +257,7 @@ describe('FeedView infinite scroll', () => {
 			await waitFor(() => expect(getRenderedPostIds()).toEqual(['p3', 'p2']));
 
 			expect(document.querySelector('.load-more-error')).not.toBeInTheDocument();
-			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'token123', cursor: 'c1' });
+			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ cursor: 'c1' });
 		});
 	});
 

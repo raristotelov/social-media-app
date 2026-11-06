@@ -9,16 +9,11 @@ import { isUnauthenticatedError } from '../../utils/errors';
 const NotificationsProvider = ({ children }) => {
 	const [unreadCount, setUnreadCount] = useState(0);
 
-	const { jwtToken, loggedInUser, endSession } = useContext(LoggedInUserContext);
+	const { loggedInUser, endSession } = useContext(LoggedInUserContext);
 
-	const jwtTokenRef = useRef(jwtToken);
 	const clearCountRef = useRef(0);
 
-	const isLoggedIn = Boolean(jwtToken && loggedInUser);
-
-	useEffect(() => {
-		jwtTokenRef.current = jwtToken;
-	}, [jwtToken]);
+	const isLoggedIn = Boolean(loggedInUser);
 
 	useEffect(() => {
 		if (!isLoggedIn) {
@@ -34,7 +29,7 @@ const NotificationsProvider = ({ children }) => {
 			const clearCountAtRequestStart = clearCountRef.current;
 
 			try {
-				const { count } = await getUnreadNotificationCount({ jwtToken: jwtTokenRef.current });
+				const { count } = await getUnreadNotificationCount();
 
 				if (isActive && clearCountAtRequestStart === clearCountRef.current) {
 					setUnreadCount(count);

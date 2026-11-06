@@ -33,13 +33,12 @@ const renderPopup = ({
 	userPostId,
 	commentId,
 	listType = 'followers',
-	jwtToken = 'token123',
 	onClose = jest.fn(),
 	onAccountClick,
 	endSession = jest.fn(),
 } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken, loggedInUser, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>
 			<MemoryRouter initialEntries={['/user/owner']}>
 				<UserListPopup
 					userId={userId}
@@ -85,7 +84,7 @@ describe('UserListPopup', () => {
 			await screen.findByText('janedoe');
 
 			expect(getFollowers).toHaveBeenCalledTimes(1);
-			expect(getFollowers).toHaveBeenCalledWith({ userId: 'owner', jwtToken: 'token123' });
+			expect(getFollowers).toHaveBeenCalledWith({ userId: 'owner' });
 			expect(getFollowing).not.toHaveBeenCalled();
 		});
 
@@ -95,7 +94,7 @@ describe('UserListPopup', () => {
 			await screen.findByText('followedone');
 
 			expect(getFollowing).toHaveBeenCalledTimes(1);
-			expect(getFollowing).toHaveBeenCalledWith({ userId: 'owner', jwtToken: 'token123' });
+			expect(getFollowing).toHaveBeenCalledWith({ userId: 'owner' });
 			expect(getFollowers).not.toHaveBeenCalled();
 		});
 	});
@@ -115,13 +114,13 @@ describe('UserListPopup', () => {
 			await screen.findByText('alice');
 		});
 
-		it('loads the viewers of the given story with the token', async () => {
+		it('loads the viewers of the given story', async () => {
 			renderPopup({ listType: 'viewers', storyId: 'story1' });
 
 			await screen.findByText('alice');
 
 			expect(getStoryViewers).toHaveBeenCalledTimes(1);
-			expect(getStoryViewers).toHaveBeenCalledWith(expect.objectContaining({ storyId: 'story1', jwtToken: 'token123' }));
+			expect(getStoryViewers).toHaveBeenCalledWith(expect.objectContaining({ storyId: 'story1' }));
 			expect(getFollowers).not.toHaveBeenCalled();
 			expect(getFollowing).not.toHaveBeenCalled();
 		});
@@ -212,13 +211,13 @@ describe('UserListPopup', () => {
 			await screen.findByText('newestliker');
 		});
 
-		it('loads the likes of the given id with the token, and nothing else', async () => {
+		it('loads the likes of the given id, and nothing else', async () => {
 			renderLikes();
 
 			await screen.findByText('newestliker');
 
 			expect(loadLikes).toHaveBeenCalledTimes(1);
-			expect(loadLikes).toHaveBeenCalledWith(expect.objectContaining({ [idKey]: idValue, jwtToken: 'token123' }));
+			expect(loadLikes).toHaveBeenCalledWith(expect.objectContaining({ [idKey]: idValue }));
 			expect(otherLoadLikes).not.toHaveBeenCalled();
 			expect(getFollowers).not.toHaveBeenCalled();
 			expect(getFollowing).not.toHaveBeenCalled();
@@ -262,10 +261,10 @@ describe('UserListPopup', () => {
 		});
 
 		it('is open to guests', async () => {
-			renderLikes({ loggedInUser: null, jwtToken: null });
+			renderLikes({ loggedInUser: null });
 
 			expect(await screen.findByText('newestliker')).toBeInTheDocument();
-			expect(loadLikes).toHaveBeenCalledWith(expect.objectContaining({ [idKey]: idValue, jwtToken: null }));
+			expect(loadLikes).toHaveBeenCalledWith(expect.objectContaining({ [idKey]: idValue }));
 		});
 
 		it('shows the inline error with a Try again button when the likes fail to load', async () => {

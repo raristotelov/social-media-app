@@ -50,7 +50,7 @@ const renderSuggestions = async ({ placement = 'sidebar', options, serverResult 
 	getSuggestions.mockResolvedValue(serverResult);
 
 	const wrapper = ({ children }) => (
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser, endSession }}>
 			<ToastProvider>{children}</ToastProvider>
 		</LoggedInUserContext.Provider>
 	);
@@ -66,8 +66,8 @@ const renderSuggestions = async ({ placement = 'sidebar', options, serverResult 
 describe('useSuggestions', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
-		followUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
-		unfollowUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		followUser.mockResolvedValue({ user: loggedInUser });
+		unfollowUser.mockResolvedValue({ user: loggedInUser });
 		dismissSuggestionsCarousel.mockResolvedValue(undefined);
 	});
 
@@ -81,11 +81,11 @@ describe('useSuggestions', () => {
 			expect(result.current.followedIds).toEqual([]);
 		});
 
-		it('requests the placement with the token', async () => {
+		it('requests the placement, without passing a token', async () => {
 			await renderSuggestions({ placement: 'carousel' });
 
 			expect(getSuggestions).toHaveBeenCalledTimes(1);
-			expect(getSuggestions).toHaveBeenCalledWith({ placement: 'carousel', jwtToken: 'token123' });
+			expect(getSuggestions).toHaveBeenCalledWith({ placement: 'carousel' });
 		});
 
 		it('exposes the suggestions once loaded', async () => {
@@ -108,7 +108,7 @@ describe('useSuggestions', () => {
 			const updateLoggedInUser = jest.fn();
 			const endSession = jest.fn();
 			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser, endSession }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser, endSession }}>
 					<ToastProvider>{children}</ToastProvider>
 				</LoggedInUserContext.Provider>
 			);
@@ -127,7 +127,7 @@ describe('useSuggestions', () => {
 			getSuggestions.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const endSession = jest.fn();
 			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
 					<ToastProvider>{children}</ToastProvider>
 				</LoggedInUserContext.Provider>
 			);
@@ -142,7 +142,7 @@ describe('useSuggestions', () => {
 
 			getSuggestions.mockReturnValue(request.promise);
 			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 					<ToastProvider>{children}</ToastProvider>
 				</LoggedInUserContext.Provider>
 			);
@@ -173,7 +173,7 @@ describe('useSuggestions', () => {
 
 			await act(() => result.current.followSuggestion('p1'));
 
-			expect(followUser).toHaveBeenCalledWith({ userId: 'me', jwtToken: 'token123', userIdToFollow: 'p1' });
+			expect(followUser).toHaveBeenCalledWith({ userId: 'me', userIdToFollow: 'p1' });
 		});
 
 		it('fills the gap with the first spare suggestion, keeping the list size', async () => {
@@ -300,7 +300,7 @@ describe('useSuggestions', () => {
 
 			expect(followUser).toHaveBeenCalledTimes(1);
 
-			await act(async () => request.resolve({ user: loggedInUser, jwt: 'j' }));
+			await act(async () => request.resolve({ user: loggedInUser }));
 		});
 
 		it('can follow two different users at once', async () => {
@@ -386,7 +386,7 @@ describe('useSuggestions', () => {
 			});
 
 			expect(result.current.followedIds).toEqual([]);
-			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'me', jwtToken: 'token123', userIdToUnfollow: 'p1' });
+			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'me', userIdToUnfollow: 'p1' });
 			expect(getIds(result)).toEqual(['p1', 'p2', 'n1']);
 		});
 
@@ -455,12 +455,12 @@ describe('useSuggestions', () => {
 			expect(result.current.isCarouselDismissed).toBe(true);
 		});
 
-		it('tells the server with the token', async () => {
+		it('tells the server, without passing a token', async () => {
 			const { result } = await renderSuggestions({ placement: 'carousel' });
 
 			await act(() => result.current.dismissCarousel());
 
-			expect(dismissSuggestionsCarousel).toHaveBeenCalledWith({ jwtToken: 'token123' });
+			expect(dismissSuggestionsCarousel).toHaveBeenCalledWith();
 		});
 
 		it('stays dismissed, with no toast, when the request fails', async () => {
@@ -488,7 +488,7 @@ describe('useSuggestions', () => {
 		it('loads again for the new placement and drops the previous list', async () => {
 			getSuggestions.mockResolvedValue(buildResult());
 			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 					<ToastProvider>{children}</ToastProvider>
 				</LoggedInUserContext.Provider>
 			);
@@ -503,7 +503,7 @@ describe('useSuggestions', () => {
 			rerender({ placement: 'carousel' });
 
 			await waitFor(() => expect(getIds(result)).toEqual(['x1']));
-			expect(getSuggestions).toHaveBeenLastCalledWith({ placement: 'carousel', jwtToken: 'token123' });
+			expect(getSuggestions).toHaveBeenLastCalledWith({ placement: 'carousel' });
 		});
 	});
 });

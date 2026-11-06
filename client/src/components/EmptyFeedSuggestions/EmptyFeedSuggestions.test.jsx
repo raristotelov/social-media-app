@@ -27,7 +27,7 @@ const renderList = ({ result = { suggestions, reserve: [], isCarouselDismissed: 
 	getSuggestions.mockResolvedValue(result);
 
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<EmptyFeedSuggestions onFollowChange={onFollowChange} />
@@ -42,8 +42,8 @@ const renderList = ({ result = { suggestions, reserve: [], isCarouselDismissed: 
 describe('EmptyFeedSuggestions', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
-		followUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
-		unfollowUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		followUser.mockResolvedValue({ user: loggedInUser });
+		unfollowUser.mockResolvedValue({ user: loggedInUser });
 	});
 
 	it('requests the empty-feed placement', async () => {
@@ -51,7 +51,7 @@ describe('EmptyFeedSuggestions', () => {
 
 		await screen.findByRole('region', { name: 'Suggested for you' });
 
-		expect(getSuggestions).toHaveBeenCalledWith({ placement: 'empty-feed', jwtToken: 'token123' });
+		expect(getSuggestions).toHaveBeenCalledWith({ placement: 'empty-feed' });
 	});
 
 	it('lists all 8 suggestions with a primary Follow button each', async () => {
@@ -89,7 +89,7 @@ describe('EmptyFeedSuggestions', () => {
 		getSuggestions.mockReturnValue(new Promise(() => {}));
 
 		render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<EmptyFeedSuggestions />
@@ -105,7 +105,7 @@ describe('EmptyFeedSuggestions', () => {
 		getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
 		render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<EmptyFeedSuggestions />
@@ -147,7 +147,7 @@ describe('EmptyFeedSuggestions', () => {
 
 			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
-			await waitFor(() => expect(followUser).toHaveBeenCalledWith({ userId: 'me', jwtToken: 'token123', userIdToFollow: 'p1' }));
+			await waitFor(() => expect(followUser).toHaveBeenCalledWith({ userId: 'me', userIdToFollow: 'p1' }));
 		});
 
 		it('tells the feed to reload its posts once the follow succeeded', async () => {
@@ -214,7 +214,7 @@ describe('EmptyFeedSuggestions', () => {
 
 			userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
-			await waitFor(() => expect(unfollowUser).toHaveBeenCalledWith({ userId: 'me', jwtToken: 'token123', userIdToUnfollow: 'p1' }));
+			await waitFor(() => expect(unfollowUser).toHaveBeenCalledWith({ userId: 'me', userIdToUnfollow: 'p1' }));
 		});
 
 		it('tells the feed to reload its posts once the unfollow succeeded', async () => {

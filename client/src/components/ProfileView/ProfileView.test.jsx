@@ -46,7 +46,7 @@ const renderProfileView = (loggedInUser) => {
 	getUsersProfileData.mockResolvedValue([profileUser]);
 
 	return render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={['/user/user2']}>
 					<Routes>
@@ -85,7 +85,7 @@ describe('ProfileView', () => {
 
 		userEvent.click(screen.getByRole('button', { name: 'Follow' }));
 
-		await waitFor(() => expect(followUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToFollow: 'user2' }));
+		await waitFor(() => expect(followUser).toHaveBeenCalledWith({ userId: 'user1', userIdToFollow: 'user2' }));
 	});
 });
 
@@ -101,7 +101,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 		getUsersProfileData.mockResolvedValue([{ ...profileUser, posts, ...profile }]);
 
 		const rendered = render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser, endSession }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser, endSession }}>
 				<ToastProvider>
 					<MemoryRouter initialEntries={['/user/user2']}>
 						<Routes>
@@ -270,7 +270,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 			submitUpload();
 
-			await waitFor(() => expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Third caption' }, 'token123'));
+			await waitFor(() => expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Third caption' }));
 			expect(resizeImage).toHaveBeenCalledTimes(1);
 			expect(resizeImage).toHaveBeenCalledWith(chosenFile);
 		});
@@ -443,7 +443,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			openDeleteConfirmForTile(1);
 			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-			await waitFor(() => expect(deleteUserPost).toHaveBeenCalledWith({ userPostId: 'post2', jwtToken: 'token123' }));
+			await waitFor(() => expect(deleteUserPost).toHaveBeenCalledWith({ userPostId: 'post2' }));
 		});
 
 		it('removes only the deleted tile, updates the post count and closes the confirmation on success', async () => {
@@ -639,9 +639,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
 			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-			await waitFor(() =>
-				expect(updateUserPostCaption).toHaveBeenCalledWith({ userPostId: 'post1', caption: 'Edited caption', jwtToken: 'token123' }),
-			);
+			await waitFor(() => expect(updateUserPostCaption).toHaveBeenCalledWith({ userPostId: 'post1', caption: 'Edited caption' }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Picture' })).not.toBeInTheDocument());
 		});
 
@@ -738,7 +736,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('resizes the chosen file and sends the resized file to the server', async () => {
 			const updatedUser = { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] };
 
-			updateUserProfileData.mockResolvedValue({ user: updatedUser, jwt: 'new.jwt' });
+			updateUserProfileData.mockResolvedValue({ user: updatedUser });
 			await renderOwnProfile({ profile });
 
 			chooseProfilePictureAndSubmit();
@@ -746,7 +744,6 @@ describe('ProfileView post actions and profile picture removal', () => {
 			await waitFor(() =>
 				expect(updateUserProfileData).toHaveBeenCalledWith({
 					userId: 'user2',
-					jwtToken: 'token123',
 					updatedProfileData: { profilePicture: resizedFile },
 				}),
 			);
@@ -765,7 +762,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserProfileData.mockImplementation(async () => {
 				callOrder.push('request');
 
-				return { user: { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] }, jwt: 'new.jwt' };
+				return { user: { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] } };
 			});
 			await renderOwnProfile({ profile });
 
@@ -778,17 +775,17 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('refreshes the logged-in user and closes the popup after a successful upload', async () => {
 			const updatedUser = { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] };
 
-			updateUserProfileData.mockResolvedValue({ user: updatedUser, jwt: 'new.jwt' });
+			updateUserProfileData.mockResolvedValue({ user: updatedUser });
 			const { updateLoggedInUser } = await renderOwnProfile({ profile });
 
 			chooseProfilePictureAndSubmit();
 
-			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith({ user: updatedUser, jwt: 'new.jwt' }));
+			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith({ user: updatedUser }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Profile' })).not.toBeInTheDocument());
 		});
 
 		it('does not resize anything when only text fields change', async () => {
-			updateUserProfileData.mockResolvedValue({ user: { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] }, jwt: 'j' });
+			updateUserProfileData.mockResolvedValue({ user: { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] } });
 			await renderOwnProfile({ profile });
 
 			userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
@@ -840,7 +837,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('sends profilePicture: null without uploading anything and refreshes the logged-in user on Save', async () => {
 			const updatedUser = { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] };
 
-			updateUserProfileData.mockResolvedValue({ user: updatedUser, jwt: 'new.jwt' });
+			updateUserProfileData.mockResolvedValue({ user: updatedUser });
 			const { updateLoggedInUser } = await renderOwnProfile({ profile: profileWithPicture });
 
 			openEditProfile();
@@ -850,12 +847,11 @@ describe('ProfileView post actions and profile picture removal', () => {
 			await waitFor(() =>
 				expect(updateUserProfileData).toHaveBeenCalledWith({
 					userId: 'user2',
-					jwtToken: 'token123',
 					updatedProfileData: { profilePicture: null },
 				}),
 			);
 			expect(resizeImage).not.toHaveBeenCalled();
-			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith({ user: updatedUser, jwt: 'new.jwt' }));
+			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith({ user: updatedUser }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Profile' })).not.toBeInTheDocument());
 		});
 
@@ -889,7 +885,7 @@ describe('ProfileView errors', () => {
 
 	const renderProfile = ({ loggedInUser = otherUser, endSession = jest.fn() } = {}) => {
 		const rendered = render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
 				<ToastProvider>
 					<NotFoundProvider>
 						<MemoryRouter initialEntries={['/user/user2']}>
@@ -947,7 +943,7 @@ describe('ProfileView errors', () => {
 
 			expect(await screen.findByText('janedoe')).toBeInTheDocument();
 			expect(getUsersProfileData).toHaveBeenCalledTimes(2);
-			expect(getUsersProfileData).toHaveBeenLastCalledWith({ userIds: ['user2'], jwtToken: 'token123' });
+			expect(getUsersProfileData).toHaveBeenLastCalledWith({ userIds: ['user2'] });
 			expect(screen.queryByRole('heading', { name: "Couldn't load this profile" })).not.toBeInTheDocument();
 		});
 
@@ -1145,7 +1141,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 		getUsersProfileData.mockResolvedValue([profileData]);
 
 		render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser, endSession }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser, endSession }}>
 				<ToastProvider>
 					<MemoryRouter initialEntries={['/user/user2']}>
 						<Routes>
@@ -1186,12 +1182,12 @@ describe('ProfileView optimistic follow and unfollow', () => {
 
 			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
 
-			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToFollow: 'user2' });
+			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', userIdToFollow: 'user2' });
 			expect(followUser).toHaveBeenCalledTimes(1);
 		});
 
 		it('refreshes the logged-in user with the server response once the request succeeds', async () => {
-			const serverResponse = { user: { ...viewer, following: ['user2'] }, jwt: 'new.jwt' };
+			const serverResponse = { user: { ...viewer, following: ['user2'] } };
 
 			followUser.mockResolvedValue(serverResponse);
 			const { updateLoggedInUser } = await renderProfile();
@@ -1204,7 +1200,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 		});
 
 		it('does not refetch the profile after clicking Follow', async () => {
-			followUser.mockResolvedValue({ user: viewerFollowingProfile, jwt: 'new.jwt' });
+			followUser.mockResolvedValue({ user: viewerFollowingProfile });
 			const { updateLoggedInUser } = await renderProfile();
 
 			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
@@ -1228,9 +1224,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 		});
 
 		it('lets the user follow again after a failure', async () => {
-			followUser
-				.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 })
-				.mockResolvedValueOnce({ user: viewerFollowingProfile, jwt: 'j' });
+			followUser.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce({ user: viewerFollowingProfile });
 			const { updateLoggedInUser } = await renderProfile();
 
 			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
@@ -1282,7 +1276,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 
 			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
 
-			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToUnfollow: 'user2' });
+			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', userIdToUnfollow: 'user2' });
 		});
 
 		it('reverts to Unfollow with the old count and shows the unfollow toast when the request fails', async () => {
@@ -1324,8 +1318,8 @@ describe('ProfileView optimistic follow and unfollow', () => {
 		it('ignores the response of an earlier click that returns after a later one', async () => {
 			const followRequest = buildDeferred();
 			const unfollowRequest = buildDeferred();
-			const followResponse = { user: { ...viewer, following: ['user2'] }, jwt: 'follow.jwt' };
-			const unfollowResponse = { user: { ...viewer, following: [] }, jwt: 'unfollow.jwt' };
+			const followResponse = { user: { ...viewer, following: ['user2'] } };
+			const unfollowResponse = { user: { ...viewer, following: [] } };
 
 			followUser.mockReturnValue(followRequest.promise);
 			unfollowUser.mockReturnValue(unfollowRequest.promise);
@@ -1365,7 +1359,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 		it('ignores a stale response that returns before the latest one', async () => {
 			const followRequest = buildDeferred();
 			const unfollowRequest = buildDeferred();
-			const unfollowResponse = { user: { ...viewer, following: [] }, jwt: 'unfollow.jwt' };
+			const unfollowResponse = { user: { ...viewer, following: [] } };
 
 			followUser.mockReturnValue(followRequest.promise);
 			unfollowUser.mockReturnValue(unfollowRequest.promise);
@@ -1374,7 +1368,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
 			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
 
-			followRequest.resolve({ user: { ...viewer, following: ['user2'] }, jwt: 'follow.jwt' });
+			followRequest.resolve({ user: { ...viewer, following: ['user2'] } });
 			await followRequest.promise;
 
 			expect(updateLoggedInUser).not.toHaveBeenCalled();
@@ -1413,7 +1407,7 @@ describe('ProfileView followers and following popup', () => {
 		getFollowing.mockResolvedValue(followingRows);
 
 		render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 				<ToastProvider>
 					<MemoryRouter initialEntries={['/user/user2']}>
 						<Routes>
@@ -1448,7 +1442,7 @@ describe('ProfileView followers and following popup', () => {
 		expect(screen.getByRole('heading', { name: 'Followers' })).toBeInTheDocument();
 		expect(await screen.findByText('firstfollower')).toBeInTheDocument();
 		expect(screen.getByText('secondfollower')).toBeInTheDocument();
-		expect(getFollowers).toHaveBeenCalledWith({ userId: 'user2', jwtToken: 'token123' });
+		expect(getFollowers).toHaveBeenCalledWith({ userId: 'user2' });
 		expect(getFollowing).not.toHaveBeenCalled();
 	});
 
@@ -1459,7 +1453,7 @@ describe('ProfileView followers and following popup', () => {
 
 		expect(screen.getByRole('heading', { name: 'Following' })).toBeInTheDocument();
 		expect(await screen.findByText('followedone')).toBeInTheDocument();
-		expect(getFollowing).toHaveBeenCalledWith({ userId: 'user2', jwtToken: 'token123' });
+		expect(getFollowing).toHaveBeenCalledWith({ userId: 'user2' });
 		expect(getFollowers).not.toHaveBeenCalled();
 	});
 
@@ -1496,7 +1490,7 @@ describe('ProfileView followers and following popup', () => {
 
 		expect(screen.queryByRole('heading', { name: 'Followers' })).not.toBeInTheDocument();
 		await waitFor(() => expect(document.querySelector('.username')).toHaveTextContent('secondfollower'));
-		expect(getUsersProfileData).toHaveBeenCalledWith({ userIds: ['follower2'], jwtToken: 'token123' });
+		expect(getUsersProfileData).toHaveBeenCalledWith({ userIds: ['follower2'] });
 	});
 
 	it('shows the rows in the order the server returned, with the logged-in user first', async () => {
@@ -1519,7 +1513,7 @@ describe('ProfileView followers and following popup', () => {
 		userEvent.click(screen.getByRole('button', { name: '3 followers' }));
 
 		await screen.findByText('firstfollower');
-		expect(getFollowers).toHaveBeenCalledWith({ userId: 'user2', jwtToken: 'token123' });
+		expect(getFollowers).toHaveBeenCalledWith({ userId: 'user2' });
 	});
 
 	it('shows the retry state in the popup when the list fails to load, keeping the profile visible', async () => {

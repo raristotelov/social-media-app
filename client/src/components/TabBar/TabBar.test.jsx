@@ -10,7 +10,7 @@ const member = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderTabBarAt = (path, user = member) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user }}>
 			<MemoryRouter initialEntries={[path]}>
 				<TabBar />
 			</MemoryRouter>

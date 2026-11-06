@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, getProfileViaApi } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession, getProfileViaApi } from '../../support/api';
 
 const FIXTURE_IMAGE = 'cypress/fixtures/test-image.png';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -9,7 +9,7 @@ const FALLBACK_MESSAGE = "Couldn't upload the picture. Try again.";
 
 describe('post upload errors', () => {
 	let user;
-	let jwtToken;
+	let session;
 	let userId;
 	let profilePath;
 
@@ -37,9 +37,9 @@ describe('post upload errors', () => {
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 			profilePath = `/user/${userId}`;
 		});
 	});
@@ -51,7 +51,7 @@ describe('post upload errors', () => {
 	describe('choosing a file in the browser', () => {
 		beforeEach(() => {
 			cy.intercept('POST', '**/user-posts').as('uploadRequest');
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 			openUploadPopup();
 		});
 
@@ -120,7 +120,7 @@ describe('post upload errors', () => {
 
 		it('shows the size message under the picture for a 413 and keeps the popup open', () => {
 			stubUpload(413, { code: 'IMAGE_TOO_LARGE', message: 'image: IMAGE_TOO_LARGE', fields: { image: 'IMAGE_TOO_LARGE' } });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@uploadRequest');
@@ -133,7 +133,7 @@ describe('post upload errors', () => {
 
 		it('shows the type message under the picture for a 400 IMAGE_TYPE_INVALID', () => {
 			stubUpload(400, { code: 'IMAGE_TYPE_INVALID', message: 'image: IMAGE_TYPE_INVALID', fields: { image: 'IMAGE_TYPE_INVALID' } });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@uploadRequest');
@@ -144,7 +144,7 @@ describe('post upload errors', () => {
 
 		it('shows the fallback message and keeps the popup open for a 500', () => {
 			stubUpload(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@uploadRequest');
@@ -158,7 +158,7 @@ describe('post upload errors', () => {
 
 		it('shows the fallback message when the network fails', () => {
 			cy.intercept('POST', '**/user-posts', { forceNetworkError: true }).as('uploadRequest');
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 
@@ -168,7 +168,7 @@ describe('post upload errors', () => {
 
 		it('never shows the developer message from the server', () => {
 			stubUpload(500, { code: 'INTERNAL_ERROR', message: 'Could not upload image cypress_secret_detail' });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@uploadRequest');
@@ -179,7 +179,7 @@ describe('post upload errors', () => {
 
 		it('lets the user submit again after a failure', () => {
 			stubUpload(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@uploadRequest');
@@ -190,7 +190,7 @@ describe('post upload errors', () => {
 
 		it('ends the session and sends the user to /log-in for UNAUTHENTICATED', () => {
 			stubUpload(401, { code: 'UNAUTHENTICATED', message: 'Invalid or expired token' });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@uploadRequest');
@@ -209,7 +209,7 @@ describe('post upload errors', () => {
 
 		beforeEach(() => {
 			stubSlowUpload();
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 			openUploadPopup();
 			fileInput().selectFile(FIXTURE_IMAGE, { force: true });
 		});
@@ -253,7 +253,7 @@ describe('post upload errors', () => {
 	describe('at narrow widths', () => {
 		it('shows the picture error inside the popup at 300px without horizontal scrolling', () => {
 			cy.viewport(300, 700);
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 			openUploadPopup();
 
 			fileInput().selectFile(

@@ -27,7 +27,7 @@ const renderFollowActions = () => {
 	const updateLoggedInUser = jest.fn();
 	const endSession = jest.fn();
 	const wrapper = ({ children }) => (
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser, endSession }}>
 			<ToastProvider>{children}</ToastProvider>
 		</LoggedInUserContext.Provider>
 	);
@@ -42,17 +42,17 @@ describe('useFollowActions', () => {
 	});
 
 	describe('follow', () => {
-		it('sends the follow request with the logged-in user, the token and the target', async () => {
-			followUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		it('sends the follow request with the logged-in user and the target, and no token', async () => {
+			followUser.mockResolvedValue({ user: loggedInUser });
 			const { result } = renderFollowActions();
 
 			await act(() => result.current.follow('user2'));
 
-			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToFollow: 'user2' });
+			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', userIdToFollow: 'user2' });
 		});
 
 		it('resolves true and refreshes the logged-in user with the server response', async () => {
-			const response = { user: { ...loggedInUser, following: ['user2'] }, jwt: 'new.jwt' };
+			const response = { user: { ...loggedInUser, following: ['user2'] } };
 
 			followUser.mockResolvedValue(response);
 			const { result, updateLoggedInUser } = renderFollowActions();
@@ -108,17 +108,17 @@ describe('useFollowActions', () => {
 	});
 
 	describe('unfollow', () => {
-		it('sends the unfollow request with the logged-in user, the token and the target', async () => {
-			unfollowUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		it('sends the unfollow request with the logged-in user and the target, and no token', async () => {
+			unfollowUser.mockResolvedValue({ user: loggedInUser });
 			const { result } = renderFollowActions();
 
 			await act(() => result.current.unfollow('user2'));
 
-			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToUnfollow: 'user2' });
+			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', userIdToUnfollow: 'user2' });
 		});
 
 		it('resolves true and refreshes the logged-in user with the server response', async () => {
-			const response = { user: loggedInUser, jwt: 'new.jwt' };
+			const response = { user: loggedInUser };
 
 			unfollowUser.mockResolvedValue(response);
 			const { result, updateLoggedInUser } = renderFollowActions();
@@ -162,8 +162,8 @@ describe('useFollowActions', () => {
 		it('ignores the response of an earlier request that returns after a later one', async () => {
 			const first = buildDeferred();
 			const second = buildDeferred();
-			const firstResponse = { user: { ...loggedInUser, following: ['user2'] }, jwt: 'first.jwt' };
-			const secondResponse = { user: { ...loggedInUser, following: ['user2', 'user3'] }, jwt: 'second.jwt' };
+			const firstResponse = { user: { ...loggedInUser, following: ['user2'] } };
+			const secondResponse = { user: { ...loggedInUser, following: ['user2', 'user3'] } };
 
 			followUser.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
 			const { result, updateLoggedInUser } = renderFollowActions();

@@ -61,6 +61,12 @@ const buildVisitorData = () => ({
 	genericComments: GENERIC_COMMENTS,
 });
 
+const readSessionCookie = (response) => response.headers.getSetCookie().find((cookie) => cookie.startsWith(`${constants.AUTH_COOKIE_NAME}=`));
+
+const readSessionToken = (response) => readSessionCookie(response)?.split(';')[0].split('=')[1];
+
+const authHeaders = (token) => ({ Cookie: `${constants.AUTH_COOKIE_NAME}=${token}` });
+
 let nextIpSuffix = 1;
 
 const nextIp = () => {
@@ -76,8 +82,6 @@ describe('POST /users/demo-login against a real database', () => {
 	let originalJwtSecret;
 
 	const demoLogin = (ip = nextIp()) => fetch(`${baseUrl}/users/demo-login`, { method: 'POST', headers: { 'X-Forwarded-For': ip } });
-
-	const authHeaders = (token) => ({ 'X-Authorization': token });
 
 	beforeAll(async () => {
 		originalJwtSecret = process.env.JWT_SECRET;
@@ -114,6 +118,7 @@ describe('POST /users/demo-login against a real database', () => {
 		let firstToken;
 		let secondToken;
 		let firstResponse;
+		let firstBody;
 
 		beforeAll(async () => {
 			await seedDatabase(fixture, SEED_NOW);
@@ -134,17 +139,33 @@ describe('POST /users/demo-login against a real database', () => {
 			scheduleReactions.mockReset();
 
 			firstResponse = await demoLogin();
-			firstToken = await firstResponse.clone().json();
-			secondToken = await (await demoLogin()).json();
+			firstBody = await firstResponse.clone().json();
+			firstToken = readSessionToken(firstResponse);
+			secondToken = readSessionToken(await demoLogin());
 		});
 
 		it('should answer 200 without any form, credentials or body', () => {
 			expect(firstResponse.status).toBe(200);
 		});
 
-		it('should answer with a token and nothing else', () => {
+		it('should hand the token over only in the session cookie', () => {
 			expect(typeof firstToken).toBe('string');
 			expect(firstToken.split('.')).toHaveLength(3);
+		});
+
+		it('should set the session cookie httpOnly, same-site lax and for the token lifetime', () => {
+			const cookie = readSessionCookie(firstResponse);
+
+			expect(cookie).toContain('HttpOnly');
+			expect(cookie).toContain('SameSite=Lax');
+			expect(cookie).toContain(`Max-Age=${constants.JWT_EXPIRY}`);
+			expect(cookie).not.toContain('Secure');
+		});
+
+		it('should answer with the visitor profile and no token', () => {
+			expect(firstBody.accountType).toBe('demo');
+			expect(JSON.stringify(firstBody)).not.toContain(firstToken);
+			expect(firstBody).not.toHaveProperty('jwt');
 		});
 
 		it('should sign the token the same way a login does, for the new account', async () => {
@@ -201,10 +222,10 @@ describe('POST /users/demo-login against a real database', () => {
 			expect(profile.profilePicture.imageUrl).toContain('visitor-avatars');
 		});
 
-		it('should not hand out any credential: the response is only the token', async () => {
+		it('should not hand out any password in the response', async () => {
 			const text = await (await demoLogin()).text();
 
-			expect(text).not.toMatch(/password|email|@visitor/i);
+			expect(text).not.toMatch(/password/i);
 		});
 	});
 
@@ -242,9 +263,11 @@ describe('POST /users/demo-login against a real database', () => {
 
 		it('hands out no token and creates no account', async () => {
 			const before = await UserModel.countDocuments({ accountType: 'demo' });
-			const text = await (await demoLogin()).text();
+			const response = await demoLogin();
+			const text = await response.text();
 
 			expect(text).not.toMatch(/\.[A-Za-z0-9_-]+\./);
+			expect(readSessionCookie(response)).toBeUndefined();
 			expect(await UserModel.countDocuments({ accountType: 'demo' })).toBe(before);
 		});
 
@@ -285,7 +308,8 @@ describe('POST /users/demo-login against a real database', () => {
 
 	describe('the rate limit of 5 per connection per hour', () => {
 		beforeEach(() => {
-			jest.spyOn(userService, 'demoLogin').mockResolvedValue('a.demo.token');
+			jest.spyOn(userService, 'demoLogin').mockResolvedValue(JWT.sign({ userId: 'a-demo-user-id', username: 'a_demo_1' }, JWT_SECRET));
+			jest.spyOn(userService, 'getCurrentUser').mockResolvedValue({ _id: 'a-demo-user-id', username: 'a_demo_1' });
 		});
 
 		it('should be 5 requests', () => {
@@ -387,7 +411,7 @@ describe('the account type cannot be set by a user, against a real database', ()
 	const signUp = async (username, extra = {}) => {
 		const response = await postJson('/users/sign-up', { email: `${username}@example.com`, username, password: 'a-valid-password', ...extra });
 
-		return { response, token: await response.json() };
+		return { response, token: readSessionToken(response) };
 	};
 
 	const updateProfile = (user, token, fields) => {
@@ -395,7 +419,7 @@ describe('the account type cannot be set by a user, against a real database', ()
 
 		Object.entries(fields).forEach(([name, value]) => form.append(name, value));
 
-		return fetch(`${baseUrl}/users/update/${user._id}`, { method: 'PATCH', headers: { 'X-Authorization': token }, body: form });
+		return fetch(`${baseUrl}/users/update/${user._id}`, { method: 'PATCH', headers: authHeaders(token), body: form });
 	};
 
 	beforeAll(async () => {
@@ -449,7 +473,7 @@ describe('the account type cannot be set by a user, against a real database', ()
 	it('should show the owner the account type user on their own profile', async () => {
 		const { token } = await signUp('loginuser');
 		const stored = await UserModel.findOne({ username: 'loginuser' });
-		const response = await fetch(`${baseUrl}/users?userIds=${stored._id}`, { headers: { 'X-Authorization': token } });
+		const response = await fetch(`${baseUrl}/users?userIds=${stored._id}`, { headers: authHeaders(token) });
 		const [profile] = await response.json();
 
 		expect(profile.accountType).toBe('user');

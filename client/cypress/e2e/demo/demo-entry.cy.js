@@ -1,4 +1,4 @@
-import { userIdFromToken, visitAsUser } from '../../support/api';
+import { AUTH_COOKIE_NAME, visitAsUser } from '../../support/api';
 
 const GUEST_PAGE = '/popular-posts';
 const GUEST_COPY = 'Explore the app without signing up';
@@ -107,9 +107,7 @@ describe('demo entry', () => {
 			cy.contains('.toast-region .toast-message', RATE_LIMIT_MESSAGE).should('be.visible');
 			cy.location('pathname').should('eq', GUEST_PAGE);
 			cy.contains('.demo-strip button', 'Try the demo').should('be.enabled');
-			cy.window().then((win) => {
-				expect(win.localStorage.getItem('jwt-token')).to.equal(null);
-			});
+			cy.getCookie(AUTH_COOKIE_NAME).should('not.exist');
 		});
 
 		it('shows the fallback message in a toast when the server fails', () => {
@@ -153,7 +151,7 @@ describe('demo entry', () => {
 	});
 
 	describe('entering the app as a demo visitor', () => {
-		let visitorToken;
+		let visitorSession;
 		let visitorId;
 		let visitorUsername;
 
@@ -174,9 +172,17 @@ describe('demo entry', () => {
 			cy.wait('@demoLogin').then(({ response }) => {
 				expect(response.statusCode).to.eq(200);
 
-				visitorToken = response.body;
-				visitorId = userIdFromToken(visitorToken);
-				visitorUsername = JSON.parse(atob(visitorToken.split('.')[1])).username;
+				visitorId = response.body._id;
+				visitorUsername = response.body.username;
+
+				expect(response.body.accountType).to.eq('demo');
+				expect(JSON.stringify(response.body)).not.to.match(/"(jwt|token)"/);
+			});
+
+			cy.getCookie(AUTH_COOKIE_NAME).then((cookie) => {
+				expect(cookie.httpOnly).to.eq(true);
+
+				visitorSession = { userId: visitorId, value: cookie.value };
 			});
 
 			cy.location('pathname').should('eq', '/user-feed');
@@ -188,7 +194,7 @@ describe('demo entry', () => {
 		});
 
 		it('replaces the invitation with the demo account notice', () => {
-			visitAsUser('/user-feed', visitorToken);
+			visitAsUser('/user-feed', visitorSession);
 
 			cy.contains('.demo-strip', NOTICE_LEAD).should('be.visible');
 			cy.contains('.demo-strip', 'It and everything you post will be deleted within 24 hours.').should('be.visible');
@@ -197,7 +203,7 @@ describe('demo entry', () => {
 		});
 
 		it('opens the own profile with the starter posts and the edit button', () => {
-			visitAsUser(`/user/${visitorId}`, visitorToken);
+			visitAsUser(`/user/${visitorId}`, visitorSession);
 
 			cy.contains('.profile-header .username', visitorUsername).should('be.visible');
 			cy.contains('.profile-action button', 'Edit Profile').should('be.visible');
@@ -205,7 +211,7 @@ describe('demo entry', () => {
 		});
 
 		it('hides the notice with the close button and keeps it hidden after a reload, while staying logged in', () => {
-			visitAsUser('/user-feed', visitorToken);
+			visitAsUser('/user-feed', visitorSession);
 
 			cy.get('.demo-strip-close').click();
 
@@ -221,7 +227,7 @@ describe('demo entry', () => {
 
 		it('shows the shorter notice at 390', () => {
 			cy.viewport(390, 844);
-			visitAsUser('/user-feed', visitorToken);
+			visitAsUser('/user-feed', visitorSession);
 
 			cy.contains('.demo-strip', 'Demo account').should('be.visible');
 			cy.contains('.demo-strip', '· deleted within 24 hours').should('be.visible');

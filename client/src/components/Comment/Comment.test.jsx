@@ -50,7 +50,7 @@ const renderComment = ({
 	endSession = jest.fn(),
 } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={[entry]}>
 					<Comment comment={comment} userPostId='post1' onReload={onReload} onCloseComments={onCloseComments} />
@@ -168,7 +168,7 @@ describe('Comment', () => {
 			expect(await screen.findByText('newestliker')).toBeInTheDocument();
 			expect(screen.getByText('olderliker')).toBeInTheDocument();
 			expect(getCommentLikes).toHaveBeenCalledTimes(1);
-			expect(getCommentLikes).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'c1', jwtToken: 'token123' }));
+			expect(getCommentLikes).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'c1' }));
 		});
 
 		it('does not toggle the like when the count is clicked', async () => {
@@ -416,7 +416,7 @@ describe('Comment', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
-			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1', jwtToken: 'token123' });
+			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1' });
 			expect(unlikeComment).not.toHaveBeenCalled();
 		});
 
@@ -468,7 +468,7 @@ describe('Comment', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Unlike comment' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
-			expect(unlikeComment).toHaveBeenCalledWith({ commentId: 'c1', jwtToken: 'token123' });
+			expect(unlikeComment).toHaveBeenCalledWith({ commentId: 'c1' });
 			expect(likeComment).not.toHaveBeenCalled();
 		});
 
@@ -575,7 +575,7 @@ describe('Comment', () => {
 			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
-			expect(likeComment).toHaveBeenCalledWith({ commentId: 'r1', jwtToken: 'token123' });
+			expect(likeComment).toHaveBeenCalledWith({ commentId: 'r1' });
 		});
 	});
 
@@ -689,7 +689,6 @@ describe('Comment', () => {
 					text: '@alice Thanks',
 					parentCommentId: 'c1',
 					mentionedUserId: 'user3',
-					jwtToken: 'token123',
 				}),
 			);
 		});
@@ -709,7 +708,6 @@ describe('Comment', () => {
 					text: '@bob Agreed',
 					parentCommentId: 'c1',
 					mentionedUserId: 'user4',
-					jwtToken: 'token123',
 				}),
 			);
 		});
@@ -745,7 +743,6 @@ describe('Comment', () => {
 					text: 'Thanks',
 					parentCommentId: 'c1',
 					mentionedUserId: null,
-					jwtToken: 'token123',
 				}),
 			);
 		});

@@ -1,6 +1,5 @@
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 
-import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { addUserPost } from '../../services/userPostService';
 import { addStory } from '../../services/storyService';
@@ -17,14 +16,13 @@ const CREATE_MODE_ORDER = Object.freeze([CREATE_MODES.POST, CREATE_MODES.STORY])
 const CreatePopup = ({ initialMode = CREATE_MODES.POST, onClose, onPostAdded, onStoryAdded }) => {
 	const [mode, setMode] = useState(initialMode);
 
-	const { jwtToken } = useContext(LoggedInUserContext);
 	const { runWithSessionGuard } = useSessionGuard();
 
 	const submitPost = (image, caption) =>
 		runWithSessionGuard(async () => {
 			const resizedImage = await resizeImage(image);
 
-			const savedUserPost = await addUserPost({ image: resizedImage, caption }, jwtToken);
+			const savedUserPost = await addUserPost({ image: resizedImage, caption });
 
 			onPostAdded?.(savedUserPost);
 
@@ -35,7 +33,7 @@ const CreatePopup = ({ initialMode = CREATE_MODES.POST, onClose, onPostAdded, on
 		runWithSessionGuard(async () => {
 			const resizedImage = await resizeImage(image);
 
-			const savedStory = await addStory({ image: resizedImage }, jwtToken);
+			const savedStory = await addStory({ image: resizedImage });
 
 			onStoryAdded?.(savedStory);
 

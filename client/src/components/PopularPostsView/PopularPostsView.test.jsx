@@ -64,9 +64,7 @@ const memberUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderPopular = ({ entries = ['/popular-posts'], user = memberUser } = {}) =>
 	render(
-		<LoggedInUserContext.Provider
-			value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}
-		>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={entries}>
 					<MainHeader logoutHandler={jest.fn()} />
@@ -317,17 +315,17 @@ describe('PopularPostsView', () => {
 			expect(screen.getByRole('link', { name: 'Popular' })).toHaveClass('navigation-item-active');
 		});
 
-		it('requests the posts with the token for a member and without for a guest', async () => {
+		it('makes the same request for a member and for a guest, with no token passed', async () => {
 			const guest = renderPopular({ user: null });
 
 			await screen.findAllByAltText('user-post');
-			expect(getPopularPosts).toHaveBeenLastCalledWith(expect.objectContaining({ jwtToken: null }));
+			expect(getPopularPosts.mock.calls[0][0]).not.toHaveProperty('jwtToken');
 
 			guest.unmount();
 			renderPopular();
 
 			await screen.findAllByAltText('user-post');
-			expect(getPopularPosts).toHaveBeenLastCalledWith(expect.objectContaining({ jwtToken: 'token123' }));
+			expect(getPopularPosts.mock.calls[1][0]).not.toHaveProperty('jwtToken');
 		});
 	});
 
@@ -356,7 +354,7 @@ describe('PopularPostsView', () => {
 
 			await waitFor(() => expect(getNextPopularPosts).toHaveBeenCalled());
 
-			expect(getNextPopularPosts).toHaveBeenCalledWith({ jwtToken: 'token123', snapshotTime: SNAPSHOT_TIME, shownPostIds: ['p1', 'p2', 'p3'] });
+			expect(getNextPopularPosts).toHaveBeenCalledWith({ snapshotTime: SNAPSHOT_TIME, shownPostIds: ['p1', 'p2', 'p3'] });
 		});
 
 		it('shows a spinner under the grid while the next batch loads', async () => {

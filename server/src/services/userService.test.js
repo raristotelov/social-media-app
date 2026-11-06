@@ -47,6 +47,19 @@ describe('userService', () => {
 		createPostVisibility.mockResolvedValue((post) => post);
 	});
 
+	const givenProfileLookup = (userId, overrides = {}) => {
+		const profile = { _id: userId, username: 'realuser', email: 'realuser@example.com', posts: [], following: [], followers: [], ...overrides };
+
+		UserModel.find = jest.fn().mockReturnValue({
+			select: jest.fn().mockReturnValue({
+				populate: jest.fn().mockResolvedValue([{ _id: userId, posts: [], toObject: () => ({ ...profile }) }]),
+			}),
+		});
+		commentService.getPreviewCommentsForPosts.mockResolvedValue({});
+
+		return profile;
+	};
+
 	describe('login', () => {
 		it('rejects with a 401 when no user matches the given email', async () => {
 			UserModel.findOne = jest.fn().mockResolvedValue(null);
@@ -117,20 +130,89 @@ describe('userService', () => {
 			expect(wrongPasswordError.fields).toBeUndefined();
 		});
 
-		it('resolves with a signed JWT when the email and password are both correct', async () => {
-			const dbUser = { _id: 'user1', username: 'realuser', password: 'hashedPassword' };
+		describe('when the email and password are both correct', () => {
+			const USER_ID = '64b7f0a1c2d3e4f5a6b7c8f1';
+			const dbUser = { _id: USER_ID, username: 'realuser', password: 'hashedPassword' };
 
-			UserModel.findOne = jest.fn().mockResolvedValue(dbUser);
-			bcrypt.compare.mockResolvedValue(true);
-			JWT.sign.mockReturnValue('signed.jwt.token');
-
-			const result = await login({ email: 'realuser@example.com', password: 'correctPassword' });
-
-			expect(bcrypt.compare).toHaveBeenCalledWith('correctPassword', 'hashedPassword');
-			expect(JWT.sign).toHaveBeenCalledWith({ userId: 'user1', username: 'realuser' }, process.env.JWT_SECRET, {
-				expiresIn: constants.JWT_EXPIRY,
+			beforeEach(() => {
+				UserModel.findOne = jest.fn().mockResolvedValue(dbUser);
+				bcrypt.compare.mockResolvedValue(true);
+				JWT.sign.mockReturnValue('signed.jwt.token');
 			});
-			expect(result).toBe('signed.jwt.token');
+
+			it('resolves with the current user profile and the signed JWT', async () => {
+				const profile = givenProfileLookup(USER_ID);
+
+				const result = await login({ email: 'realuser@example.com', password: 'correctPassword' });
+
+				expect(result).toEqual({ user: profile, jwt: 'signed.jwt.token' });
+			});
+
+			it('checks the password against the stored hash', async () => {
+				givenProfileLookup(USER_ID);
+
+				await login({ email: 'realuser@example.com', password: 'correctPassword' });
+
+				expect(bcrypt.compare).toHaveBeenCalledWith('correctPassword', 'hashedPassword');
+			});
+
+			it('signs the JWT for the user id and username', async () => {
+				givenProfileLookup(USER_ID);
+
+				await login({ email: 'realuser@example.com', password: 'correctPassword' });
+
+				expect(JWT.sign).toHaveBeenCalledWith({ userId: USER_ID, username: 'realuser' }, process.env.JWT_SECRET, {
+					expiresIn: constants.JWT_EXPIRY,
+				});
+			});
+
+			it('loads the profile as the user themselves, so the email is kept', async () => {
+				givenProfileLookup(USER_ID);
+
+				const { user } = await login({ email: 'realuser@example.com', password: 'correctPassword' });
+
+				expect(user.email).toBe('realuser@example.com');
+			});
+
+			it('rejects with a 401 UNAUTHENTICATED, not a 500, when the user can no longer be loaded', async () => {
+				UserModel.find = jest.fn().mockReturnValue({
+					select: jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue([]) }),
+				});
+
+				await expect(login({ email: 'realuser@example.com', password: 'correctPassword' })).rejects.toMatchObject({
+					statusCode: 401,
+					code: ERROR_CODES.UNAUTHENTICATED,
+				});
+			});
+
+			it('passes a failure to load the profile through as the 500 it already is', async () => {
+				const dbError = new Error('connection lost');
+
+				UserModel.find = jest.fn().mockImplementation(() => {
+					throw dbError;
+				});
+
+				await expect(login({ email: 'realuser@example.com', password: 'correctPassword' })).rejects.toMatchObject({
+					statusCode: 500,
+					message: 'Could not load users profile data',
+					cause: dbError,
+				});
+			});
+
+			it('wraps a non-AppError raised while starting the session in a 500 "Could not log in"', async () => {
+				const signError = new Error('secretOrPrivateKey must have a value');
+
+				givenProfileLookup(USER_ID);
+				JWT.sign.mockImplementation(() => {
+					throw signError;
+				});
+
+				await expect(login({ email: 'realuser@example.com', password: 'correctPassword' })).rejects.toMatchObject({
+					statusCode: 500,
+					message: 'Could not log in',
+					cause: signError,
+				});
+			});
 		});
 
 		it('wraps an unexpected error (e.g. a database failure) in a 500 AppError', async () => {
@@ -301,16 +383,19 @@ describe('userService', () => {
 	});
 
 	describe('signUp', () => {
+		const NEW_USER_ID = '64b7f0a1c2d3e4f5a6b7c8f2';
+
 		const buildUserModelMock = (saveImplementation) => {
 			UserModel.mockImplementation(function UserModelMock(data) {
 				Object.assign(this, data);
-				this._id = 'mockUserId';
+				this._id = NEW_USER_ID;
 				this.save = saveImplementation;
 			});
 		};
 
 		beforeEach(() => {
 			bcrypt.hash.mockResolvedValue('hashedPassword123');
+			givenProfileLookup(NEW_USER_ID, { username: 'newuser', email: 'a@b.com' });
 		});
 
 		it('throws a 400 when the password is shorter than MIN_PASSWORD_LENGTH', async () => {
@@ -352,15 +437,84 @@ describe('userService', () => {
 			expect(bcrypt.hash).not.toHaveBeenCalled();
 		});
 
-		it('returns a signed JWT so the client can log the new user straight in', async () => {
+		it('returns the current user profile and a signed JWT so the client can log the new user straight in', async () => {
 			buildUserModelMock(jest.fn().mockResolvedValue(undefined));
 			JWT.sign.mockReturnValue('signed.jwt.token');
+			const profile = givenProfileLookup(NEW_USER_ID, { username: 'newuser', email: 'a@b.com' });
 
 			const result = await signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' });
 
-			expect(result).toBe('signed.jwt.token');
-			expect(JWT.sign).toHaveBeenCalledWith({ userId: 'mockUserId', username: 'newuser' }, process.env.JWT_SECRET, {
+			expect(result).toEqual({ user: profile, jwt: 'signed.jwt.token' });
+		});
+
+		it('signs the JWT for the new user id and username', async () => {
+			buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+			JWT.sign.mockReturnValue('signed.jwt.token');
+
+			await signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' });
+
+			expect(JWT.sign).toHaveBeenCalledWith({ userId: NEW_USER_ID, username: 'newuser' }, process.env.JWT_SECRET, {
 				expiresIn: constants.JWT_EXPIRY,
+			});
+		});
+
+		it('returns a profile that carries the email, since it is the new user themselves', async () => {
+			buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+			JWT.sign.mockReturnValue('signed.jwt.token');
+
+			const { user } = await signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' });
+
+			expect(user.email).toBe('a@b.com');
+		});
+
+		it('returns a response with no token string on the user', async () => {
+			buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+			JWT.sign.mockReturnValue('signed.jwt.token');
+
+			const { user } = await signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' });
+
+			expect(JSON.stringify(user)).not.toContain('signed.jwt.token');
+		});
+
+		it('passes a failure to load the new profile through as the 500 it already is', async () => {
+			const dbError = new Error('connection lost');
+
+			buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+			UserModel.find = jest.fn().mockImplementation(() => {
+				throw dbError;
+			});
+
+			await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' })).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not load users profile data',
+				cause: dbError,
+			});
+		});
+
+		it('wraps a non-AppError raised while starting the session in a 500 "Could not sign up"', async () => {
+			const signError = new Error('secretOrPrivateKey must have a value');
+
+			buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+			JWT.sign.mockImplementation(() => {
+				throw signError;
+			});
+
+			await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' })).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not sign up',
+				cause: signError,
+			});
+		});
+
+		it('rejects with a 401 UNAUTHENTICATED when the saved user cannot be loaded back', async () => {
+			buildUserModelMock(jest.fn().mockResolvedValue(undefined));
+			UserModel.find = jest.fn().mockReturnValue({
+				select: jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue([]) }),
+			});
+
+			await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' })).rejects.toMatchObject({
+				statusCode: 401,
+				code: ERROR_CODES.UNAUTHENTICATED,
 			});
 		});
 
@@ -1672,12 +1826,21 @@ describe('userService', () => {
 			consoleErrorSpy.mockRestore();
 		});
 
-		it('creates a visitor and returns a JWT signed for that visitor, the same way a login does', async () => {
+		it('creates a visitor and returns their current user profile and a JWT signed for that visitor', async () => {
 			createDemoVisitor.mockResolvedValue(VISITOR);
+			const profile = givenProfileLookup(VISITOR._id, { username: VISITOR.username });
 
 			const result = await demoLogin();
 
-			expect(result).toBe('visitor.jwt.token');
+			expect(result).toEqual({ user: profile, jwt: 'visitor.jwt.token' });
+		});
+
+		it('signs the JWT for the visitor id and username, the same way a login does', async () => {
+			createDemoVisitor.mockResolvedValue(VISITOR);
+			givenProfileLookup(VISITOR._id, { username: VISITOR.username });
+
+			await demoLogin();
+
 			expect(JWT.sign).toHaveBeenCalledWith({ userId: VISITOR._id, username: VISITOR.username }, process.env.JWT_SECRET, {
 				expiresIn: constants.JWT_EXPIRY,
 			});
@@ -1685,6 +1848,7 @@ describe('userService', () => {
 
 		it('takes no credentials', async () => {
 			createDemoVisitor.mockResolvedValue(VISITOR);
+			givenProfileLookup(VISITOR._id);
 
 			await demoLogin();
 
@@ -1692,17 +1856,65 @@ describe('userService', () => {
 		});
 
 		it('creates a new visitor on every call', async () => {
-			createDemoVisitor.mockResolvedValueOnce(VISITOR).mockResolvedValueOnce({ _id: '64b7f0a1c2d3e4f5a6b7c9a2', username: 'mary_demo_9' });
+			const SECOND_VISITOR = { _id: '64b7f0a1c2d3e4f5a6b7c9a2', username: 'mary_demo_9' };
+
+			createDemoVisitor.mockResolvedValueOnce(VISITOR).mockResolvedValueOnce(SECOND_VISITOR);
+			givenProfileLookup(VISITOR._id);
 
 			await demoLogin();
+			givenProfileLookup(SECOND_VISITOR._id);
 			await demoLogin();
 
 			expect(createDemoVisitor).toHaveBeenCalledTimes(2);
 			expect(JWT.sign.mock.calls[0][0].userId).not.toBe(JWT.sign.mock.calls[1][0].userId);
 		});
 
+		it('passes a failure to load the visitor profile through as the 500 it already is', async () => {
+			const dbError = new Error('connection lost');
+
+			createDemoVisitor.mockResolvedValue(VISITOR);
+			UserModel.find = jest.fn().mockImplementation(() => {
+				throw dbError;
+			});
+
+			await expect(demoLogin()).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not load users profile data',
+				cause: dbError,
+			});
+		});
+
+		it('wraps a non-AppError raised while starting the session in a 500 "Could not start the demo"', async () => {
+			const signError = new Error('secretOrPrivateKey must have a value');
+
+			createDemoVisitor.mockResolvedValue(VISITOR);
+			givenProfileLookup(VISITOR._id);
+			JWT.sign.mockImplementation(() => {
+				throw signError;
+			});
+
+			await expect(demoLogin()).rejects.toMatchObject({
+				statusCode: 500,
+				message: 'Could not start the demo',
+				cause: signError,
+			});
+		});
+
+		it('rejects with a 401 UNAUTHENTICATED when the new visitor cannot be loaded back', async () => {
+			createDemoVisitor.mockResolvedValue(VISITOR);
+			UserModel.find = jest.fn().mockReturnValue({
+				select: jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue([]) }),
+			});
+
+			await expect(demoLogin()).rejects.toMatchObject({
+				statusCode: 401,
+				code: ERROR_CODES.UNAUTHENTICATED,
+			});
+		});
+
 		it('does not look anything up by email or password', async () => {
 			createDemoVisitor.mockResolvedValue(VISITOR);
+			givenProfileLookup(VISITOR._id);
 			UserModel.findOne = jest.fn();
 
 			await demoLogin();
@@ -1750,6 +1962,7 @@ describe('userService', () => {
 		beforeEach(() => {
 			bcrypt.hash.mockResolvedValue('hashedPassword123');
 			JWT.sign.mockReturnValue('signed.jwt.token');
+			givenProfileLookup(USER_ID);
 		});
 
 		describe('signing up', () => {
@@ -1787,7 +2000,9 @@ describe('userService', () => {
 				buildUserModelMock(jest.fn().mockResolvedValue(undefined));
 				reactToSignUp.mockReturnValue(new Promise(() => {}));
 
-				await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' })).resolves.toBe('signed.jwt.token');
+				await expect(signUp({ email: 'a@b.com', username: 'newuser', password: 'validPassword1' })).resolves.toMatchObject({
+					jwt: 'signed.jwt.token',
+				});
 			});
 		});
 

@@ -3,7 +3,7 @@ import {
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	followUserViaApi,
 	searchUsersViaApi,
 	uploadProfilePictureViaApi,
@@ -13,7 +13,7 @@ describe('user search', () => {
 	const user = buildTestUser();
 	const searchedUser = buildTestUser();
 
-	let jwtToken;
+	let session;
 	let ownProfilePath;
 	let searchedUserId;
 	let searchedProfilePath;
@@ -23,21 +23,21 @@ describe('user search', () => {
 		createUserViaApi(user);
 
 		createUserViaApi(searchedUser).then((response) => {
-			searchedUserId = userIdFromToken(response.body);
+			searchedUserId = response.body._id;
 			searchedProfilePath = `/user/${searchedUserId}`;
 		});
 
 		loginViaApi(searchedUser)
-			.then((token) => uploadProfilePictureViaApi(token))
+			.then((searchedSession) => uploadProfilePictureViaApi(searchedSession))
 			.then((picture) => {
 				searchedPictureUrl = picture.imageUrl;
 			});
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			ownProfilePath = `/user/${userIdFromToken(token)}`;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			ownProfilePath = `/user/${userIdFromSession(loggedInSession)}`;
 
-			followUserViaApi(token, searchedUserId);
+			followUserViaApi(loggedInSession, searchedUserId);
 		});
 	});
 
@@ -48,7 +48,7 @@ describe('user search', () => {
 
 	it('shows matching users in the header dropdown and opens the one you pick', () => {
 		cy.viewport(1440, 900);
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser(ownProfilePath, session);
 
 		cy.get('.search-input').type(searchedUser.username);
 
@@ -60,7 +60,7 @@ describe('user search', () => {
 
 	it('shows the designed result row with the real follower count on desktop', () => {
 		cy.viewport(1440, 900);
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser(ownProfilePath, session);
 
 		cy.get('.search-input').type(searchedUser.username);
 
@@ -72,7 +72,7 @@ describe('user search', () => {
 
 	it('shows the designed result row with the real follower count on tablet', () => {
 		cy.viewport(768, 1024);
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser(ownProfilePath, session);
 
 		cy.get('.search-input').type(searchedUser.username);
 
@@ -83,7 +83,7 @@ describe('user search', () => {
 
 	it('shows the real follower count in the mobile result row', () => {
 		cy.viewport(390, 844);
-		visitAsUser('/user-feed', jwtToken);
+		visitAsUser('/user-feed', session);
 
 		cy.get('.mobile-top-bar-action[aria-label="Search"]').click();
 		cy.get('.mobile-search-field').type(searchedUser.username);
@@ -93,7 +93,7 @@ describe('user search', () => {
 
 	it("shows the user's profile picture as the avatar in the desktop dropdown row", () => {
 		cy.viewport(1440, 900);
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser(ownProfilePath, session);
 
 		cy.get('.search-input').type(searchedUser.username);
 
@@ -105,7 +105,7 @@ describe('user search', () => {
 
 	it('shows the placeholder avatar for a user without a profile picture', () => {
 		cy.viewport(1440, 900);
-		visitAsUser(searchedProfilePath, jwtToken);
+		visitAsUser(searchedProfilePath, session);
 
 		cy.get('.search-input').type(user.username);
 
@@ -117,7 +117,7 @@ describe('user search', () => {
 
 	it("shows the user's profile picture as the avatar in the mobile result row", () => {
 		cy.viewport(390, 844);
-		visitAsUser('/user-feed', jwtToken);
+		visitAsUser('/user-feed', session);
 
 		cy.get('.mobile-top-bar-action[aria-label="Search"]').click();
 		cy.get('.mobile-search-field').type(searchedUser.username);
@@ -146,7 +146,7 @@ describe('user search', () => {
 
 	it('expands the field from the magnifier on mobile and opens a result', () => {
 		cy.viewport(390, 844);
-		visitAsUser('/user-feed', jwtToken);
+		visitAsUser('/user-feed', session);
 
 		cy.get('.mobile-search-field').should('not.exist');
 
@@ -161,7 +161,7 @@ describe('user search', () => {
 
 	it('closes the mobile search when Cancel is clicked', () => {
 		cy.viewport(390, 844);
-		visitAsUser('/user-feed', jwtToken);
+		visitAsUser('/user-feed', session);
 
 		cy.get('.mobile-top-bar-action[aria-label="Search"]').click();
 		cy.get('.mobile-search-field').should('be.visible');

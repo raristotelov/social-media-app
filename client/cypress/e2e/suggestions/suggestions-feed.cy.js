@@ -8,7 +8,7 @@ import {
 	getFollowingViaApi,
 	getSuggestionsViaApi,
 	dismissSuggestionsCarouselViaApi,
-	userIdFromToken,
+	userIdFromSession,
 } from '../../support/api';
 
 const SIDEBAR_SELECTOR = '.suggestions-sidebar';
@@ -53,18 +53,18 @@ describe('follow suggestions on the feed', () => {
 		carouselPostsViewer,
 	];
 
-	const tokens = {};
+	const sessions = {};
 
 	const createAccount = (user) => {
 		createUserViaApi(user);
-		loginViaApi(user).then((token) => {
-			tokens[user.username] = token;
+		loginViaApi(user).then((session) => {
+			sessions[user.username] = session;
 		});
 	};
 
-	const tokenOf = (user) => tokens[user.username];
+	const sessionOf = (user) => sessions[user.username];
 
-	const idOf = (user) => userIdFromToken(tokenOf(user));
+	const idOf = (user) => userIdFromSession(sessionOf(user));
 
 	const sidebarRow = (user) => cy.contains(`${SIDEBAR_SELECTOR} .suggested-user`, user.username);
 
@@ -76,21 +76,21 @@ describe('follow suggestions on the feed', () => {
 		targets.forEach(createAccount);
 		viewers.forEach(createAccount);
 
-		cy.then(() => uploadPostViaApi(tokenOf(author), 'post the suggestions sit beside'));
-		cy.then(() => uploadPostViaApi(tokenOf(firstTarget), TARGET_POST_CAPTION));
+		cy.then(() => uploadPostViaApi(sessionOf(author), 'post the suggestions sit beside'));
+		cy.then(() => uploadPostViaApi(sessionOf(firstTarget), TARGET_POST_CAPTION));
 
 		cy.then(() => {
-			targets.forEach((target) => followUserViaApi(tokenOf(author), idOf(target)));
-			viewers.forEach((viewer) => followUserViaApi(tokenOf(viewer), idOf(author)));
-			viewers.forEach((viewer) => followUserViaApi(tokenOf(viewer), idOf(coAuthor)));
-			followUserViaApi(tokenOf(coAuthor), idOf(author));
-			followUserViaApi(tokenOf(coAuthor), idOf(firstTarget));
-			followUserViaApi(tokenOf(fifthTarget), idOf(secondTarget));
-			followUserViaApi(tokenOf(sixthTarget), idOf(secondTarget));
-			followUserViaApi(tokenOf(seventhTarget), idOf(secondTarget));
-			followUserViaApi(tokenOf(fifthTarget), idOf(thirdTarget));
-			followUserViaApi(tokenOf(sixthTarget), idOf(thirdTarget));
-			followUserViaApi(tokenOf(fifthTarget), idOf(fourthTarget));
+			targets.forEach((target) => followUserViaApi(sessionOf(author), idOf(target)));
+			viewers.forEach((viewer) => followUserViaApi(sessionOf(viewer), idOf(author)));
+			viewers.forEach((viewer) => followUserViaApi(sessionOf(viewer), idOf(coAuthor)));
+			followUserViaApi(sessionOf(coAuthor), idOf(author));
+			followUserViaApi(sessionOf(coAuthor), idOf(firstTarget));
+			followUserViaApi(sessionOf(fifthTarget), idOf(secondTarget));
+			followUserViaApi(sessionOf(sixthTarget), idOf(secondTarget));
+			followUserViaApi(sessionOf(seventhTarget), idOf(secondTarget));
+			followUserViaApi(sessionOf(fifthTarget), idOf(thirdTarget));
+			followUserViaApi(sessionOf(sixthTarget), idOf(thirdTarget));
+			followUserViaApi(sessionOf(fifthTarget), idOf(fourthTarget));
 		});
 	});
 
@@ -101,7 +101,7 @@ describe('follow suggestions on the feed', () => {
 	describe('the desktop sidebar', () => {
 		it('lists the two top mutual suggestions beside the feed, each with who follows them', () => {
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(readerViewer));
+			visitAsUser('/user-feed', sessionOf(readerViewer));
 
 			cy.get(SIDEBAR_SELECTOR).should('be.visible');
 			cy.contains(`${SIDEBAR_SELECTOR} h2`, 'Suggested for you').should('be.visible');
@@ -115,7 +115,7 @@ describe('follow suggestions on the feed', () => {
 
 		it('shows no carousel on desktop', () => {
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(readerViewer));
+			visitAsUser('/user-feed', sessionOf(readerViewer));
 
 			cy.get(SIDEBAR_SELECTOR).should('be.visible');
 			cy.get(CAROUSEL_SELECTOR).should('not.exist');
@@ -123,7 +123,7 @@ describe('follow suggestions on the feed', () => {
 
 		it('sits beside the posts, not above them', () => {
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(readerViewer));
+			visitAsUser('/user-feed', sessionOf(readerViewer));
 
 			cy.get('.user-post').should('be.visible');
 			cy.get(SIDEBAR_SELECTOR).then(($sidebar) => {
@@ -137,7 +137,7 @@ describe('follow suggestions on the feed', () => {
 
 		it('opens the profile from the username', () => {
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(readerViewer));
+			visitAsUser('/user-feed', sessionOf(readerViewer));
 
 			sidebarRow(secondTarget).find('a').first().click();
 
@@ -146,7 +146,7 @@ describe('follow suggestions on the feed', () => {
 
 		it('removes a followed user and fills the gap with the next mutual suggestion', () => {
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(sidebarViewer));
+			visitAsUser('/user-feed', sessionOf(sidebarViewer));
 
 			sidebarRow(firstTarget).find('button').click();
 
@@ -158,14 +158,14 @@ describe('follow suggestions on the feed', () => {
 				.should('contain.text', `Followed by ${author.username}`)
 				.and('not.contain.text', firstTarget.username);
 
-			cy.then(() => getFollowingViaApi(idOf(sidebarViewer), tokenOf(sidebarViewer))).then((following) => {
+			cy.then(() => getFollowingViaApi(idOf(sidebarViewer), sessionOf(sidebarViewer))).then((following) => {
 				expect(following.map((user) => user.username)).to.include(firstTarget.username);
 			});
 		});
 
 		it("does not add the followed user's post to the feed until the page is reloaded", () => {
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(sidebarPostsViewer));
+			visitAsUser('/user-feed', sessionOf(sidebarPostsViewer));
 
 			cy.get('.user-post').should('have.length', 1);
 			sidebarRow(firstTarget).find('button').click();
@@ -182,7 +182,7 @@ describe('follow suggestions on the feed', () => {
 		it('keeps the followed user out of the sidebar after a reload', () => {
 			cy.viewport(1440, 900);
 			cy.intercept('POST', '**/users/*/follow/*').as('follow');
-			visitAsUser('/user-feed', tokenOf(reloadViewer));
+			visitAsUser('/user-feed', sessionOf(reloadViewer));
 
 			sidebarRow(firstTarget).find('button').click();
 			cy.wait('@follow');
@@ -199,7 +199,7 @@ describe('follow suggestions on the feed', () => {
 			cy.intercept('POST', '**/users/*/follow/*', { statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }).as(
 				'failingFollow',
 			);
-			visitAsUser('/user-feed', tokenOf(failingViewer));
+			visitAsUser('/user-feed', sessionOf(failingViewer));
 
 			sidebarRow(firstTarget).find('button').click();
 
@@ -212,7 +212,7 @@ describe('follow suggestions on the feed', () => {
 	describe('the carousel on tablet and mobile', () => {
 		it('sits after the last post when there are fewer than 5, with the top mutual suggestions as cards', () => {
 			cy.viewport(768, 1024);
-			visitAsUser('/user-feed', tokenOf(readerViewer));
+			visitAsUser('/user-feed', sessionOf(readerViewer));
 
 			cy.get(CAROUSEL_SELECTOR).should('be.visible');
 			cy.contains(`${CAROUSEL_SELECTOR} h2`, 'Suggested for you').should('be.visible');
@@ -229,7 +229,7 @@ describe('follow suggestions on the feed', () => {
 
 		it('shows no sidebar on tablet', () => {
 			cy.viewport(768, 1024);
-			visitAsUser('/user-feed', tokenOf(readerViewer));
+			visitAsUser('/user-feed', sessionOf(readerViewer));
 
 			cy.get(CAROUSEL_SELECTOR).should('be.visible');
 			cy.get(SIDEBAR_SELECTOR).should('not.exist');
@@ -237,14 +237,14 @@ describe('follow suggestions on the feed', () => {
 
 		it('shows Follow as a filled button on each card', () => {
 			cy.viewport(390, 844);
-			visitAsUser('/user-feed', tokenOf(readerViewer));
+			visitAsUser('/user-feed', sessionOf(readerViewer));
 
 			carouselCard(firstTarget).find('button').should('have.text', 'Follow').and('not.have.class', 'button-secondary');
 		});
 
 		it('removes a followed card and fills the gap with the next mutual suggestion', () => {
 			cy.viewport(390, 844);
-			visitAsUser('/user-feed', tokenOf(carouselViewer));
+			visitAsUser('/user-feed', sessionOf(carouselViewer));
 
 			carouselCard(firstTarget).find('button').click();
 
@@ -255,7 +255,7 @@ describe('follow suggestions on the feed', () => {
 
 		it("does not add the followed user's post to the feed until the page is reloaded", () => {
 			cy.viewport(390, 844);
-			visitAsUser('/user-feed', tokenOf(carouselPostsViewer));
+			visitAsUser('/user-feed', sessionOf(carouselPostsViewer));
 
 			cy.get('.user-post').should('have.length', 1);
 			carouselCard(firstTarget).find('button').click();
@@ -274,7 +274,7 @@ describe('follow suggestions on the feed', () => {
 			cy.intercept('POST', '**/users/*/follow/*', { statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }).as(
 				'failingFollow',
 			);
-			visitAsUser('/user-feed', tokenOf(failingViewer));
+			visitAsUser('/user-feed', sessionOf(failingViewer));
 
 			carouselCard(firstTarget).find('button').click();
 
@@ -286,7 +286,7 @@ describe('follow suggestions on the feed', () => {
 		it('is dismissed with the ✕, stays hidden after a reload and is remembered by the server', () => {
 			cy.viewport(390, 844);
 			cy.intercept({ method: 'GET', pathname: '/suggestions', query: { placement: 'carousel' } }).as('carouselRequest');
-			visitAsUser('/user-feed', tokenOf(dismissViewer));
+			visitAsUser('/user-feed', sessionOf(dismissViewer));
 
 			cy.get(CAROUSEL_SELECTOR).should('be.visible');
 			cy.get(`${CAROUSEL_SELECTOR} .suggestions-carousel-dismiss`).click();
@@ -299,24 +299,24 @@ describe('follow suggestions on the feed', () => {
 			cy.get('.user-post').should('be.visible');
 			cy.get(CAROUSEL_SELECTOR).should('not.exist');
 
-			cy.then(() => getSuggestionsViaApi(tokenOf(dismissViewer), 'carousel')).then((result) => {
+			cy.then(() => getSuggestionsViaApi(sessionOf(dismissViewer), 'carousel')).then((result) => {
 				expect(result.isCarouselDismissed).to.eq(true);
 				expect(result.suggestions).to.have.length(0);
 			});
 		});
 
 		it('stays dismissed at another viewport, while the desktop sidebar is unaffected', () => {
-			cy.then(() => dismissSuggestionsCarouselViaApi(tokenOf(dismissedViewer)));
+			cy.then(() => dismissSuggestionsCarouselViaApi(sessionOf(dismissedViewer)));
 			cy.viewport(768, 1024);
 			cy.intercept({ method: 'GET', pathname: '/suggestions', query: { placement: 'carousel' } }).as('carouselRequest');
-			visitAsUser('/user-feed', tokenOf(dismissedViewer));
+			visitAsUser('/user-feed', sessionOf(dismissedViewer));
 
 			cy.wait('@carouselRequest');
 			cy.get('.user-post').should('be.visible');
 			cy.get(CAROUSEL_SELECTOR).should('not.exist');
 
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', tokenOf(dismissedViewer));
+			visitAsUser('/user-feed', sessionOf(dismissedViewer));
 
 			cy.get(SIDEBAR_SELECTOR).should('be.visible');
 		});
@@ -326,7 +326,7 @@ describe('follow suggestions on the feed', () => {
 		WIDTHS.forEach(([width, height]) => {
 			it(`has no horizontal scroll at ${width}px with the suggestions shown`, () => {
 				cy.viewport(width, height);
-				visitAsUser('/user-feed', tokenOf(readerViewer));
+				visitAsUser('/user-feed', sessionOf(readerViewer));
 
 				cy.get(width >= 1280 ? SIDEBAR_SELECTOR : CAROUSEL_SELECTOR).should('be.visible');
 				expectNoHorizontalScroll();
@@ -335,7 +335,7 @@ describe('follow suggestions on the feed', () => {
 
 		it('keeps every control of the carousel reachable at 300px', () => {
 			cy.viewport(300, 700);
-			visitAsUser('/user-feed', tokenOf(readerViewer));
+			visitAsUser('/user-feed', sessionOf(readerViewer));
 
 			cy.get(`${CAROUSEL_SELECTOR} .suggestions-carousel-dismiss`).should('be.visible');
 			carouselCard(firstTarget).find('button').scrollIntoView().should('be.visible');

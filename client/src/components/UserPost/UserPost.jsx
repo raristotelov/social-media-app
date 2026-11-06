@@ -34,7 +34,7 @@ const UserPost = ({ userPostData, author, showActions = false, commentsOpenReque
 	const isUpdatingLikeRef = useRef(false);
 	const heartPulseTimeoutRef = useRef(null);
 
-	const { jwtToken, loggedInUser, endSession } = useContext(LoggedInUserContext);
+	const { loggedInUser, endSession } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 	const redirectToLogin = useLoginRedirect();
 	const { isMenuOpen, menuContainerRef, toggleMenu, closeMenu } = usePostActionsMenu();
@@ -80,8 +80,8 @@ const UserPost = ({ userPostData, author, showActions = false, commentsOpenReque
 
 		try {
 			const updatedUserPost = hasLikedUserPost
-				? await unlikeUserPost({ userPostToUnlikeId: userPostId, jwtToken })
-				: await likeUserPost({ userPostToLikeId: userPostId, jwtToken });
+				? await unlikeUserPost({ userPostToUnlikeId: userPostId })
+				: await likeUserPost({ userPostToLikeId: userPostId });
 
 			onPostChange(userPostId, { likes: updatedUserPost.likes });
 
@@ -110,7 +110,7 @@ const UserPost = ({ userPostData, author, showActions = false, commentsOpenReque
 	);
 
 	const submitComment = async (text) => {
-		const addedComment = await addComment({ userPostId, text, jwtToken });
+		const addedComment = await addComment({ userPostId, text });
 
 		onPostChange(userPostId, {
 			commentsCount: commentsCount + 1,

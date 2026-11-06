@@ -47,7 +47,7 @@ const notificationEntry = (postId, shouldOpenComments) => ({
 
 const renderPostsView = (entry) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: viewer, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: viewer, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 			<ToastProvider>
 				<NotFoundProvider>
 					<MemoryRouter initialEntries={[entry]}>

@@ -5,7 +5,7 @@ import {
 	visitAsUser,
 	uploadPostViaApi,
 	followUserViaApi,
-	userIdFromToken,
+	userIdFromSession,
 	addCommentViaApi,
 	deletePostViaApi,
 } from '../../support/api';
@@ -15,25 +15,25 @@ describe('feed', () => {
 	const firstAuthor = buildTestUser();
 	const secondAuthor = buildTestUser();
 
-	let viewerToken;
-	let firstAuthorToken;
-	let secondAuthorToken;
+	let viewerSession;
+	let firstAuthorSession;
+	let secondAuthorSession;
 
 	before(() => {
 		createUserViaApi(viewer);
 		createUserViaApi(firstAuthor);
 		createUserViaApi(secondAuthor);
 
-		loginViaApi(viewer).then((token) => {
-			viewerToken = token;
+		loginViaApi(viewer).then((session) => {
+			viewerSession = session;
 		});
 
-		loginViaApi(firstAuthor).then((token) => {
-			firstAuthorToken = token;
+		loginViaApi(firstAuthor).then((session) => {
+			firstAuthorSession = session;
 		});
 
-		loginViaApi(secondAuthor).then((token) => {
-			secondAuthorToken = token;
+		loginViaApi(secondAuthor).then((session) => {
+			secondAuthorSession = session;
 		});
 	});
 
@@ -45,7 +45,7 @@ describe('feed', () => {
 
 	describe('for a user who follows nobody', () => {
 		it('shows the empty state and no posts', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			cy.contains('.feed-empty h1', 'Your feed is empty').should('be.visible');
 			cy.contains('.feed-empty', 'Follow people to see their posts here').should('be.visible');
@@ -55,16 +55,16 @@ describe('feed', () => {
 
 	describe('for a user who follows people', () => {
 		before(() => {
-			cy.then(() => uploadPostViaApi(firstAuthorToken, 'oldest from first author'));
-			cy.then(() => uploadPostViaApi(secondAuthorToken, 'middle from second author'));
-			cy.then(() => uploadPostViaApi(firstAuthorToken, 'newest from first author'));
+			cy.then(() => uploadPostViaApi(firstAuthorSession, 'oldest from first author'));
+			cy.then(() => uploadPostViaApi(secondAuthorSession, 'middle from second author'));
+			cy.then(() => uploadPostViaApi(firstAuthorSession, 'newest from first author'));
 
-			cy.then(() => followUserViaApi(viewerToken, userIdFromToken(firstAuthorToken)));
-			cy.then(() => followUserViaApi(viewerToken, userIdFromToken(secondAuthorToken)));
+			cy.then(() => followUserViaApi(viewerSession, userIdFromSession(firstAuthorSession)));
+			cy.then(() => followUserViaApi(viewerSession, userIdFromSession(secondAuthorSession)));
 		});
 
 		it('lists the followed users posts newest first, across authors', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			cy.get('.user-post').should('have.length', 3);
 			cy.get('.user-post').eq(0).should('contain.text', 'newest from first author');
@@ -73,14 +73,14 @@ describe('feed', () => {
 		});
 
 		it("shows each post's author in the card header", () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			cy.get('.user-post').eq(1).find('.user-post-username').should('have.text', secondAuthor.username);
 			cy.get('.user-post').eq(0).find('.user-post-username').should('have.text', firstAuthor.username);
 		});
 
 		it('shows no post actions on the feed', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			cy.get('.user-post').should('have.length', 3);
 			cy.get('.user-post-actions-button').should('not.exist');
@@ -92,14 +92,14 @@ describe('feed', () => {
 		const replyPostAuthor = buildTestUser();
 		const replyCommenter = buildTestUser();
 
-		let replyViewerToken;
-		let replyPostAuthorToken;
-		let replyCommenterToken;
+		let replyViewerSession;
+		let replyPostAuthorSession;
+		let replyCommenterSession;
 		let replyCommenterId;
 		let feedPost;
 
 		const openCommentsPopup = () => {
-			visitAsUser('/user-feed', replyViewerToken);
+			visitAsUser('/user-feed', replyViewerSession);
 
 			cy.get('.user-post-comments-button').click();
 		};
@@ -109,30 +109,30 @@ describe('feed', () => {
 			createUserViaApi(replyPostAuthor);
 			createUserViaApi(replyCommenter);
 
-			loginViaApi(replyViewer).then((token) => {
-				replyViewerToken = token;
+			loginViaApi(replyViewer).then((session) => {
+				replyViewerSession = session;
 			});
 
-			loginViaApi(replyPostAuthor).then((token) => {
-				replyPostAuthorToken = token;
+			loginViaApi(replyPostAuthor).then((session) => {
+				replyPostAuthorSession = session;
 			});
 
-			loginViaApi(replyCommenter).then((token) => {
-				replyCommenterToken = token;
-				replyCommenterId = userIdFromToken(token);
+			loginViaApi(replyCommenter).then((session) => {
+				replyCommenterSession = session;
+				replyCommenterId = userIdFromSession(session);
 			});
 
-			cy.then(() => uploadPostViaApi(replyPostAuthorToken, 'post to reply under')).then((post) => {
+			cy.then(() => uploadPostViaApi(replyPostAuthorSession, 'post to reply under')).then((post) => {
 				feedPost = post;
 			});
 
-			cy.then(() => followUserViaApi(replyViewerToken, userIdFromToken(replyPostAuthorToken)));
+			cy.then(() => followUserViaApi(replyViewerSession, userIdFromSession(replyPostAuthorSession)));
 
-			cy.then(() => addCommentViaApi(replyCommenterToken, feedPost._id, 'comment to reply to'));
+			cy.then(() => addCommentViaApi(replyCommenterSession, feedPost._id, 'comment to reply to'));
 		});
 
 		after(() => {
-			cy.then(() => deletePostViaApi(replyPostAuthorToken, feedPost._id, false));
+			cy.then(() => deletePostViaApi(replyPostAuthorSession, feedPost._id, false));
 			cy.task('deleteTestUser', replyViewer.email);
 			cy.task('deleteTestUser', replyPostAuthor.email);
 			cy.task('deleteTestUser', replyCommenter.email);

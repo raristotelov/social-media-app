@@ -45,7 +45,7 @@ const getPostIds = (result) => result.current.posts.map((post) => post._id);
 const renderPopularPosts = async ({
 	firstPostId,
 	onFirstPostMissing = jest.fn(),
-	jwtToken = 'token123',
+	loggedInUser = { _id: 'user1' },
 	firstPage = buildPage(['p1', 'p2'], { hasMore: true }),
 	waitForLoad = true,
 } = {}) => {
@@ -55,7 +55,7 @@ const renderPopularPosts = async ({
 		getPopularPosts.mockResolvedValue(firstPage);
 	}
 
-	const wrapper = ({ children }) => <LoggedInUserContext.Provider value={{ jwtToken, endSession }}>{children}</LoggedInUserContext.Provider>;
+	const wrapper = ({ children }) => <LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>{children}</LoggedInUserContext.Provider>;
 	const rendered = renderHook(() => usePopularPosts({ firstPostId, onFirstPostMissing }), { wrapper });
 
 	if (waitForLoad) {
@@ -85,23 +85,23 @@ describe('usePopularPosts', () => {
 			});
 		});
 
-		it('requests the first page with the token and no first post', async () => {
+		it('requests the first page with no first post', async () => {
 			await renderPopularPosts();
 
 			expect(getPopularPosts).toHaveBeenCalledTimes(1);
-			expect(getPopularPosts).toHaveBeenCalledWith({ jwtToken: 'token123', firstPostId: undefined });
+			expect(getPopularPosts).toHaveBeenCalledWith({ firstPostId: undefined });
 		});
 
-		it('requests the first page without a token for a guest', async () => {
-			await renderPopularPosts({ jwtToken: null });
+		it('makes the same request for a guest, since the session travels in the cookie', async () => {
+			await renderPopularPosts({ loggedInUser: null });
 
-			expect(getPopularPosts).toHaveBeenCalledWith({ jwtToken: null, firstPostId: undefined });
+			expect(getPopularPosts).toHaveBeenCalledWith({ firstPostId: undefined });
 		});
 
 		it('names the first post in the request when one is given', async () => {
 			await renderPopularPosts({ firstPostId: 'shared1' });
 
-			expect(getPopularPosts).toHaveBeenCalledWith({ jwtToken: 'token123', firstPostId: 'shared1' });
+			expect(getPopularPosts).toHaveBeenCalledWith({ firstPostId: 'shared1' });
 		});
 
 		it('holds the posts in the order the server sent them once loaded', async () => {
@@ -214,8 +214,8 @@ describe('usePopularPosts', () => {
 			const { result, onFirstPostMissing } = await renderPopularPosts({ firstPostId: 'gone', firstPage: null });
 
 			expect(onFirstPostMissing).toHaveBeenCalledTimes(1);
-			expect(getPopularPosts).toHaveBeenNthCalledWith(1, { jwtToken: 'token123', firstPostId: 'gone' });
-			expect(getPopularPosts).toHaveBeenNthCalledWith(2, { jwtToken: 'token123' });
+			expect(getPopularPosts).toHaveBeenNthCalledWith(1, { firstPostId: 'gone' });
+			expect(getPopularPosts).toHaveBeenNthCalledWith(2);
 			expect(getPostIds(result)).toEqual(['p1', 'p2']);
 			expect(result.current.hasLoadFailed).toBe(false);
 		});
@@ -228,7 +228,7 @@ describe('usePopularPosts', () => {
 			act(() => result.current.reload());
 
 			await waitFor(() => expect(getPopularPosts).toHaveBeenCalledTimes(3));
-			expect(getPopularPosts).toHaveBeenLastCalledWith({ jwtToken: 'token123', firstPostId: undefined });
+			expect(getPopularPosts).toHaveBeenLastCalledWith({ firstPostId: undefined });
 			expect(onFirstPostMissing).toHaveBeenCalledTimes(1);
 		});
 
@@ -282,17 +282,17 @@ describe('usePopularPosts', () => {
 
 			await act(async () => result.current.loadMore());
 
-			expect(getNextPopularPosts).toHaveBeenCalledWith({ jwtToken: 'token123', snapshotTime: SNAPSHOT_TIME, shownPostIds: ['p1', 'p2'] });
+			expect(getNextPopularPosts).toHaveBeenCalledWith({ snapshotTime: SNAPSHOT_TIME, shownPostIds: ['p1', 'p2'] });
 		});
 
-		it('sends no token for a guest', async () => {
+		it('loads more for a guest with the same request', async () => {
 			getNextPopularPosts.mockResolvedValue(buildPage(['p3']));
 
-			const { result } = await renderPopularPosts({ jwtToken: null });
+			const { result } = await renderPopularPosts({ loggedInUser: null });
 
 			await act(async () => result.current.loadMore());
 
-			expect(getNextPopularPosts).toHaveBeenCalledWith(expect.objectContaining({ jwtToken: null }));
+			expect(getNextPopularPosts).toHaveBeenCalledWith({ snapshotTime: SNAPSHOT_TIME, shownPostIds: ['p1', 'p2'] });
 		});
 
 		it('adds the new posts after the loaded ones, which never move', async () => {

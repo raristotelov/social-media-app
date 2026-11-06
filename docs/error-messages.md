@@ -61,6 +61,7 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Log in | Form message | Couldn't log in. Try again. |
 | Sign up | Form message | Couldn't sign up. Try again. |
 | Try the demo | Toast | Couldn't start the demo. Try again. |
+| Log out (#20) | Toast | Couldn't log you out. Try again. |
 | Save profile | Form message | Couldn't save your profile. Try again. |
 | Change password (#24) | Form message | Couldn't change your password. Try again. |
 | Edit caption | Form message | Couldn't save the caption. Try again. |

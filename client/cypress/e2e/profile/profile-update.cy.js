@@ -1,21 +1,21 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken } from '../../support/api';
+import { AUTH_COOKIE_NAME, createUserViaApi, loginViaApi, visitAsUser, userIdFromSession } from '../../support/api';
 
 describe('profile update', () => {
 	const user = buildTestUser();
 	const otherUser = buildTestUser();
 	const editedUser = buildTestUser();
 
-	let jwtToken;
+	let session;
 	let profilePath;
 
 	before(() => {
 		createUserViaApi(user);
 		createUserViaApi(otherUser);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			profilePath = `/user/${userIdFromToken(token)}`;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			profilePath = `/user/${userIdFromSession(loggedInSession)}`;
 		});
 	});
 
@@ -28,7 +28,7 @@ describe('profile update', () => {
 	beforeEach(() => {
 		cy.intercept('PATCH', '**/users/update/**').as('updateRequest');
 
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		cy.contains('.profile-action button', 'Edit Profile').click();
 		cy.get('.popup-body').should('be.visible');
@@ -116,9 +116,7 @@ describe('profile update', () => {
 		cy.location('pathname').should('eq', profilePath);
 		cy.contains('.profile-action button', 'Edit Profile').should('exist');
 
-		cy.window().then((win) => {
-			expect(win.localStorage.getItem('jwt-token')).to.not.equal(null);
-		});
+		cy.getCookie(AUTH_COOKIE_NAME).its('httpOnly').should('eq', true);
 	});
 
 	it('saves a changed bio, username and email, and keeps them after a refresh', () => {

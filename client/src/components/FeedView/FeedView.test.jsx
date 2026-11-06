@@ -67,8 +67,8 @@ const buildDeferred = () => {
 	return deferred;
 };
 
-const buildFeedTree = ({ user, endSession, jwtToken = 'token123', updateLoggedInUser = jest.fn() }) => (
-	<LoggedInUserContext.Provider value={{ jwtToken, loggedInUser: user, updateLoggedInUser, endSession }}>
+const buildFeedTree = ({ user, endSession, updateLoggedInUser = jest.fn() }) => (
+	<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser, endSession }}>
 		<ToastProvider>
 			<MemoryRouter initialEntries={['/user-feed']}>
 				<FeedView />
@@ -80,9 +80,9 @@ const buildFeedTree = ({ user, endSession, jwtToken = 'token123', updateLoggedIn
 const renderFeed = ({ user = loggedInUser, endSession = jest.fn() } = {}) => {
 	const rendered = render(buildFeedTree({ user, endSession }));
 
-	const rerenderWithToken = (jwtToken) => rendered.rerender(buildFeedTree({ user, endSession, jwtToken }));
+	const rerenderWithUser = (refreshedUser) => rendered.rerender(buildFeedTree({ user: refreshedUser, endSession }));
 
-	return { ...rendered, endSession, rerenderWithToken };
+	return { ...rendered, endSession, rerenderWithUser };
 };
 
 const getRenderedPostIds = () => Array.from(document.querySelectorAll('article.user-post')).map((article) => article.id);
@@ -94,8 +94,8 @@ describe('FeedView', () => {
 		jest.resetAllMocks();
 		getStoryTray.mockResolvedValue([]);
 		getSuggestions.mockResolvedValue(EMPTY_SUGGESTIONS);
-		followUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
-		unfollowUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		followUser.mockResolvedValue({ user: loggedInUser });
+		unfollowUser.mockResolvedValue({ user: loggedInUser });
 		dismissSuggestionsCarousel.mockResolvedValue(undefined);
 		setViewport(false);
 	});
@@ -121,13 +121,13 @@ describe('FeedView', () => {
 			expect(tray.compareDocumentPosition(firstPost) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 		});
 
-		it('loads the tray with the token', async () => {
+		it('loads the tray', async () => {
 			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
 			await screen.findAllByRole('article');
 
-			await waitFor(() => expect(getStoryTray).toHaveBeenCalledWith({ jwtToken: 'token123' }));
+			await waitFor(() => expect(getStoryTray).toHaveBeenCalledWith());
 		});
 
 		it('shows the people with an active story', async () => {
@@ -261,7 +261,7 @@ describe('FeedView', () => {
 
 			await screen.findAllByRole('article');
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
-			expect(getFollowedUsersPosts).toHaveBeenCalledWith({ jwtToken: 'token123' });
+			expect(getFollowedUsersPosts).toHaveBeenCalledWith();
 		});
 
 		it('renders every post it received', async () => {
@@ -581,17 +581,17 @@ describe('FeedView', () => {
 
 			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-s1' })).not.toBeInTheDocument());
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
-			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToFollow: 's1' });
+			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', userIdToFollow: 's1' });
 		});
 
-		it('does not refetch the feed when the token changes after a sidebar follow', async () => {
-			const { rerenderWithToken } = renderFeed();
+		it('does not refetch the feed when the logged-in user is refreshed after a sidebar follow', async () => {
+			const { rerenderWithUser } = renderFeed();
 
 			await screen.findAllByRole('article');
 			userEvent.click(await screen.findByRole('button', { name: 'Follow name-s1' }));
 			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-s1' })).not.toBeInTheDocument());
 
-			rerenderWithToken('new.jwt');
+			rerenderWithUser({ ...loggedInUser, following: ['s1'] });
 
 			await screen.findAllByRole('article');
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
@@ -699,7 +699,7 @@ describe('FeedView', () => {
 			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
 
 			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
-			await waitFor(() => expect(dismissSuggestionsCarousel).toHaveBeenCalledWith({ jwtToken: 'token123' }));
+			await waitFor(() => expect(dismissSuggestionsCarousel).toHaveBeenCalledWith());
 			expect(getRenderedPostIds()).toEqual(['post3', 'post2', 'post1']);
 		});
 
@@ -713,15 +713,15 @@ describe('FeedView', () => {
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not refetch the feed when the token changes after a carousel follow', async () => {
+		it('does not refetch the feed when the logged-in user is refreshed after a carousel follow', async () => {
 			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
-			const { rerenderWithToken } = renderFeed();
+			const { rerenderWithUser } = renderFeed();
 
 			await screen.findAllByRole('article');
 			userEvent.click(await screen.findByRole('button', { name: 'Follow name-c1' }));
 			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-c1' })).not.toBeInTheDocument());
 
-			rerenderWithToken('new.jwt');
+			rerenderWithUser({ ...loggedInUser, following: ['c1'] });
 
 			await screen.findAllByRole('article');
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
@@ -864,19 +864,19 @@ describe('FeedView', () => {
 				expect(list.compareDocumentPosition(posts[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 			});
 
-			it('reloads the posts with the latest token after the token changed', async () => {
+			it('reloads the posts after the logged-in user was refreshed', async () => {
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
-				const { rerenderWithToken } = renderFeed();
+				const { rerenderWithUser } = renderFeed();
 
 				await screen.findByRole('button', { name: 'Follow name-p1' });
-				rerenderWithToken('new.jwt');
+				rerenderWithUser({ ...loggedInUser, bio: 'refreshed' });
 				expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
 
 				userEvent.click(screen.getByRole('button', { name: 'Follow name-p1' }));
 
 				await screen.findAllByRole('article');
 				expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2);
-				expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'new.jwt' });
+				expect(getFollowedUsersPosts).toHaveBeenLastCalledWith();
 			});
 
 			it('keeps the message and the full list of 8 on screen after posts appear', async () => {
@@ -972,7 +972,7 @@ describe('FeedView', () => {
 				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 				expect(await screen.findByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();
-				expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', jwtToken: 'token123', userIdToUnfollow: 'p1' });
+				expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', userIdToUnfollow: 'p1' });
 			});
 
 			it('reloads the posts once more after the unfollow', async () => {

@@ -1,17 +1,17 @@
 import { buildTestUser } from '../../support/testUser';
 import {
-	serverUrl,
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	uploadProfilePictureViaApi,
 	getProfileViaApi,
+	updateProfileViaApi,
 } from '../../support/api';
 
 describe('profile picture removal', () => {
 	let user;
-	let jwtToken;
+	let session;
 	let userId;
 	let profilePath;
 	let picture;
@@ -30,13 +30,13 @@ describe('profile picture removal', () => {
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 			profilePath = `/user/${userId}`;
 		});
 
-		cy.then(() => uploadProfilePictureViaApi(jwtToken)).then((uploadedPicture) => {
+		cy.then(() => uploadProfilePictureViaApi(session)).then((uploadedPicture) => {
 			picture = uploadedPicture;
 		});
 
@@ -48,7 +48,7 @@ describe('profile picture removal', () => {
 	});
 
 	it('shows the current picture with a remove button in the form', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		cy.get('.profile-picture-wrapper img').should('have.attr', 'src', picture.imageUrl);
 
@@ -59,7 +59,7 @@ describe('profile picture removal', () => {
 	});
 
 	it('opens the file picker when the picture is clicked', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		cy.get('#edit-user-profile-form input[type="file"]').then(($input) => {
@@ -72,7 +72,7 @@ describe('profile picture removal', () => {
 	});
 
 	it('shows the empty input after clicking the remove button and saves nothing yet', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		removeButton().click();
@@ -84,7 +84,7 @@ describe('profile picture removal', () => {
 	});
 
 	it('keeps the picture when Cancel is clicked after removing it', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		removeButton().click();
@@ -100,7 +100,7 @@ describe('profile picture removal', () => {
 	});
 
 	it('removes the picture on Save, shows the placeholder avatar, and keeps it removed after a refresh', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		removeButton().click();
@@ -123,7 +123,7 @@ describe('profile picture removal', () => {
 	});
 
 	it('shows the empty input in the form when it is reopened after removal', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		removeButton().click();
@@ -138,7 +138,7 @@ describe('profile picture removal', () => {
 	});
 
 	it('removes the picture together with other changed fields in one save', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		cy.get('textarea#bio').type('Bio saved with the removal.');
@@ -152,7 +152,7 @@ describe('profile picture removal', () => {
 	});
 
 	it('sends profilePicture: null and nothing else when only the picture was removed', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		removeButton().click();
@@ -163,7 +163,7 @@ describe('profile picture removal', () => {
 
 	it('works as a full-screen view on mobile', () => {
 		cy.viewport(390, 844);
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		removeButton().click();
@@ -175,7 +175,7 @@ describe('profile picture removal', () => {
 
 	describe('after the picture was removed', () => {
 		beforeEach(() => {
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 			openEditProfile();
 
 			removeButton().click();
@@ -194,13 +194,7 @@ describe('profile picture removal', () => {
 	});
 
 	describe('server', () => {
-		const removePictureViaApi = () =>
-			cy.request({
-				method: 'PATCH',
-				url: `${serverUrl}/users/update/${userId}`,
-				headers: { 'X-Authorization': jwtToken },
-				body: { profilePicture: null },
-			});
+		const removePictureViaApi = () => updateProfileViaApi(session, userId, { profilePicture: null });
 
 		it('removes the picture when profilePicture: null is sent', () => {
 			removePictureViaApi().its('status').should('eq', 200);

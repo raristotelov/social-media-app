@@ -3,7 +3,7 @@ import {
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	uploadStoryViaApi,
 	getUserStoriesViaApi,
 	getProfileViaApi,
@@ -13,7 +13,7 @@ const FIXTURE_IMAGE = 'cypress/fixtures/test-image.png';
 
 describe('creating a story', () => {
 	let user;
-	let jwtToken;
+	let session;
 	let userId;
 
 	const selectedTab = () => cy.get('.create-popup [role="tab"][aria-selected="true"]');
@@ -34,9 +34,9 @@ describe('creating a story', () => {
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 		});
 
 		cy.intercept('POST', '**/stories').as('storyRequest');
@@ -47,7 +47,7 @@ describe('creating a story', () => {
 	});
 
 	it('posts a story from the "Your story" circle on an empty feed and shows it in the circle', () => {
-		visitAsUser('/user-feed', jwtToken);
+		visitAsUser('/user-feed', session);
 
 		cy.get('.stories-tray .story-circle-label').should('have.length', 1).and('have.text', 'Your story');
 		cy.get('button[aria-label="Add to your story"]').click();
@@ -69,28 +69,28 @@ describe('creating a story', () => {
 		cy.get('button[aria-label="View your story"]').should('be.visible');
 		cy.get('button[aria-label="Add to your story"]').should('be.visible');
 
-		cy.then(() => getUserStoriesViaApi(jwtToken, userId)).then(({ stories }) => {
+		cy.then(() => getUserStoriesViaApi(session, userId)).then(({ stories }) => {
 			expect(stories).to.have.length(1);
 			expect(stories[0].imageUrl).to.match(/^https:\/\/res\.cloudinary\.com\//);
 		});
 	});
 
 	it('does not create a post when a story is shared', () => {
-		visitAsUser('/user-feed', jwtToken);
+		visitAsUser('/user-feed', session);
 
 		cy.get('button[aria-label="Add to your story"]').click();
 		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
 		shareButton().click();
 		cy.wait('@storyRequest');
 
-		cy.then(() => getProfileViaApi(userId, jwtToken)).then((profile) => {
+		cy.then(() => getProfileViaApi(userId, session)).then((profile) => {
 			expect(profile.posts).to.have.length(0);
 		});
 	});
 
 	it('plays the new story for 5 seconds from when its photo loads, then closes the viewer', () => {
-		cy.then(() => uploadStoryViaApi(jwtToken));
-		visitAsUser('/user-feed', jwtToken);
+		cy.then(() => uploadStoryViaApi(session));
+		visitAsUser('/user-feed', session);
 
 		cy.get('button[aria-label="View your story"]').click();
 
@@ -107,8 +107,8 @@ describe('creating a story', () => {
 	});
 
 	it('opens the viewer from the picture and Create on Story from the plus, once you have a story', () => {
-		cy.then(() => uploadStoryViaApi(jwtToken));
-		visitAsUser('/user-feed', jwtToken);
+		cy.then(() => uploadStoryViaApi(session));
+		visitAsUser('/user-feed', session);
 
 		cy.get('button[aria-label="Add to your story"]').click();
 
@@ -123,7 +123,7 @@ describe('creating a story', () => {
 	});
 
 	it('keeps the chosen picture and the caption when switching between the Post and Story tabs on the profile', () => {
-		visitAsUser(`/user/${userId}`, jwtToken);
+		visitAsUser(`/user/${userId}`, session);
 
 		cy.get('.add-post-button').click();
 		selectedTab().should('contain.text', 'Post');
@@ -143,7 +143,7 @@ describe('creating a story', () => {
 	});
 
 	it('shares a story from the profile popup after switching to the Story tab, and adds no post tile', () => {
-		visitAsUser(`/user/${userId}`, jwtToken);
+		visitAsUser(`/user/${userId}`, session);
 
 		cy.get('.add-post-button').click();
 		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
@@ -157,7 +157,7 @@ describe('creating a story', () => {
 
 	it('lets you pick and share a story at the 300px floor without horizontal scrolling', () => {
 		cy.viewport(300, 700);
-		visitAsUser('/user-feed', jwtToken);
+		visitAsUser('/user-feed', session);
 
 		cy.get('button[aria-label="Add to your story"]').click();
 		fileInput().selectFile(FIXTURE_IMAGE, { force: true });

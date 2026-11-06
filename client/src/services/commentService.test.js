@@ -1,5 +1,5 @@
 import { requestFactory } from './requester';
-import { getComments, addComment, likeComment, unlikeComment } from './commentService';
+import { getComments, addComment, likeComment, unlikeComment, getCommentLikes } from './commentService';
 
 jest.mock('./requester');
 
@@ -14,38 +14,48 @@ describe('commentService', () => {
 
 			requestFactory.mockReturnValue({ get });
 
-			await getComments({ userPostId: 'post1', jwtToken: 'token123' });
+			await getComments({ userPostId: 'post1' });
 
 			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/comments\/post\/post1$/));
 		});
 
-		it('sends the token when there is one', async () => {
+		it('builds the requester without a token, as the session travels in the cookie', async () => {
 			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue([]) });
 
-			await getComments({ userPostId: 'post1', jwtToken: 'token123' });
+			await getComments({ userPostId: 'post1' });
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 		});
 
-		it('works without a token, for a guest', async () => {
-			const get = jest.fn().mockResolvedValue([{ _id: 'c1' }]);
+		it('resolves with the comments', async () => {
+			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue([{ _id: 'c1' }]) });
+
+			await expect(getComments({ userPostId: 'post1' })).resolves.toEqual([{ _id: 'c1' }]);
+		});
+	});
+
+	describe('getCommentLikes', () => {
+		it('gets the likes endpoint of the comment', async () => {
+			const get = jest.fn().mockResolvedValue([]);
 
 			requestFactory.mockReturnValue({ get });
 
-			await expect(getComments({ userPostId: 'post1' })).resolves.toEqual([{ _id: 'c1' }]);
-			expect(requestFactory).toHaveBeenCalledWith(undefined);
+			await getCommentLikes({ commentId: 'c1' });
+
+			expect(requestFactory).toHaveBeenCalledWith();
+			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/comments\/c1\/likes$/));
 		});
 	});
 
 	describe('addComment', () => {
-		it('posts the post id and text to the comments endpoint with the token', async () => {
+		it('posts the post id and text to the comments endpoint', async () => {
 			const post = jest.fn().mockResolvedValue({ _id: 'c1' });
 
 			requestFactory.mockReturnValue({ post });
 
-			await addComment({ userPostId: 'post1', text: 'Nice shot', jwtToken: 'token123' });
+			await addComment({ userPostId: 'post1', text: 'Nice shot' });
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments$/), {
 				userPostId: 'post1',
 				text: 'Nice shot',
@@ -59,7 +69,7 @@ describe('commentService', () => {
 
 			requestFactory.mockReturnValue({ post });
 
-			await addComment({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1', jwtToken: 'token123' });
+			await addComment({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1' });
 
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments$/), {
 				userPostId: 'post1',
@@ -74,7 +84,7 @@ describe('commentService', () => {
 
 			requestFactory.mockReturnValue({ post });
 
-			await addComment({ userPostId: 'post1', text: '@bob Thanks', parentCommentId: 'c1', mentionedUserId: 'user4', jwtToken: 'token123' });
+			await addComment({ userPostId: 'post1', text: '@bob Thanks', parentCommentId: 'c1', mentionedUserId: 'user4' });
 
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments$/), {
 				userPostId: 'post1',
@@ -89,7 +99,7 @@ describe('commentService', () => {
 
 			requestFactory.mockReturnValue({ post });
 
-			await addComment({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1', mentionedUserId: null, jwtToken: 'token123' });
+			await addComment({ userPostId: 'post1', text: 'Thanks', parentCommentId: 'c1', mentionedUserId: null });
 
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments$/), expect.objectContaining({ mentionedUserId: null }));
 		});
@@ -97,32 +107,32 @@ describe('commentService', () => {
 		it('resolves with the saved comment', async () => {
 			requestFactory.mockReturnValue({ post: jest.fn().mockResolvedValue({ _id: 'c1' }) });
 
-			await expect(addComment({ userPostId: 'post1', text: 'Nice shot', jwtToken: 'token123' })).resolves.toEqual({ _id: 'c1' });
+			await expect(addComment({ userPostId: 'post1', text: 'Nice shot' })).resolves.toEqual({ _id: 'c1' });
 		});
 	});
 
 	describe('likeComment', () => {
-		it('posts to the like endpoint of the comment with the token', async () => {
+		it('posts to the like endpoint of the comment', async () => {
 			const post = jest.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ post });
 
-			await likeComment({ commentId: 'c1', jwtToken: 'token123' });
+			await likeComment({ commentId: 'c1' });
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments\/c1\/like$/));
 		});
 	});
 
 	describe('unlikeComment', () => {
-		it('posts to the unlike endpoint of the comment with the token', async () => {
+		it('posts to the unlike endpoint of the comment', async () => {
 			const post = jest.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ post });
 
-			await unlikeComment({ commentId: 'c1', jwtToken: 'token123' });
+			await unlikeComment({ commentId: 'c1' });
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/comments\/c1\/unlike$/));
 		});
 	});

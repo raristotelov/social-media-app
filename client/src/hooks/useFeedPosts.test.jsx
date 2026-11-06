@@ -36,9 +36,9 @@ const buildDeferred = () => {
 
 const getPostIds = (result) => result.current.posts.map((post) => post._id);
 
-const mountFeedPosts = async ({ firstPage = buildPage(['p3', 'p2'], { hasMore: true }), jwtToken = 'token123', waitForLoad = true } = {}) => {
+const mountFeedPosts = async ({ firstPage = buildPage(['p3', 'p2'], { hasMore: true }), waitForLoad = true } = {}) => {
 	const endSession = jest.fn();
-	const context = { jwtToken, endSession };
+	const context = { endSession };
 
 	if (firstPage) {
 		getFollowedUsersPosts.mockResolvedValueOnce(firstPage);
@@ -75,11 +75,11 @@ describe('useFeedPosts', () => {
 			});
 		});
 
-		it('requests the first page with the token and no cursor', async () => {
+		it('requests the first page with no token and no cursor', async () => {
 			await mountFeedPosts();
 
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
-			expect(getFollowedUsersPosts).toHaveBeenCalledWith({ jwtToken: 'token123' });
+			expect(getFollowedUsersPosts).toHaveBeenCalledWith();
 		});
 
 		it('holds the posts in the order the server sent them', async () => {
@@ -143,7 +143,7 @@ describe('useFeedPosts', () => {
 
 			await act(() => result.current.loadMore());
 
-			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'token123', cursor: '200_abc' });
+			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ cursor: '200_abc' });
 		});
 
 		it('adds the next page below the posts already loaded', async () => {
@@ -175,7 +175,7 @@ describe('useFeedPosts', () => {
 			getFollowedUsersPosts.mockResolvedValueOnce(buildPage(['p2'], { hasMore: false }));
 			await act(() => result.current.loadMore());
 
-			expect(getFollowedUsersPosts.mock.calls.map(([arguments_]) => arguments_.cursor)).toEqual([undefined, 'c1', 'c2']);
+			expect(getFollowedUsersPosts.mock.calls.map(([arguments_]) => arguments_?.cursor)).toEqual([undefined, 'c1', 'c2']);
 			expect(getPostIds(result)).toEqual(['p4', 'p3', 'p2']);
 		});
 
@@ -266,7 +266,7 @@ describe('useFeedPosts', () => {
 
 				expect(result.current.hasLoadMoreFailed).toBe(false);
 				expect(getPostIds(result)).toEqual(['p3', 'p2']);
-				expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'token123', cursor: 'c1' });
+				expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ cursor: 'c1' });
 			});
 
 			it('ends the session, and reports no failure, when the token is rejected', async () => {
@@ -291,12 +291,12 @@ describe('useFeedPosts', () => {
 			act(() => result.current.reload());
 			await waitFor(() => expect(getPostIds(result)).toEqual(['n2', 'n1']));
 
-			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'token123' });
+			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith();
 
 			getFollowedUsersPosts.mockResolvedValueOnce(buildPage(['n0']));
 			await act(() => result.current.loadMore());
 
-			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'token123', cursor: 'fresh' });
+			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ cursor: 'fresh' });
 		});
 
 		it('shows no loading state and keeps the posts while it runs', async () => {
@@ -359,20 +359,20 @@ describe('useFeedPosts', () => {
 			await waitFor(() => expect(getPostIds(result)).toEqual(['p1']));
 		});
 
-		it('uses the latest token without reloading by itself when the token changes', async () => {
+		it('does not reload by itself when the logged-in user is refreshed', async () => {
 			const endSession = jest.fn();
-			let token = 'token123';
+			let loggedInUser = { _id: 'user1', following: [] };
 
 			getFollowedUsersPosts.mockResolvedValueOnce(buildPage(['p1']));
 
 			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ jwtToken: token, endSession }}>{children}</LoggedInUserContext.Provider>
+				<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>{children}</LoggedInUserContext.Provider>
 			);
 			const { result, rerender } = renderHook(() => useFeedPosts(), { wrapper });
 
 			await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-			token = 'new.jwt';
+			loggedInUser = { _id: 'user1', following: ['user2'] };
 			rerender();
 
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
@@ -381,7 +381,7 @@ describe('useFeedPosts', () => {
 			act(() => result.current.reload());
 			await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2));
 
-			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'new.jwt' });
+			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith();
 		});
 	});
 
@@ -423,7 +423,7 @@ describe('useFeedPosts', () => {
 			await waitFor(() => expect(result.current.canLoadMore).toBe(true));
 			await act(() => result.current.loadMore());
 
-			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ jwtToken: 'token123', cursor: 'fresh' });
+			expect(getFollowedUsersPosts).toHaveBeenLastCalledWith({ cursor: 'fresh' });
 			expect(getPostIds(result)).toEqual(['n2', 'n1', 'n0']);
 		});
 

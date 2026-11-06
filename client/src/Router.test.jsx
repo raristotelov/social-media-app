@@ -34,6 +34,8 @@ jest.mock('./components/PopularPostsView/PopularPostsView', () => () => <p>Popul
 jest.mock('./components/PopularPostsPostsView/PopularPostsPostsView', () => () => <p>Popular posts posts view</p>);
 jest.mock('./components/NotFoundView/NotFoundView', () => () => <p>Not found view</p>);
 
+const LOGGED_IN_USER = { _id: 'user1', username: 'johndoe' };
+
 const LocationDisplay = () => {
 	const location = useLocation();
 	const navigationType = useNavigationType();
@@ -49,9 +51,9 @@ const LocationDisplay = () => {
 	);
 };
 
-const renderRouterAt = (path, jwtToken) =>
+const renderRouterAt = (path, loggedInUser) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken, loggedInUser: null }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser }}>
 			<MemoryRouter initialEntries={[path]}>
 				<Router />
 
@@ -76,7 +78,7 @@ describe('Router', () => {
 		});
 
 		it('sends a logged-in user to the feed', () => {
-			renderRouterAt('/', 'token123');
+			renderRouterAt('/', LOGGED_IN_USER);
 
 			expect(screen.getByText('Feed view')).toBeInTheDocument();
 			expect(screen.getByTestId('location')).toHaveTextContent(/^\/user-feed$/);
@@ -84,9 +86,9 @@ describe('Router', () => {
 
 		it.each([
 			['a guest', null],
-			['a logged-in user', 'token123'],
-		])('replaces / in the history for %s, so Back does not land on the redirect again', (_name, jwtToken) => {
-			renderRouterAt('/', jwtToken);
+			['a logged-in user', LOGGED_IN_USER],
+		])('replaces / in the history for %s, so Back does not land on the redirect again', (_name, loggedInUser) => {
+			renderRouterAt('/', loggedInUser);
 
 			expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE');
 		});
@@ -94,7 +96,7 @@ describe('Router', () => {
 
 	describe('opening /user-feed', () => {
 		it('shows the feed to a logged-in user', () => {
-			renderRouterAt('/user-feed', 'token123');
+			renderRouterAt('/user-feed', LOGGED_IN_USER);
 
 			expect(screen.getByText('Feed view')).toBeInTheDocument();
 			expect(screen.getByTestId('location')).toHaveTextContent(/^\/user-feed$/);
@@ -129,18 +131,18 @@ describe('Router', () => {
 	describe('the popular posts routes', () => {
 		it.each([
 			['a guest', null],
-			['a logged-in user', 'token123'],
-		])('shows the popular grid inside the popular layout to %s', (_name, jwtToken) => {
-			renderRouterAt('/popular-posts', jwtToken);
+			['a logged-in user', LOGGED_IN_USER],
+		])('shows the popular grid inside the popular layout to %s', (_name, loggedInUser) => {
+			renderRouterAt('/popular-posts', loggedInUser);
 
 			expect(screen.getByTestId('popular-posts-layout')).toContainElement(screen.getByText('Popular posts view'));
 		});
 
 		it.each([
 			['a guest', null],
-			['a logged-in user', 'token123'],
-		])('shows the popular posts view inside the popular layout to %s', (_name, jwtToken) => {
-			renderRouterAt('/popular-posts/posts', jwtToken);
+			['a logged-in user', LOGGED_IN_USER],
+		])('shows the popular posts view inside the popular layout to %s', (_name, loggedInUser) => {
+			renderRouterAt('/popular-posts/posts', loggedInUser);
 
 			expect(screen.getByTestId('popular-posts-layout')).toContainElement(screen.getByText('Popular posts posts view'));
 		});
@@ -167,9 +169,9 @@ describe('Router', () => {
 	describe('an unknown route', () => {
 		it.each([
 			['a guest', null],
-			['a logged-in user', 'token123'],
-		])('shows the 404 page to %s', (_name, jwtToken) => {
-			renderRouterAt('/no/such/page', jwtToken);
+			['a logged-in user', LOGGED_IN_USER],
+		])('shows the 404 page to %s', (_name, loggedInUser) => {
+			renderRouterAt('/no/such/page', loggedInUser);
 
 			expect(screen.getByText('Not found view')).toBeInTheDocument();
 		});
@@ -181,7 +183,7 @@ describe('Router', () => {
 		});
 
 		it.each([['/popular-posts/unknown'], ['/user'], ['/user/user2/unknown']])('shows the 404 page at the near-miss path %s', (path) => {
-			renderRouterAt(path, 'token123');
+			renderRouterAt(path, LOGGED_IN_USER);
 
 			expect(screen.getByText('Not found view')).toBeInTheDocument();
 		});
@@ -189,7 +191,7 @@ describe('Router', () => {
 		it.each([['/'], ['/user-feed'], ['/popular-posts'], ['/user/user2'], ['/user/user2/posts']])(
 			'does not show the 404 page at the known route %s',
 			(path) => {
-				renderRouterAt(path, 'token123');
+				renderRouterAt(path, LOGGED_IN_USER);
 
 				expect(screen.queryByText('Not found view')).not.toBeInTheDocument();
 			},
@@ -199,18 +201,18 @@ describe('Router', () => {
 	describe('the profile routes', () => {
 		it.each([
 			['a guest', null],
-			['a logged-in user', 'token123'],
-		])('shows the profile grid inside the profile layout to %s', (_name, jwtToken) => {
-			renderRouterAt('/user/user2', jwtToken);
+			['a logged-in user', LOGGED_IN_USER],
+		])('shows the profile grid inside the profile layout to %s', (_name, loggedInUser) => {
+			renderRouterAt('/user/user2', loggedInUser);
 
 			expect(screen.getByTestId('profile-layout')).toContainElement(screen.getByText('Profile view'));
 		});
 
 		it.each([
 			['a guest', null],
-			['a logged-in user', 'token123'],
-		])('shows the profile posts view inside the profile layout to %s', (_name, jwtToken) => {
-			renderRouterAt('/user/user2/posts', jwtToken);
+			['a logged-in user', LOGGED_IN_USER],
+		])('shows the profile posts view inside the profile layout to %s', (_name, loggedInUser) => {
+			renderRouterAt('/user/user2/posts', loggedInUser);
 
 			expect(screen.getByTestId('profile-layout')).toContainElement(screen.getByText('Profile posts view'));
 		});

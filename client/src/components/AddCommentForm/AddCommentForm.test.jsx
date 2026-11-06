@@ -31,7 +31,7 @@ const renderForm = ({ user = loggedInUser, entry = '/user-feed', endSession = je
 	const onSubmit = props.onSubmit ?? jest.fn().mockResolvedValue(undefined);
 
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: user, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
 			<MemoryRouter initialEntries={[entry]}>
 				<AddCommentForm {...props} onSubmit={onSubmit} />
 			</MemoryRouter>
@@ -356,7 +356,7 @@ describe('AddCommentForm', () => {
 			userEvent.type(getInput(), 'Nice shot');
 
 			rerender(
-				<LoggedInUserContext.Provider value={{ jwtToken: null, loggedInUser: null, endSession: jest.fn() }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser: null, endSession: jest.fn() }}>
 					<MemoryRouter initialEntries={['/user/user2/posts#post7']}>
 						<AddCommentForm onSubmit={onSubmit} />
 					</MemoryRouter>

@@ -39,16 +39,32 @@ describe('requester', () => {
 
 			fetch.mockResolvedValue(response);
 
-			await expect(requestFactory('token').delete(URL)).resolves.toEqual({});
+			await expect(requestFactory().delete(URL)).resolves.toEqual({});
 			expect(response.json).not.toHaveBeenCalled();
 		});
 
-		it('sends the token in the X-Authorization header', async () => {
+		it('includes credentials on a GET request so the session cookie is sent', async () => {
 			fetch.mockResolvedValue(buildResponse({ body: {} }));
 
-			await requestFactory('token123').get(URL);
+			await requestFactory().get(URL);
 
-			expect(fetch).toHaveBeenCalledWith(URL, { headers: { 'X-Authorization': 'token123' } });
+			expect(fetch).toHaveBeenCalledWith(URL, { credentials: 'include' });
+		});
+
+		it.each(['post', 'put', 'patch', 'delete'])('includes credentials on a %s request', async (method) => {
+			fetch.mockResolvedValue(buildResponse({ body: {} }));
+
+			await requestFactory()[method](URL, { a: 1 });
+
+			expect(fetch.mock.calls[0][1].credentials).toBe('include');
+		});
+
+		it('sends no X-Authorization header, as the token lives in an httpOnly cookie', async () => {
+			fetch.mockResolvedValue(buildResponse({ body: {} }));
+
+			await requestFactory().post(URL, { a: 1 });
+
+			expect(fetch.mock.calls[0][1].headers).not.toHaveProperty('X-Authorization');
 		});
 
 		it('sends a JSON body with a content-type header for non-GET requests', async () => {
@@ -58,6 +74,7 @@ describe('requester', () => {
 
 			expect(fetch).toHaveBeenCalledWith(URL, {
 				method: 'POST',
+				credentials: 'include',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ a: 1 }),
 			});
@@ -87,15 +104,15 @@ describe('requester', () => {
 
 				await requestFactory().post(URL, buildFormData());
 
-				expect(fetch).toHaveBeenCalledWith(URL, { method: 'POST', body: expect.any(FormData) });
+				expect(fetch).toHaveBeenCalledWith(URL, { method: 'POST', credentials: 'include', body: expect.any(FormData) });
 			});
 
-			it('still sends only the token header', async () => {
+			it('still includes credentials for a PATCH with a FormData body', async () => {
 				fetch.mockResolvedValue(buildResponse({ body: {} }));
 
-				await requestFactory('token123').patch(URL, buildFormData());
+				await requestFactory().patch(URL, buildFormData());
 
-				expect(fetch).toHaveBeenCalledWith(URL, { method: 'PATCH', body: expect.any(FormData), headers: { 'X-Authorization': 'token123' } });
+				expect(fetch).toHaveBeenCalledWith(URL, { method: 'PATCH', credentials: 'include', body: expect.any(FormData) });
 			});
 
 			it('still normalises an error response for a FormData request', async () => {
@@ -106,7 +123,7 @@ describe('requester', () => {
 					}),
 				);
 
-				const error = await catchError(requestFactory('token').post(URL, buildFormData()));
+				const error = await catchError(requestFactory().post(URL, buildFormData()));
 
 				expect(error).toBeInstanceOf(RequestError);
 				expect(error.code).toBe('IMAGE_TOO_LARGE');
@@ -144,7 +161,7 @@ describe('requester', () => {
 		it('leaves fields undefined when the body has none', async () => {
 			fetch.mockResolvedValue(buildResponse({ status: 404, body: { code: 'POST_NOT_FOUND', message: 'Post not found' } }));
 
-			const error = await catchError(requestFactory('token').delete(URL));
+			const error = await catchError(requestFactory().delete(URL));
 
 			expect(error.code).toBe('POST_NOT_FOUND');
 			expect(error.fields).toBeUndefined();
@@ -245,7 +262,7 @@ describe('requester', () => {
 		it('keeps UNAUTHENTICATED as its own code so the session can be ended', async () => {
 			fetch.mockResolvedValue(buildResponse({ status: 401, body: { code: 'UNAUTHENTICATED', message: 'Unauthorized' } }));
 
-			const error = await catchError(requestFactory('expired').get(URL));
+			const error = await catchError(requestFactory().get(URL));
 
 			expect(error.code).toBe('UNAUTHENTICATED');
 			expect(error.status).toBe(401);

@@ -5,13 +5,13 @@ describe('404 page', () => {
 	const user = buildTestUser();
 	const unknownUserId = '64b7f0a1c2d3e4f5a6b7c8d1';
 
-	let userToken;
+	let session;
 
 	before(() => {
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			userToken = token;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
 		});
 	});
 
@@ -36,7 +36,7 @@ describe('404 page', () => {
 		});
 
 		it('shows the 404 page to a member, and Go home leads to the feed', () => {
-			visitAsUser('/no/such/page', userToken);
+			visitAsUser('/no/such/page', session);
 
 			cy.contains('.page-load-error h1', 'Page not found').should('be.visible');
 
@@ -59,7 +59,7 @@ describe('404 page', () => {
 
 		it('keeps the mobile top bar with Search and the tab bar around the 404 page', () => {
 			cy.viewport(390, 844);
-			visitAsUser(`/user/${unknownUserId}`, userToken);
+			visitAsUser(`/user/${unknownUserId}`, session);
 
 			cy.contains('.page-load-error h1', 'Page not found').should('be.visible');
 			cy.get('.mobile-top-bar-action[aria-label="Search"]').should('be.visible');
@@ -68,7 +68,7 @@ describe('404 page', () => {
 
 		it('keeps the mobile top bar with Search on the /posts path too', () => {
 			cy.viewport(390, 844);
-			visitAsUser(`/user/${unknownUserId}/posts`, userToken);
+			visitAsUser(`/user/${unknownUserId}/posts`, session);
 
 			cy.contains('.page-load-error h1', 'Page not found').should('be.visible');
 			cy.get('.mobile-top-bar-action[aria-label="Search"]').should('be.visible');
@@ -76,7 +76,7 @@ describe('404 page', () => {
 
 		it('leads to the feed with Go home on mobile', () => {
 			cy.viewport(390, 844);
-			visitAsUser(`/user/${unknownUserId}`, userToken);
+			visitAsUser(`/user/${unknownUserId}`, session);
 
 			cy.contains('.page-load-error button', 'Go home').click();
 

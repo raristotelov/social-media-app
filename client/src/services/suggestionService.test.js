@@ -5,26 +5,23 @@ jest.mock('./requester');
 
 describe('suggestionService', () => {
 	describe('getSuggestions', () => {
-		it.each([['sidebar'], ['carousel'], ['empty-feed']])(
-			'gets the suggestions endpoint with the %s placement and the token',
-			async (placement) => {
-				const get = jest.fn().mockResolvedValue({ suggestions: [], reserve: [], isCarouselDismissed: false });
+		it.each([['sidebar'], ['carousel'], ['empty-feed']])('gets the suggestions endpoint with the %s placement', async (placement) => {
+			const get = jest.fn().mockResolvedValue({ suggestions: [], reserve: [], isCarouselDismissed: false });
 
-				requestFactory.mockReturnValue({ get });
+			requestFactory.mockReturnValue({ get });
 
-				await getSuggestions({ placement, jwtToken: 'token123' });
+			await getSuggestions({ placement });
 
-				expect(requestFactory).toHaveBeenCalledWith('token123');
-				expect(get).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`/suggestions\\?placement=${placement}$`)));
-			},
-		);
+			expect(requestFactory).toHaveBeenCalledWith();
+			expect(get).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`/suggestions\\?placement=${placement}$`)));
+		});
 
 		it('resolves with the server result', async () => {
 			const result = { suggestions: [{ _id: 'u2' }], reserve: [{ _id: 'u3' }], isCarouselDismissed: false };
 
 			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue(result) });
 
-			await expect(getSuggestions({ placement: 'sidebar', jwtToken: 'token123' })).resolves.toBe(result);
+			await expect(getSuggestions({ placement: 'sidebar' })).resolves.toBe(result);
 		});
 
 		it('encodes the placement in the query string', async () => {
@@ -32,7 +29,7 @@ describe('suggestionService', () => {
 
 			requestFactory.mockReturnValue({ get });
 
-			await getSuggestions({ placement: 'a&b', jwtToken: 'token123' });
+			await getSuggestions({ placement: 'a&b' });
 
 			expect(get).toHaveBeenCalledWith(expect.stringContaining('placement=a%26b'));
 		});
@@ -42,19 +39,19 @@ describe('suggestionService', () => {
 
 			requestFactory.mockReturnValue({ get: jest.fn().mockRejectedValue(error) });
 
-			await expect(getSuggestions({ placement: 'sidebar', jwtToken: 'token123' })).rejects.toBe(error);
+			await expect(getSuggestions({ placement: 'sidebar' })).rejects.toBe(error);
 		});
 	});
 
 	describe('dismissSuggestionsCarousel', () => {
-		it('posts to the carousel dismiss endpoint with the token', async () => {
+		it('posts to the carousel dismiss endpoint', async () => {
 			const post = jest.fn().mockResolvedValue(undefined);
 
 			requestFactory.mockReturnValue({ post });
 
-			await dismissSuggestionsCarousel({ jwtToken: 'token123' });
+			await dismissSuggestionsCarousel();
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/suggestions\/carousel\/dismiss$/));
 		});
 
@@ -63,7 +60,7 @@ describe('suggestionService', () => {
 
 			requestFactory.mockReturnValue({ post: jest.fn().mockRejectedValue(error) });
 
-			await expect(dismissSuggestionsCarousel({ jwtToken: 'token123' })).rejects.toBe(error);
+			await expect(dismissSuggestionsCarousel()).rejects.toBe(error);
 		});
 	});
 });

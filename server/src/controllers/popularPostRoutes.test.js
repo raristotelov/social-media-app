@@ -16,6 +16,7 @@ const app = require('../app');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
 const { MAX_SHOWN_POST_IDS } = require('../config/popularPosts');
+const constants = require('../config/constants');
 
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const POST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
@@ -30,7 +31,8 @@ describe('popular post routes', () => {
 	let originalJwtSecret;
 	let consoleErrorSpy;
 
-	const authHeaders = () => ({ 'X-Authorization': JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET) });
+	const sessionCookie = (token) => ({ Cookie: `${constants.AUTH_COOKIE_NAME}=${token}` });
+	const authHeaders = () => sessionCookie(JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET));
 
 	const postPopular = (body, headers = {}) =>
 		fetch(`${baseUrl}/user-posts/popular`, {
@@ -87,7 +89,7 @@ describe('popular post routes', () => {
 
 		it('treats a token signed with the wrong secret as a guest instead of refusing it', async () => {
 			const response = await fetch(`${baseUrl}/user-posts/popular`, {
-				headers: { 'X-Authorization': JWT.sign({ userId: USER_ID }, 'another-secret') },
+				headers: sessionCookie(JWT.sign({ userId: USER_ID }, 'another-secret')),
 			});
 
 			expect(response.status).toBe(200);
@@ -95,7 +97,7 @@ describe('popular post routes', () => {
 		});
 
 		it('treats a garbage token as a guest', async () => {
-			const response = await fetch(`${baseUrl}/user-posts/popular`, { headers: { 'X-Authorization': 'not-a-token' } });
+			const response = await fetch(`${baseUrl}/user-posts/popular`, { headers: sessionCookie('not-a-token') });
 
 			expect(response.status).toBe(200);
 			expect(popularPostService.getPopularPosts).toHaveBeenCalledWith({ userId: undefined, firstPostId: undefined });
@@ -178,7 +180,7 @@ describe('popular post routes', () => {
 		it('treats a token signed with the wrong secret as a guest', async () => {
 			const response = await postPopular(
 				{ snapshotTime: SNAPSHOT_TIME, shownPostIds: [] },
-				{ 'X-Authorization': JWT.sign({ userId: USER_ID }, 'another-secret') },
+				sessionCookie(JWT.sign({ userId: USER_ID }, 'another-secret')),
 			);
 
 			expect(response.status).toBe(200);

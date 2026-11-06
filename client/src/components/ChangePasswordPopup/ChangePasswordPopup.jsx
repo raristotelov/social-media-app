@@ -1,6 +1,5 @@
 import { useContext } from 'react';
 
-import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { changePassword } from '../../services/userService';
@@ -11,13 +10,12 @@ import Popup from '../Popup/Popup';
 import ChangePasswordForm from '../ChangePasswordForm/ChangePasswordForm';
 
 const ChangePasswordPopup = ({ onClose }) => {
-	const { jwtToken } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 	const { runWithSessionGuard } = useSessionGuard();
 
 	const changePasswordHandler = async ({ currentPassword, newPassword }) => {
 		try {
-			await runWithSessionGuard(() => changePassword({ jwtToken, currentPassword, newPassword }));
+			await runWithSessionGuard(() => changePassword({ currentPassword, newPassword }));
 		} catch (error) {
 			if (isUnauthenticatedError(error)) {
 				onClose();

@@ -7,7 +7,7 @@ import { ACTION_FALLBACK_MESSAGES } from '../constants/errorMessages';
 import { getErrorMessage, isUnauthenticatedError } from '../utils/errors';
 
 const useFollowActions = () => {
-	const { jwtToken, loggedInUser, updateLoggedInUser, endSession } = useContext(LoggedInUserContext);
+	const { loggedInUser, updateLoggedInUser, endSession } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 
 	const startedRequestCountRef = useRef(0);
@@ -42,15 +42,13 @@ const useFollowActions = () => {
 	);
 
 	const follow = useCallback(
-		(userIdToFollow) =>
-			runRequest(() => followUser({ userId: loggedInUser?._id, jwtToken, userIdToFollow }), ACTION_FALLBACK_MESSAGES.FOLLOW_USER),
-		[runRequest, loggedInUser, jwtToken],
+		(userIdToFollow) => runRequest(() => followUser({ userId: loggedInUser?._id, userIdToFollow }), ACTION_FALLBACK_MESSAGES.FOLLOW_USER),
+		[runRequest, loggedInUser],
 	);
 
 	const unfollow = useCallback(
-		(userIdToUnfollow) =>
-			runRequest(() => unfollowUser({ userId: loggedInUser?._id, jwtToken, userIdToUnfollow }), ACTION_FALLBACK_MESSAGES.UNFOLLOW_USER),
-		[runRequest, loggedInUser, jwtToken],
+		(userIdToUnfollow) => runRequest(() => unfollowUser({ userId: loggedInUser?._id, userIdToUnfollow }), ACTION_FALLBACK_MESSAGES.UNFOLLOW_USER),
+		[runRequest, loggedInUser],
 	);
 
 	return { follow, unfollow };

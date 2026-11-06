@@ -1,6 +1,5 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 
-import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { getFollowers, getFollowing } from '../../services/userService';
 import { getStoryViewers } from '../../services/storyService';
@@ -28,7 +27,6 @@ const UserListPopup = ({ userId, storyId, userPostId, commentId, listType, onClo
 	const [hasLoadFailed, setHasLoadFailed] = useState(false);
 	const [reloadCount, setReloadCount] = useState(0);
 
-	const { jwtToken } = useContext(LoggedInUserContext);
 	const { endSessionIfUnauthenticated } = useSessionGuard();
 
 	useEffect(() => {
@@ -37,7 +35,7 @@ const UserListPopup = ({ userId, storyId, userPostId, commentId, listType, onClo
 		setIsLoading(true);
 		setHasLoadFailed(false);
 
-		USER_LIST_LOADERS[listType]({ userId, storyId, userPostId, commentId, jwtToken })
+		USER_LIST_LOADERS[listType]({ userId, storyId, userPostId, commentId })
 			.then((result) => {
 				if (isCurrentRequest) {
 					setUsers(result);
@@ -63,7 +61,7 @@ const UserListPopup = ({ userId, storyId, userPostId, commentId, listType, onClo
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [userId, storyId, userPostId, commentId, listType, jwtToken, reloadCount, endSessionIfUnauthenticated]);
+	}, [userId, storyId, userPostId, commentId, listType, reloadCount, endSessionIfUnauthenticated]);
 
 	const retryLoad = () => {
 		setReloadCount((count) => count + 1);

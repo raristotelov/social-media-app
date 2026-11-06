@@ -25,7 +25,7 @@ describe('PATCH /users/password against a real database', () => {
 	let otherUser;
 
 	const authHeaders = (target) => ({
-		'X-Authorization': JWT.sign({ userId: String(target._id), username: target.username }, JWT_SECRET),
+		Cookie: `${constants.AUTH_COOKIE_NAME}=${JWT.sign({ userId: String(target._id), username: target.username }, JWT_SECRET)}`,
 		'Content-Type': 'application/json',
 	});
 

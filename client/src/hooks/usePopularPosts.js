@@ -18,18 +18,16 @@ const usePopularPosts = ({ firstPostId, onFirstPostMissing }) => {
 	const [hasLoadMoreFailed, setHasLoadMoreFailed] = useState(false);
 	const [reloadCount, setReloadCount] = useState(0);
 
-	const { jwtToken, endSession } = useContext(LoggedInUserContext);
+	const { endSession } = useContext(LoggedInUserContext);
 
-	const jwtTokenRef = useRef(jwtToken);
 	const onFirstPostMissingRef = useRef(onFirstPostMissing);
 	const firstPostIdRef = useRef(firstPostId);
 	const shownPostIdsRef = useRef([]);
 	const isLoadingMoreRef = useRef(false);
 
 	useEffect(() => {
-		jwtTokenRef.current = jwtToken;
 		onFirstPostMissingRef.current = onFirstPostMissing;
-	}, [jwtToken, onFirstPostMissing]);
+	}, [onFirstPostMissing]);
 
 	useEffect(() => {
 		let isCurrentRequest = true;
@@ -38,7 +36,7 @@ const usePopularPosts = ({ firstPostId, onFirstPostMissing }) => {
 
 		const loadFirstPage = async () => {
 			try {
-				return await getPopularPosts({ jwtToken: jwtTokenRef.current, firstPostId: firstPostIdRef.current });
+				return await getPopularPosts({ firstPostId: firstPostIdRef.current });
 			} catch (error) {
 				if (!firstPostIdRef.current || getErrorCode(error) !== ERROR_CODES.POST_NOT_FOUND) {
 					throw error;
@@ -49,7 +47,7 @@ const usePopularPosts = ({ firstPostId, onFirstPostMissing }) => {
 					onFirstPostMissingRef.current();
 				}
 
-				return getPopularPosts({ jwtToken: jwtTokenRef.current });
+				return getPopularPosts();
 			}
 		};
 
@@ -106,7 +104,6 @@ const usePopularPosts = ({ firstPostId, onFirstPostMissing }) => {
 
 		try {
 			const result = await getNextPopularPosts({
-				jwtToken: jwtTokenRef.current,
 				snapshotTime,
 				shownPostIds: shownPostIdsRef.current,
 			});

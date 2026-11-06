@@ -3,7 +3,7 @@ import { createUserViaApi, loginViaApi, uploadPostViaApi, uploadProfilePictureVi
 
 describe('cloudinary upload folder', () => {
 	let user;
-	let jwtToken;
+	let session;
 	let uploadFolder;
 
 	beforeEach(() => {
@@ -11,8 +11,8 @@ describe('cloudinary upload folder', () => {
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
 		});
 
 		cy.task('getCloudinaryFolder').then((folder) => {
@@ -25,13 +25,13 @@ describe('cloudinary upload folder', () => {
 	});
 
 	it('uploads a post image into the configured folder', () => {
-		cy.then(() => uploadPostViaApi(jwtToken, 'Folder check')).then((post) => {
+		cy.then(() => uploadPostViaApi(session, 'Folder check')).then((post) => {
 			expect(post.imageIdentifier).to.match(new RegExp(`^${Cypress._.escapeRegExp(uploadFolder)}/`));
 		});
 	});
 
 	it('uploads a profile picture into the configured folder', () => {
-		cy.then(() => uploadProfilePictureViaApi(jwtToken)).then((picture) => {
+		cy.then(() => uploadProfilePictureViaApi(session)).then((picture) => {
 			expect(picture.imageIdentifier).to.match(new RegExp(`^${Cypress._.escapeRegExp(uploadFolder)}/`));
 		});
 	});

@@ -15,7 +15,7 @@ const renderMainHeader = (loggedInUser, logoutHandler = jest.fn(), searchResults
 	getUsersProfileData.mockResolvedValue(searchResults);
 
 	return render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser }}>
 			<MemoryRouter initialEntries={[path]}>
 				<MainHeader logoutHandler={logoutHandler} />
 			</MemoryRouter>
@@ -50,7 +50,7 @@ describe('MainHeader', () => {
 
 		userEvent.type(screen.getByPlaceholderText('Search'), 'ab');
 
-		await waitFor(() => expect(getUsersProfileData).toHaveBeenCalledWith({ searchWord: 'ab', jwtToken: 'token123' }));
+		await waitFor(() => expect(getUsersProfileData).toHaveBeenCalledWith({ searchWord: 'ab' }));
 	});
 
 	describe('search dropdown', () => {
@@ -205,7 +205,7 @@ describe('MainHeader', () => {
 			getUsersProfileData.mockResolvedValue([]);
 
 			return render(
-				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: { _id: 'user1', username: 'johndoe', following: [] } }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser: { _id: 'user1', username: 'johndoe', following: [] } }}>
 					<ToastContext.Provider value={{ showToast: jest.fn(), dismissToast: jest.fn() }}>
 						<MemoryRouter>
 							<MainHeader logoutHandler={jest.fn()} />

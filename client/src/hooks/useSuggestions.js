@@ -104,24 +104,19 @@ const suggestionsReducer = (state, action) => {
 const useSuggestions = (placement, { onFollowChange } = {}) => {
 	const [state, dispatch] = useReducer(suggestionsReducer, INITIAL_STATE);
 
-	const { jwtToken, endSession } = useContext(LoggedInUserContext);
+	const { endSession } = useContext(LoggedInUserContext);
 	const { follow, unfollow } = useFollowActions();
 
-	const jwtTokenRef = useRef(jwtToken);
 	const pendingUserIdsRef = useRef(new Set());
 
 	const keepsFollowed = PLACEMENTS_KEEPING_FOLLOWED.includes(placement);
-
-	useEffect(() => {
-		jwtTokenRef.current = jwtToken;
-	}, [jwtToken]);
 
 	useEffect(() => {
 		let isCurrentRequest = true;
 
 		dispatch({ type: ACTIONS.LOAD_STARTED });
 
-		getSuggestions({ placement, jwtToken: jwtTokenRef.current })
+		getSuggestions({ placement })
 			.then((result) => {
 				if (isCurrentRequest) {
 					dispatch({
@@ -197,13 +192,13 @@ const useSuggestions = (placement, { onFollowChange } = {}) => {
 		dispatch({ type: ACTIONS.CAROUSEL_DISMISSED });
 
 		try {
-			await dismissSuggestionsCarousel({ jwtToken });
+			await dismissSuggestionsCarousel();
 		} catch (error) {
 			if (isUnauthenticatedError(error)) {
 				endSession();
 			}
 		}
-	}, [jwtToken, endSession]);
+	}, [endSession]);
 
 	return {
 		suggestions: state.suggestions,

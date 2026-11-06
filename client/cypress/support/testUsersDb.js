@@ -248,10 +248,19 @@ const deleteDemoVisitor = (userId) =>
 		return null;
 	});
 
+const signExpiredSessionToken = (userId) => {
+	loadServerEnv();
+
+	const JWT = require(path.join(SERVER_ROOT, 'node_modules/jsonwebtoken'));
+
+	return JWT.sign({ userId, username: 'cypress_expired_session' }, process.env.JWT_SECRET, { expiresIn: -60 });
+};
+
 module.exports = {
 	cleanTestUsers,
 	deleteTestUser,
 	deleteDemoVisitor,
+	signExpiredSessionToken,
 	getCloudinaryFolder,
 	cloudinaryAssetExists,
 };

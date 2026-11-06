@@ -73,12 +73,12 @@ const LocationProbe = () => {
 	);
 };
 
-const renderLayout = ({ entries = ['/popular-posts'], jwtToken = 'token123' } = {}) => {
+const renderLayout = ({ entries = ['/popular-posts'], loggedInUser = { _id: 'user1' } } = {}) => {
 	const showToast = jest.fn();
 	const endSession = jest.fn();
 
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken, loggedInUser: jwtToken ? { _id: 'user1' } : null, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>
 			<ToastContext.Provider value={{ showToast }}>
 				<MemoryRouter initialEntries={entries}>
 					<Routes>
@@ -148,21 +148,22 @@ describe('PopularPostsLayout', () => {
 			expect(await screen.findByTestId('probe-name')).toHaveTextContent('posts');
 		});
 
-		it('requests the popular posts with the token', async () => {
+		it('requests the popular posts once, without passing a token', async () => {
 			renderLayout();
 
 			await screen.findByTestId('probe-name');
 
 			expect(getPopularPosts).toHaveBeenCalledTimes(1);
-			expect(getPopularPosts).toHaveBeenCalledWith(expect.objectContaining({ jwtToken: 'token123' }));
+			expect(getPopularPosts.mock.calls[0][0]).not.toHaveProperty('jwtToken');
 		});
 
-		it('requests the popular posts without a token for a guest', async () => {
-			renderLayout({ jwtToken: null });
+		it('makes the same request for a guest', async () => {
+			renderLayout({ loggedInUser: null });
 
 			await screen.findByTestId('probe-name');
 
-			expect(getPopularPosts).toHaveBeenCalledWith(expect.objectContaining({ jwtToken: null }));
+			expect(getPopularPosts).toHaveBeenCalledTimes(1);
+			expect(getPopularPosts.mock.calls[0][0]).not.toHaveProperty('jwtToken');
 		});
 
 		it('names no first post when the grid is opened', async () => {
@@ -379,7 +380,7 @@ describe('PopularPostsLayout', () => {
 
 			expect(getPopularPosts).toHaveBeenCalledTimes(2);
 			expect(getPopularPosts.mock.calls[0][0].firstPostId).toBe('gone');
-			expect(getPopularPosts.mock.calls[1][0].firstPostId).toBeUndefined();
+			expect(getPopularPosts.mock.calls[1][0]?.firstPostId).toBeUndefined();
 		});
 
 		it('also covers a malformed post id, which the server answers the same way', async () => {
@@ -399,7 +400,7 @@ describe('PopularPostsLayout', () => {
 			renderLayout();
 
 			await waitFor(() => expect(getShownIds()).toBe('p1,p2,p3,p4'));
-			expect(getNextPopularPosts).toHaveBeenCalledWith({ jwtToken: 'token123', snapshotTime: SNAPSHOT_TIME, shownPostIds: ['p1', 'p2'] });
+			expect(getNextPopularPosts).toHaveBeenCalledWith({ snapshotTime: SNAPSHOT_TIME, shownPostIds: ['p1', 'p2'] });
 		});
 
 		it('does not ask for a next batch when the server has no more', async () => {

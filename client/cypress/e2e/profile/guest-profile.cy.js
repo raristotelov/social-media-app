@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, userIdFromToken, loginViaApi } from '../../support/api';
+import { createUserViaApi, userIdFromSession, loginViaApi } from '../../support/api';
 
 describe('guest profile', () => {
 	const user = buildTestUser();
@@ -9,8 +9,8 @@ describe('guest profile', () => {
 	before(() => {
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			profilePath = `/user/${userIdFromToken(token)}`;
+		loginViaApi(user).then((session) => {
+			profilePath = `/user/${userIdFromSession(session)}`;
 		});
 	});
 

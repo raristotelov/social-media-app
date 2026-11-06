@@ -13,17 +13,12 @@ const useFeedPosts = () => {
 	const [hasLoadMoreFailed, setHasLoadMoreFailed] = useState(false);
 	const [reloadCount, setReloadCount] = useState(0);
 
-	const { jwtToken, endSession } = useContext(LoggedInUserContext);
+	const { endSession } = useContext(LoggedInUserContext);
 
-	const jwtTokenRef = useRef(jwtToken);
 	const nextCursorRef = useRef(null);
 	const hasLoadedRef = useRef(false);
 	const isLoadingMoreRef = useRef(false);
 	const loadGenerationRef = useRef(0);
-
-	useEffect(() => {
-		jwtTokenRef.current = jwtToken;
-	}, [jwtToken]);
 
 	useEffect(() => {
 		let isCurrentRequest = true;
@@ -34,7 +29,7 @@ const useFeedPosts = () => {
 			setIsLoading(true);
 		}
 
-		getFollowedUsersPosts({ jwtToken: jwtTokenRef.current })
+		getFollowedUsersPosts()
 			.then((result) => {
 				if (!isCurrentRequest) {
 					return;
@@ -91,7 +86,7 @@ const useFeedPosts = () => {
 		setHasLoadMoreFailed(false);
 
 		try {
-			const result = await getFollowedUsersPosts({ jwtToken: jwtTokenRef.current, cursor: nextCursorRef.current });
+			const result = await getFollowedUsersPosts({ cursor: nextCursorRef.current });
 
 			if (loadGeneration !== loadGenerationRef.current) {
 				return;

@@ -1,10 +1,11 @@
 import { buildTestUser } from '../../support/testUser';
 import {
 	serverUrl,
+	cookieHeader,
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	uploadPostViaApi,
 	getProfileViaApi,
 	deletePostViaApi,
@@ -13,8 +14,8 @@ import {
 describe('post delete', () => {
 	let user;
 	let otherUser;
-	let jwtToken;
-	let otherJwtToken;
+	let session;
+	let otherSession;
 	let userId;
 	let profilePath;
 	let posts;
@@ -37,18 +38,18 @@ describe('post delete', () => {
 		createUserViaApi(user);
 		createUserViaApi(otherUser);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 			profilePath = `/user/${userId}`;
 		});
 
-		loginViaApi(otherUser).then((token) => {
-			otherJwtToken = token;
+		loginViaApi(otherUser).then((loggedInSession) => {
+			otherSession = loggedInSession;
 		});
 
-		cy.then(() => uploadPostViaApi(jwtToken, 'first caption')).then((post) => posts.push(post));
-		cy.then(() => uploadPostViaApi(jwtToken, 'second caption')).then((post) => posts.push(post));
+		cy.then(() => uploadPostViaApi(session, 'first caption')).then((post) => posts.push(post));
+		cy.then(() => uploadPostViaApi(session, 'second caption')).then((post) => posts.push(post));
 
 		cy.intercept('DELETE', '**/user-posts/**').as('deleteRequest');
 	});
@@ -59,7 +60,7 @@ describe('post delete', () => {
 	});
 
 	it('opens a menu with Edit and Delete from a tile', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		tileActionsButton(0).click();
 
@@ -68,7 +69,7 @@ describe('post delete', () => {
 	});
 
 	it('asks for confirmation before deleting and sends nothing yet', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 
@@ -78,7 +79,7 @@ describe('post delete', () => {
 	});
 
 	it('leaves the post untouched when Cancel is clicked', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		cy.get('.delete-post-actions').contains('button', 'Cancel').click();
@@ -94,7 +95,7 @@ describe('post delete', () => {
 	});
 
 	it('deletes the post, updates the grid and the post count, and keeps it gone after a refresh', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -120,7 +121,7 @@ describe('post delete', () => {
 			'failingDelete',
 		);
 
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -139,7 +140,7 @@ describe('post delete', () => {
 
 	it('works from the bottom sheets on mobile', () => {
 		cy.viewport(390, 844);
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(1);
 		confirmDelete();
@@ -149,15 +150,15 @@ describe('post delete', () => {
 	});
 
 	it('does not show post actions on another user profile', () => {
-		visitAsUser(profilePath, otherJwtToken);
+		visitAsUser(profilePath, otherSession);
 
 		cy.get('.profile-post').should('have.length', 2);
 		cy.get('.post-actions-button').should('not.exist');
 	});
 
 	describe('server authorization', () => {
-		it('rejects a delete without a token', () => {
-			cy.request({ method: 'DELETE', url: `${serverUrl}/user-posts/${posts[0]._id}`, failOnStatusCode: false })
+		it('rejects a delete without a session cookie', () => {
+			cy.request({ method: 'DELETE', url: `${serverUrl}/user-posts/${posts[0]._id}`, headers: cookieHeader(''), failOnStatusCode: false })
 				.its('status')
 				.should('eq', 401);
 
@@ -167,7 +168,7 @@ describe('post delete', () => {
 		});
 
 		it("rejects deleting someone else's post and leaves it in place", () => {
-			cy.then(() => deletePostViaApi(otherJwtToken, posts[0]._id, false))
+			cy.then(() => deletePostViaApi(otherSession, posts[0]._id, false))
 				.its('status')
 				.should('eq', 403);
 
@@ -177,13 +178,13 @@ describe('post delete', () => {
 		});
 
 		it('answers 404 for a post id that does not exist', () => {
-			cy.then(() => deletePostViaApi(jwtToken, '64b7f0a1c2d3e4f5a6b7c8e1', false))
+			cy.then(() => deletePostViaApi(session, '64b7f0a1c2d3e4f5a6b7c8e1', false))
 				.its('status')
 				.should('eq', 404);
 		});
 
 		it('answers 404 for a malformed post id', () => {
-			cy.then(() => deletePostViaApi(jwtToken, 'not-an-id', false))
+			cy.then(() => deletePostViaApi(session, 'not-an-id', false))
 				.its('status')
 				.should('eq', 404);
 		});

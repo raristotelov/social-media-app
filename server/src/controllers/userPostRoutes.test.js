@@ -14,6 +14,7 @@ jest.mock('../services', () => ({
 }));
 
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const JWT = require('jsonwebtoken');
 
 const { userPostService } = require('../services');
@@ -21,6 +22,7 @@ const userPostController = require('./userPostController');
 const errorHandler = require('../middlewares/errorHandler');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
+const constants = require('../config/constants');
 
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const POST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
@@ -32,7 +34,8 @@ describe('user post routes', () => {
 	let originalJwtSecret;
 	let consoleErrorSpy;
 
-	const authHeaders = () => ({ 'X-Authorization': JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET) });
+	const sessionCookie = (token) => ({ Cookie: `${constants.AUTH_COOKIE_NAME}=${token}` });
+	const authHeaders = () => sessionCookie(JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET));
 
 	beforeAll(async () => {
 		originalJwtSecret = process.env.JWT_SECRET;
@@ -40,6 +43,7 @@ describe('user post routes', () => {
 
 		const app = express();
 
+		app.use(cookieParser());
 		app.use(express.json());
 		app.use('/user-posts', userPostController);
 		app.use(errorHandler);
@@ -108,7 +112,7 @@ describe('user post routes', () => {
 		});
 
 		it('answers 200 for a guest who sends an expired or invalid token', async () => {
-			const response = await fetch(`${baseUrl}/user-posts/${POST_ID}/likes`, { headers: { 'X-Authorization': 'not-a-token' } });
+			const response = await fetch(`${baseUrl}/user-posts/${POST_ID}/likes`, { headers: sessionCookie('not-a-token') });
 
 			expect(response.status).toBe(200);
 		});

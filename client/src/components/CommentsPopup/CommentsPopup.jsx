@@ -1,6 +1,5 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getComments, addComment } from '../../services/commentService';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';
 import { addCommentLocally, applyLikeLocally } from '../../utils/comments';
@@ -17,8 +16,6 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [hasLoadFailed, setHasLoadFailed] = useState(false);
 	const [retryCount, setRetryCount] = useState(0);
-
-	const { jwtToken } = useContext(LoggedInUserContext);
 
 	const onCommentsLoadedRef = useRef(onCommentsLoaded);
 
@@ -40,7 +37,7 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 		setIsLoading(true);
 		setHasLoadFailed(false);
 
-		getComments({ userPostId, jwtToken })
+		getComments({ userPostId })
 			.then((result) => {
 				if (!isCurrentRequest) {
 					return;
@@ -62,7 +59,7 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [userPostId, jwtToken, retryCount, applyComments]);
+	}, [userPostId, retryCount, applyComments]);
 
 	const retryLoad = () => {
 		setRetryCount((count) => count + 1);
@@ -82,7 +79,7 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 
 	const reloadComments = async (addedComment, likeChange) => {
 		try {
-			const result = await getComments({ userPostId, jwtToken });
+			const result = await getComments({ userPostId });
 
 			setHasLoadFailed(false);
 			applyComments(result);
@@ -101,7 +98,7 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 	};
 
 	const submitComment = async (text) => {
-		const addedComment = await addComment({ userPostId, text, jwtToken });
+		const addedComment = await addComment({ userPostId, text });
 
 		await reloadComments(addedComment);
 	};

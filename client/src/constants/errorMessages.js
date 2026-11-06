@@ -37,6 +37,7 @@ export const ACTION_FALLBACK_MESSAGES = Object.freeze({
 	LOG_IN: "Couldn't log in. Try again.",
 	SIGN_UP: "Couldn't sign up. Try again.",
 	START_DEMO: "Couldn't start the demo. Try again.",
+	LOG_OUT: "Couldn't log you out. Try again.",
 	SAVE_PROFILE: "Couldn't save your profile. Try again.",
 	CHANGE_PASSWORD: "Couldn't change your password. Try again.",
 	EDIT_CAPTION: "Couldn't save the caption. Try again.",

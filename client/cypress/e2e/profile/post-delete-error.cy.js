@@ -1,9 +1,9 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, uploadPostViaApi, getProfileViaApi } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession, uploadPostViaApi, getProfileViaApi } from '../../support/api';
 
 describe('post delete error toast', () => {
 	let user;
-	let jwtToken;
+	let session;
 	let userId;
 	let profilePath;
 
@@ -22,14 +22,14 @@ describe('post delete error toast', () => {
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 			profilePath = `/user/${userId}`;
 		});
 
-		cy.then(() => uploadPostViaApi(jwtToken, 'first caption'));
-		cy.then(() => uploadPostViaApi(jwtToken, 'second caption'));
+		cy.then(() => uploadPostViaApi(session, 'first caption'));
+		cy.then(() => uploadPostViaApi(session, 'second caption'));
 	});
 
 	afterEach(() => {
@@ -38,7 +38,7 @@ describe('post delete error toast', () => {
 
 	it('closes the confirmation and shows the fallback toast when the server answers INTERNAL_ERROR', () => {
 		stubDelete(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -53,7 +53,7 @@ describe('post delete error toast', () => {
 
 	it('shows the POST_NOT_FOUND copy as a toast', () => {
 		stubDelete(404, { code: 'POST_NOT_FOUND', message: 'Post not found' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -66,7 +66,7 @@ describe('post delete error toast', () => {
 
 	it('shows the POST_FORBIDDEN copy as a toast', () => {
 		stubDelete(403, { code: 'POST_FORBIDDEN', message: 'You can only change your own posts' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -78,7 +78,7 @@ describe('post delete error toast', () => {
 
 	it('shows the fallback toast when the network fails', () => {
 		cy.intercept('DELETE', '**/user-posts/**', { forceNetworkError: true }).as('failingDelete');
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -88,7 +88,7 @@ describe('post delete error toast', () => {
 
 	it('never shows the developer message from the server', () => {
 		stubDelete(500, { code: 'INTERNAL_ERROR', message: 'Could not delete image cypress_image_123' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -101,7 +101,7 @@ describe('post delete error toast', () => {
 
 	it('dismisses the toast with the close button', () => {
 		stubDelete(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -114,7 +114,7 @@ describe('post delete error toast', () => {
 
 	it('dismisses the toast by itself after 5 seconds', () => {
 		stubDelete(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -125,7 +125,7 @@ describe('post delete error toast', () => {
 
 	it('keeps the toast while the pointer is over it', () => {
 		stubDelete(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -139,7 +139,7 @@ describe('post delete error toast', () => {
 	it('shows the toast above the tab bar at 390', () => {
 		cy.viewport(390, 844);
 		stubDelete(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -150,7 +150,7 @@ describe('post delete error toast', () => {
 
 	it('ends the session and sends the user to /log-in when the delete answers UNAUTHENTICATED', () => {
 		stubDelete(401, { code: 'UNAUTHENTICATED', message: 'Invalid or expired token' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();
@@ -160,14 +160,14 @@ describe('post delete error toast', () => {
 		cy.location('pathname').should('eq', '/log-in');
 		cy.get('.toast-region .toast').should('not.exist');
 
-		cy.window().then((win) => {
-			expect(win.localStorage.getItem('jwt-token')).to.equal(null);
+		cy.get('.tab-bar').within(() => {
+			cy.contains('Log in').should('exist');
 		});
 	});
 
 	it('leaves the stored posts untouched after a failed delete', () => {
 		stubDelete(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openDeleteConfirmation(0);
 		confirmDelete();

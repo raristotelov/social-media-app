@@ -30,8 +30,8 @@ const CountProbe = () => {
 	);
 };
 
-const buildTree = ({ jwtToken = 'token123', user = loggedInUser, endSession = jest.fn() } = {}) => (
-	<LoggedInUserContext.Provider value={{ jwtToken, loggedInUser: user, endSession }}>
+const buildTree = ({ user = loggedInUser, endSession = jest.fn() } = {}) => (
+	<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
 		<NotificationsProvider>
 			<CountProbe />
 		</NotificationsProvider>
@@ -73,27 +73,20 @@ describe('NotificationsProvider', () => {
 
 	describe('for a guest', () => {
 		it('never asks for the count and shows zero', async () => {
-			render(buildTree({ jwtToken: null, user: null }));
+			render(buildTree({ user: null }));
 			await advance(NOTIFICATIONS_POLL_INTERVAL_MS * 3);
 
 			expect(getUnreadNotificationCount).not.toHaveBeenCalled();
 			expect(screen.getByTestId('count')).toHaveTextContent('0');
 		});
-
-		it('does not ask when there is a token but no user yet', async () => {
-			render(buildTree({ user: null }));
-			await advance(NOTIFICATIONS_POLL_INTERVAL_MS);
-
-			expect(getUnreadNotificationCount).not.toHaveBeenCalled();
-		});
 	});
 
 	describe('on app load', () => {
-		it('fetches the count with the token', async () => {
+		it('fetches the count without passing a token', async () => {
 			render(buildTree());
 			await flush();
 
-			expect(getUnreadNotificationCount).toHaveBeenCalledWith({ jwtToken: 'token123' });
+			expect(getUnreadNotificationCount).toHaveBeenCalledWith();
 			expect(getUnreadNotificationCount).toHaveBeenCalledTimes(1);
 		});
 
@@ -208,7 +201,7 @@ describe('NotificationsProvider', () => {
 			const { rerender } = render(buildTree());
 
 			await flush();
-			rerender(buildTree({ jwtToken: null, user: null }));
+			rerender(buildTree({ user: null }));
 			await advance(NOTIFICATIONS_POLL_INTERVAL_MS * 2);
 
 			expect(getUnreadNotificationCount).toHaveBeenCalledTimes(1);
@@ -333,7 +326,7 @@ describe('NotificationsProvider', () => {
 			expect(endSession).not.toHaveBeenCalled();
 		});
 
-		it('ends the session when the token is no longer valid', async () => {
+		it('ends the session when the session is no longer valid', async () => {
 			const endSession = jest.fn();
 
 			getUnreadNotificationCount.mockRejectedValue(

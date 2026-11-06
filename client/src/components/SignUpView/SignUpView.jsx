@@ -9,13 +9,13 @@ import SignUpForm from '../SignUpForm/SignUpForm';
 import './SignUpView.css';
 
 const SignUpView = () => {
-	const { setJwtToken } = useContext(LoggedInUserContext);
+	const { setLoggedInUser } = useContext(LoggedInUserContext);
 	const navigate = useNavigate();
 
 	const signUpHandler = async ({ repeatPassword, ...newUserData }) => {
-		const newUserJwt = await signUp(newUserData);
+		const newUser = await signUp(newUserData);
 
-		setJwtToken(newUserJwt);
+		setLoggedInUser(newUser);
 		navigate('/user-feed');
 	};
 

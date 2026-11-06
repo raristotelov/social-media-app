@@ -8,7 +8,8 @@ const MIN_SEARCH_LENGTH = 2;
 // Shared by the desktop header dropdown and the mobile search view so the two
 // cannot drift apart.
 export const useUserSearch = () => {
-	const { jwtToken } = useContext(LoggedInUserContext);
+	const { loggedInUser } = useContext(LoggedInUserContext);
+	const loggedInUserId = loggedInUser?._id;
 	const [searchWord, setSearchWord] = useState('');
 	const [results, setResults] = useState([]);
 	const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +26,7 @@ export const useUserSearch = () => {
 
 		setIsLoading(true);
 
-		getUsersProfileData({ searchWord, jwtToken })
+		getUsersProfileData({ searchWord })
 			.then((result) => {
 				// A slower earlier request must not overwrite a newer one's results.
 				if (isCurrent) {
@@ -46,7 +47,7 @@ export const useUserSearch = () => {
 		return () => {
 			isCurrent = false;
 		};
-	}, [searchWord, jwtToken]);
+	}, [searchWord, loggedInUserId]);
 
 	const clearSearch = () => {
 		setSearchWord('');

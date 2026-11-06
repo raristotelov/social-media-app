@@ -67,9 +67,7 @@ const memberUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderPosts = ({ entries = ['/popular-posts/posts#p2'], initialIndex, user = memberUser } = {}) =>
 	render(
-		<LoggedInUserContext.Provider
-			value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}
-		>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
 					<Routes>
@@ -349,11 +347,11 @@ describe('PopularPostsPostsView', () => {
 	});
 
 	describe('as a guest', () => {
-		it('loads and shows the posts without a token', async () => {
+		it('loads and shows the posts, with no token passed', async () => {
 			renderPosts({ user: null });
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
-			expect(getPopularPosts).toHaveBeenCalledWith(expect.objectContaining({ jwtToken: null }));
+			expect(getPopularPosts.mock.calls[0][0]).not.toHaveProperty('jwtToken');
 		});
 
 		it('shows the same cards as a member, with the like control and the comment box', async () => {
@@ -438,7 +436,7 @@ describe('PopularPostsPostsView', () => {
 			userEvent.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
 
 			expect(await within(articles[1]).findByText('1 like')).toBeInTheDocument();
-			expect(likeUserPost).toHaveBeenCalledWith({ userPostToLikeId: 'p2', jwtToken: 'token123' });
+			expect(likeUserPost).toHaveBeenCalledWith({ userPostToLikeId: 'p2' });
 		});
 
 		it('shows a like given in the posts view on the grid tile', async () => {

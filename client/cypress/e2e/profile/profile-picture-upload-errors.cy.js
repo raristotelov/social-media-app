@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, getProfileViaApi } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession, getProfileViaApi } from '../../support/api';
 
 const FIXTURE_IMAGE = 'cypress/fixtures/test-image.png';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -9,7 +9,7 @@ const FALLBACK_MESSAGE = "Couldn't save your profile. Try again.";
 
 describe('profile picture upload errors', () => {
 	let user;
-	let jwtToken;
+	let session;
 	let userId;
 	let profilePath;
 
@@ -37,9 +37,9 @@ describe('profile picture upload errors', () => {
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 			profilePath = `/user/${userId}`;
 		});
 	});
@@ -51,7 +51,7 @@ describe('profile picture upload errors', () => {
 	describe('choosing a file in the browser', () => {
 		beforeEach(() => {
 			cy.intercept('PATCH', '**/users/update/**').as('updateRequest');
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 			openEditProfile();
 		});
 
@@ -96,7 +96,7 @@ describe('profile picture upload errors', () => {
 	describe('when the server rejects the upload', () => {
 		it('shows the size message under the picture for a 413 and keeps the popup open', () => {
 			stubUpdate(413, { code: 'IMAGE_TOO_LARGE', message: 'profilePicture: IMAGE_TOO_LARGE', fields: { profilePicture: 'IMAGE_TOO_LARGE' } });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@updateRequest');
@@ -108,7 +108,7 @@ describe('profile picture upload errors', () => {
 
 		it('shows the fallback message and keeps the popup open for a 500', () => {
 			stubUpdate(500, { code: 'INTERNAL_ERROR', message: 'Something went wrong' });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@updateRequest');
@@ -122,7 +122,7 @@ describe('profile picture upload errors', () => {
 
 		it('clears the picture message when the picture is removed', () => {
 			stubUpdate(413, { code: 'IMAGE_TOO_LARGE', message: 'profilePicture: IMAGE_TOO_LARGE', fields: { profilePicture: 'IMAGE_TOO_LARGE' } });
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 
 			chooseAndSubmit();
 			cy.wait('@updateRequest');
@@ -139,7 +139,7 @@ describe('profile picture upload errors', () => {
 			cy.intercept('PATCH', '**/users/update/**', (req) => {
 				req.reply({ delay: 1500, statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } });
 			}).as('updateRequest');
-			visitAsUser(profilePath, jwtToken);
+			visitAsUser(profilePath, session);
 			openEditProfile();
 			fileInput().selectFile(FIXTURE_IMAGE, { force: true });
 		});
@@ -167,7 +167,7 @@ describe('profile picture upload errors', () => {
 		[300, 390].forEach((width) => {
 			it(`shows the picture error under the picture at ${width}px without horizontal scrolling`, () => {
 				cy.viewport(width, 700);
-				visitAsUser(profilePath, jwtToken);
+				visitAsUser(profilePath, session);
 				openEditProfile();
 
 				fileInput().selectFile(
