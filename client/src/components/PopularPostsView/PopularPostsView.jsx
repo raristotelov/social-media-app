@@ -1,4 +1,4 @@
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router';
 
 import { POPULAR_EMPTY_MESSAGE, POPULAR_POSTS_VIEW_PATH } from '../../constants/popularPosts';
 

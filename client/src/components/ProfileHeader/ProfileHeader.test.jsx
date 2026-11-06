@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -20,9 +19,9 @@ const renderProfileHeader = (props = {}) =>
 			userData={buildUserData()}
 			loggedInUserData={null}
 			isLoggedInUserProfile={false}
-			onEditProfileClick={jest.fn()}
-			onFollowUserClick={jest.fn()}
-			onUnfollowUserClick={jest.fn()}
+			onEditProfileClick={vi.fn()}
+			onFollowUserClick={vi.fn()}
+			onUnfollowUserClick={vi.fn()}
 			{...props}
 		/>,
 	);
@@ -76,64 +75,67 @@ describe('ProfileHeader', () => {
 	describe('followers and following counts', () => {
 		const buildItems = (count) => Array.from({ length: count }, (_, index) => ({ _id: `item${index}` }));
 
-		it('opens the followers list when the followers count is clicked', () => {
-			const onFollowersClick = jest.fn();
+		it('opens the followers list when the followers count is clicked', async () => {
+			const user = userEvent.setup();
+			const onFollowersClick = vi.fn();
 			renderProfileHeader({ onFollowersClick });
 
-			userEvent.click(screen.getByRole('button', { name: '1 follower' }));
+			await user.click(screen.getByRole('button', { name: /^1\s*follower$/ }));
 
 			expect(onFollowersClick).toHaveBeenCalledTimes(1);
 		});
 
-		it('opens the following list when the following count is clicked', () => {
-			const onFollowingClick = jest.fn();
+		it('opens the following list when the following count is clicked', async () => {
+			const user = userEvent.setup();
+			const onFollowingClick = vi.fn();
 			renderProfileHeader({ onFollowingClick });
 
-			userEvent.click(screen.getByRole('button', { name: '2 following' }));
+			await user.click(screen.getByRole('button', { name: /^2\s*following$/ }));
 
 			expect(onFollowingClick).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not call the following handler when the followers count is clicked', () => {
-			const onFollowingClick = jest.fn();
-			renderProfileHeader({ onFollowersClick: jest.fn(), onFollowingClick });
+		it('does not call the following handler when the followers count is clicked', async () => {
+			const user = userEvent.setup();
+			const onFollowingClick = vi.fn();
+			renderProfileHeader({ onFollowersClick: vi.fn(), onFollowingClick });
 
-			userEvent.click(screen.getByRole('button', { name: '1 follower' }));
+			await user.click(screen.getByRole('button', { name: /^1\s*follower$/ }));
 
 			expect(onFollowingClick).not.toHaveBeenCalled();
 		});
 
 		it('renders a zero followers count as plain text, not a button', () => {
-			renderProfileHeader({ userData: buildUserData({ followers: [] }), onFollowersClick: jest.fn() });
+			renderProfileHeader({ userData: buildUserData({ followers: [] }), onFollowersClick: vi.fn() });
 
-			expect(screen.queryByRole('button', { name: '0 followers' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /^0\s*followers$/ })).not.toBeInTheDocument();
 			expect(screen.getByText('followers')).toBeInTheDocument();
 		});
 
 		it('renders a zero following count as plain text, not a button', () => {
-			renderProfileHeader({ userData: buildUserData({ following: [] }), onFollowingClick: jest.fn() });
+			renderProfileHeader({ userData: buildUserData({ following: [] }), onFollowingClick: vi.fn() });
 
-			expect(screen.queryByRole('button', { name: '0 following' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /^0\s*following$/ })).not.toBeInTheDocument();
 			expect(screen.getByText('following')).toBeInTheDocument();
 		});
 
 		it('renders a missing followers list as a zero count that is not clickable', () => {
-			renderProfileHeader({ userData: buildUserData({ followers: undefined }), onFollowersClick: jest.fn() });
+			renderProfileHeader({ userData: buildUserData({ followers: undefined }), onFollowersClick: vi.fn() });
 
-			expect(screen.queryByRole('button', { name: '0 followers' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /^0\s*followers$/ })).not.toBeInTheDocument();
 		});
 
 		it('renders the counts as plain text when no handler is given', () => {
 			renderProfileHeader({ userData: buildUserData({ followers: buildItems(3), following: buildItems(3) }) });
 
-			expect(screen.queryByRole('button', { name: '3 followers' })).not.toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: '3 following' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /^3\s*followers$/ })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /^3\s*following$/ })).not.toBeInTheDocument();
 		});
 
 		it('never makes the posts count a button', () => {
-			renderProfileHeader({ onFollowersClick: jest.fn(), onFollowingClick: jest.fn() });
+			renderProfileHeader({ onFollowersClick: vi.fn(), onFollowingClick: vi.fn() });
 
-			expect(screen.queryByRole('button', { name: '3 posts' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /^3\s*posts$/ })).not.toBeInTheDocument();
 		});
 	});
 
@@ -167,30 +169,33 @@ describe('ProfileHeader', () => {
 		expect(container.querySelector('header')).not.toHaveClass('profile-header-no-bio');
 	});
 
-	it('shows "Edit Profile" and calls onEditProfileClick when viewing your own profile', () => {
-		const onEditProfileClick = jest.fn();
+	it('shows "Edit Profile" and calls onEditProfileClick when viewing your own profile', async () => {
+		const user = userEvent.setup();
+		const onEditProfileClick = vi.fn();
 		renderProfileHeader({ isLoggedInUserProfile: true, onEditProfileClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
+		await user.click(screen.getByRole('button', { name: 'Edit Profile' }));
 
 		expect(onEditProfileClick).toHaveBeenCalledTimes(1);
 	});
 
-	it('shows "Follow" and calls onFollowUserClick with the profile\'s user id when viewing someone else\'s profile', () => {
-		const onFollowUserClick = jest.fn();
+	it('shows "Follow" and calls onFollowUserClick with the profile\'s user id when viewing someone else\'s profile', async () => {
+		const user = userEvent.setup();
+		const onFollowUserClick = vi.fn();
 		renderProfileHeader({
 			userData: buildUserData({ _id: 'user1' }),
 			isLoggedInUserProfile: false,
 			onFollowUserClick,
 		});
 
-		userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+		await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 		expect(onFollowUserClick).toHaveBeenCalledWith('user1');
 	});
 
-	it('shows "Unfollow" and calls onUnfollowUserClick when loggedInUserData.following contains the profile\'s id', () => {
-		const onUnfollowUserClick = jest.fn();
+	it('shows "Unfollow" and calls onUnfollowUserClick when loggedInUserData.following contains the profile\'s id', async () => {
+		const user = userEvent.setup();
+		const onUnfollowUserClick = vi.fn();
 		renderProfileHeader({
 			userData: buildUserData({ _id: 'user1' }),
 			loggedInUserData: { following: ['user1'] },
@@ -198,7 +203,7 @@ describe('ProfileHeader', () => {
 			onUnfollowUserClick,
 		});
 
-		userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+		await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 		expect(onUnfollowUserClick).toHaveBeenCalledWith('user1');
 	});

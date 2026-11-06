@@ -54,20 +54,20 @@ describe('resizeImage', () => {
 	let getContextSpy;
 
 	const givenBitmap = (width, height) => {
-		bitmap = { width, height, close: jest.fn() };
-		global.createImageBitmap = jest.fn().mockResolvedValue(bitmap);
+		bitmap = { width, height, close: vi.fn() };
+		globalThis.createImageBitmap = vi.fn().mockResolvedValue(bitmap);
 	};
 
 	beforeEach(() => {
-		context = { fillStyle: '', fillRect: jest.fn(), drawImage: jest.fn() };
+		context = { fillStyle: '', fillRect: vi.fn(), drawImage: vi.fn() };
 		canvasWidthHeight = null;
 
-		getContextSpy = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function getContext() {
+		getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function getContext() {
 			canvasWidthHeight = { width: this.width, height: this.height };
 
 			return context;
 		});
-		toBlobSpy = jest
+		toBlobSpy = vi
 			.spyOn(HTMLCanvasElement.prototype, 'toBlob')
 			.mockImplementation((callback) => callback(new Blob(['(resized)'], { type: 'image/jpeg' })));
 	});
@@ -75,7 +75,7 @@ describe('resizeImage', () => {
 	afterEach(() => {
 		getContextSpy.mockRestore();
 		toBlobSpy.mockRestore();
-		delete global.createImageBitmap;
+		delete globalThis.createImageBitmap;
 	});
 
 	describe('an image within the limit', () => {
@@ -102,7 +102,7 @@ describe('resizeImage', () => {
 
 			await resizeImage(original);
 
-			expect(global.createImageBitmap).toHaveBeenCalledWith(original);
+			expect(globalThis.createImageBitmap).toHaveBeenCalledWith(original);
 		});
 
 		it('releases the decoded bitmap', async () => {
@@ -229,7 +229,7 @@ describe('resizeImage', () => {
 		it('rejects with the decoding error', async () => {
 			const decodeError = new Error('The source image could not be decoded');
 
-			global.createImageBitmap = jest.fn().mockRejectedValue(decodeError);
+			globalThis.createImageBitmap = vi.fn().mockRejectedValue(decodeError);
 
 			await expect(resizeImage(buildImage())).rejects.toBe(decodeError);
 		});

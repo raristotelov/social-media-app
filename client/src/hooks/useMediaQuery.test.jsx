@@ -8,11 +8,11 @@ const installMatchMedia = (matches) => {
 	const listeners = new Set();
 	const mediaQueryList = {
 		matches,
-		addEventListener: jest.fn((_event, listener) => listeners.add(listener)),
-		removeEventListener: jest.fn((_event, listener) => listeners.delete(listener)),
+		addEventListener: vi.fn((_event, listener) => listeners.add(listener)),
+		removeEventListener: vi.fn((_event, listener) => listeners.delete(listener)),
 	};
 
-	window.matchMedia = jest.fn().mockReturnValue(mediaQueryList);
+	window.matchMedia = vi.fn().mockReturnValue(mediaQueryList);
 
 	return {
 		mediaQueryList,

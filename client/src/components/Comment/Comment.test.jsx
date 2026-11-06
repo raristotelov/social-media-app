@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { likeComment, unlikeComment, addComment, getCommentLikes } from '../../services/commentService';
@@ -10,14 +9,16 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import Comment from './Comment';
 
-jest.mock('../../services/commentService');
+vi.mock('../../services/commentService');
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 
-jest.mock('react-router-dom', () => ({
-	...jest.requireActual('react-router-dom'),
+vi.mock('react-router', async () => ({
+	...(await vi.importActual('react-router')),
 	useNavigate: () => mockNavigate,
 }));
+
+let user;
 
 const loggedInUser = { _id: 'user1', username: 'johndoe' };
 
@@ -44,10 +45,10 @@ const buildDeferred = () => {
 const renderComment = ({
 	comment = baseComment,
 	user = loggedInUser,
-	onReload = jest.fn().mockResolvedValue(undefined),
-	onCloseComments = jest.fn(),
+	onReload = vi.fn().mockResolvedValue(undefined),
+	onCloseComments = vi.fn(),
 	entry = '/user/user2/posts#post1',
-	endSession = jest.fn(),
+	endSession = vi.fn(),
 } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
@@ -66,7 +67,8 @@ const getReplyTexts = (container) => Array.from(container.querySelectorAll('.com
 
 describe('Comment', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 	});
 
 	describe('content', () => {
@@ -130,10 +132,10 @@ describe('Comment', () => {
 			expect(screen.queryByRole('button', { name: '0 likes' })).not.toBeInTheDocument();
 		});
 
-		it('does nothing when "0 likes" is clicked', () => {
+		it('does nothing when "0 likes" is clicked', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByText('0 likes'));
+			await user.click(screen.getByText('0 likes'));
 
 			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
 			expect(getCommentLikes).not.toHaveBeenCalled();
@@ -162,7 +164,7 @@ describe('Comment', () => {
 			getCommentLikes.mockResolvedValue(likers);
 			renderComment({ comment: likedComment });
 
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
 
 			expect(screen.getByRole('heading', { name: 'Likes' })).toBeInTheDocument();
 			expect(await screen.findByText('newestliker')).toBeInTheDocument();
@@ -175,7 +177,7 @@ describe('Comment', () => {
 			getCommentLikes.mockResolvedValue(likers);
 			renderComment({ comment: likedComment });
 
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
 			await screen.findByText('newestliker');
 
 			expect(likeComment).not.toHaveBeenCalled();
@@ -186,7 +188,7 @@ describe('Comment', () => {
 			likeComment.mockResolvedValue({ _id: 'c1', likes: ['user8', 'user9', 'user1'] });
 			renderComment({ comment: likedComment });
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
 			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
@@ -197,9 +199,9 @@ describe('Comment', () => {
 			getCommentLikes.mockResolvedValue(likers);
 			const { onCloseComments } = renderComment({ comment: likedComment });
 
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
 			await screen.findByText('newestliker');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
 			expect(onCloseComments).not.toHaveBeenCalled();
@@ -209,8 +211,8 @@ describe('Comment', () => {
 			getCommentLikes.mockResolvedValue(likers);
 			const { onCloseComments } = renderComment({ comment: likedComment });
 
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
-			userEvent.click(await screen.findByRole('link', { name: /olderliker/ }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(await screen.findByRole('link', { name: /olderliker/ }));
 
 			expect(onCloseComments).toHaveBeenCalledTimes(1);
 		});
@@ -219,7 +221,7 @@ describe('Comment', () => {
 			getCommentLikes.mockResolvedValue(likers);
 			renderComment({ comment: likedComment });
 
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
 
 			expect(await screen.findByRole('link', { name: /newestliker/ })).toHaveAttribute('href', '/user/user9');
 			expect(screen.getByRole('link', { name: /olderliker/ })).toHaveAttribute('href', '/user/user8');
@@ -230,9 +232,9 @@ describe('Comment', () => {
 			const reply = { _id: 'r1', text: 'a liked reply', likes: ['user9'], userId: { _id: 'user4', username: 'bob' } };
 			const { onCloseComments } = renderComment({ comment: { ...baseComment, replies: [reply] } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(screen.getByRole('button', { name: '1 like' }));
-			userEvent.click(await screen.findByRole('link', { name: /newestliker/ }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: '1 like' }));
+			await user.click(await screen.findByRole('link', { name: /newestliker/ }));
 
 			expect(getCommentLikes).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'r1' }));
 			expect(onCloseComments).toHaveBeenCalledTimes(1);
@@ -242,8 +244,8 @@ describe('Comment', () => {
 			getCommentLikes.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(likers);
 			renderComment({ comment: likedComment });
 
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			expect(await screen.findByText('newestliker')).toBeInTheDocument();
 			expect(getCommentLikes).toHaveBeenCalledTimes(2);
@@ -253,7 +255,7 @@ describe('Comment', () => {
 			getCommentLikes.mockResolvedValue(likers);
 			renderComment({ user: null, comment: likedComment });
 
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
 
 			expect(await screen.findByText('newestliker')).toBeInTheDocument();
 			expect(mockNavigate).not.toHaveBeenCalled();
@@ -268,28 +270,28 @@ describe('Comment', () => {
 			expect(screen.getByRole('button', { name: 'View replies' })).toBeInTheDocument();
 		});
 
-		it('shows the replies in the order given, oldest first, after "View replies" is clicked', () => {
+		it('shows the replies in the order given, oldest first, after "View replies" is clicked', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			expect(getReplyTexts(container)).toEqual(['first reply', 'second reply']);
 		});
 
-		it('swaps "View replies" for "Hide replies" once the replies are shown', () => {
+		it('swaps "View replies" for "Hide replies" once the replies are shown', async () => {
 			renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			expect(screen.queryByRole('button', { name: 'View replies' })).not.toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Hide replies' })).toBeInTheDocument();
 		});
 
-		it('hides the replies again when "Hide replies" is clicked', () => {
+		it('hides the replies again when "Hide replies" is clicked', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(screen.getByRole('button', { name: 'Hide replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'Hide replies' }));
 
 			expect(getReplyTexts(container)).toEqual([]);
 		});
@@ -300,19 +302,19 @@ describe('Comment', () => {
 			expect(screen.queryByRole('button', { name: 'View replies' })).not.toBeInTheDocument();
 		});
 
-		it('offers Reply on the comment and on each of its replies, and "View replies" only on the comment', () => {
+		it('offers Reply on the comment and on each of its replies, and "View replies" only on the comment', async () => {
 			renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(3);
 			expect(screen.queryByRole('button', { name: 'View replies' })).not.toBeInTheDocument();
 		});
 
-		it('offers no "View replies" or "Hide replies" on a reply', () => {
+		it('offers no "View replies" or "Hide replies" on a reply', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			expect(container.querySelectorAll('.comment-reply .comment-replies')).toHaveLength(0);
 			expect(screen.getAllByRole('button', { name: 'Hide replies' })).toHaveLength(1);
@@ -322,18 +324,18 @@ describe('Comment', () => {
 	describe('the mention in a reply', () => {
 		const mentionedAlice = { _id: 'user3', username: 'alice' };
 
-		const renderWithReply = (reply) => {
+		const renderWithReply = async (reply) => {
 			const rendered = renderComment({
 				comment: { ...baseComment, replies: [{ _id: 'r1', likes: [], userId: { _id: 'user4', username: 'bob' }, ...reply }] },
 			});
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			return rendered;
 		};
 
-		it('shows the leading @username as a link to the profile of the mentioned user', () => {
-			const { container } = renderWithReply({ text: '@alice thanks', mentionedUserId: mentionedAlice });
+		it('shows the leading @username as a link to the profile of the mentioned user', async () => {
+			const { container } = await renderWithReply({ text: '@alice thanks', mentionedUserId: mentionedAlice });
 
 			const mention = container.querySelector('.comment-reply .comment-mention');
 
@@ -341,8 +343,8 @@ describe('Comment', () => {
 			expect(mention).toHaveAttribute('href', '/user/user3');
 		});
 
-		it('keeps the rest of the reply as plain text after the link', () => {
-			const { container } = renderWithReply({ text: '@alice thanks a lot', mentionedUserId: mentionedAlice });
+		it('keeps the rest of the reply as plain text after the link', async () => {
+			const { container } = await renderWithReply({ text: '@alice thanks a lot', mentionedUserId: mentionedAlice });
 
 			const text = container.querySelector('.comment-reply .comment-text');
 
@@ -351,46 +353,46 @@ describe('Comment', () => {
 			expect(text.lastChild.textContent).toBe(' thanks a lot');
 		});
 
-		it('links a reply that is only the mention', () => {
-			const { container } = renderWithReply({ text: '@alice', mentionedUserId: mentionedAlice });
+		it('links a reply that is only the mention', async () => {
+			const { container } = await renderWithReply({ text: '@alice', mentionedUserId: mentionedAlice });
 
 			expect(container.querySelector('.comment-reply .comment-mention')).toHaveAttribute('href', '/user/user3');
 		});
 
-		it('shows a plain reply as plain text when no user is mentioned', () => {
-			const { container } = renderWithReply({ text: '@alice thanks', mentionedUserId: null });
+		it('shows a plain reply as plain text when no user is mentioned', async () => {
+			const { container } = await renderWithReply({ text: '@alice thanks', mentionedUserId: null });
 
 			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
 			expect(container.querySelector('.comment-reply .comment-text')).toHaveTextContent('@alice thanks');
 		});
 
-		it('shows a reply without the field as plain text', () => {
-			const { container } = renderWithReply({ text: '@alice thanks' });
+		it('shows a reply without the field as plain text', async () => {
+			const { container } = await renderWithReply({ text: '@alice thanks' });
 
 			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
 		});
 
-		it('shows the reply as plain text when it no longer starts with the @username of the mentioned user', () => {
-			const { container } = renderWithReply({ text: 'thanks @alice', mentionedUserId: mentionedAlice });
+		it('shows the reply as plain text when it no longer starts with the @username of the mentioned user', async () => {
+			const { container } = await renderWithReply({ text: 'thanks @alice', mentionedUserId: mentionedAlice });
 
 			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
 			expect(container.querySelector('.comment-reply .comment-text')).toHaveTextContent('thanks @alice');
 		});
 
-		it('shows the reply as plain text when it starts with a different @name', () => {
-			const { container } = renderWithReply({ text: '@carol thanks', mentionedUserId: mentionedAlice });
+		it('shows the reply as plain text when it starts with a different @name', async () => {
+			const { container } = await renderWithReply({ text: '@carol thanks', mentionedUserId: mentionedAlice });
 
 			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
 		});
 
-		it('shows the reply as plain text when the mentioned user is only an id, not populated', () => {
-			const { container } = renderWithReply({ text: '@alice thanks', mentionedUserId: 'user3' });
+		it('shows the reply as plain text when the mentioned user is only an id, not populated', async () => {
+			const { container } = await renderWithReply({ text: '@alice thanks', mentionedUserId: 'user3' });
 
 			expect(container.querySelector('.comment-reply .comment-mention')).not.toBeInTheDocument();
 			expect(container.querySelector('.comment-reply .comment-text')).toHaveTextContent('@alice thanks');
 		});
 
-		it('lets a guest follow the mention link', () => {
+		it('lets a guest follow the mention link', async () => {
 			const { container } = renderComment({
 				user: null,
 				comment: {
@@ -401,7 +403,7 @@ describe('Comment', () => {
 				},
 			});
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			expect(container.querySelector('.comment-mention')).toHaveAttribute('href', '/user/user3');
 			expect(mockNavigate).not.toHaveBeenCalled();
@@ -413,7 +415,7 @@ describe('Comment', () => {
 			likeComment.mockResolvedValue({});
 			const { onReload } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1' });
@@ -424,7 +426,7 @@ describe('Comment', () => {
 			likeComment.mockResolvedValue({ _id: 'c1', likes: ['user1'] });
 			const { onReload } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'c1', userId: 'user1', isLiked: true });
@@ -434,7 +436,7 @@ describe('Comment', () => {
 			unlikeComment.mockResolvedValue({});
 			const { onReload } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
 
-			userEvent.click(screen.getByRole('button', { name: 'Unlike comment' }));
+			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'c1', userId: 'user1', isLiked: false });
@@ -444,8 +446,8 @@ describe('Comment', () => {
 			likeComment.mockResolvedValue({});
 			const { onReload } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'r1', userId: 'user1', isLiked: true });
@@ -455,7 +457,7 @@ describe('Comment', () => {
 			likeComment.mockResolvedValue({});
 			const { onReload } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			expect(screen.queryByText("Couldn't update your like. Try again.")).not.toBeInTheDocument();
@@ -465,7 +467,7 @@ describe('Comment', () => {
 			unlikeComment.mockResolvedValue({});
 			const { onReload } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
 
-			userEvent.click(screen.getByRole('button', { name: 'Unlike comment' }));
+			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			expect(unlikeComment).toHaveBeenCalledWith({ commentId: 'c1' });
@@ -490,7 +492,7 @@ describe('Comment', () => {
 			likeComment.mockReturnValue(request.promise);
 			const { onReload } = renderComment();
 
-			userEvent.dblClick(screen.getByRole('button', { name: 'Like comment' }));
+			await user.dblClick(screen.getByRole('button', { name: 'Like comment' }));
 
 			expect(likeComment).toHaveBeenCalledTimes(1);
 
@@ -502,9 +504,9 @@ describe('Comment', () => {
 			likeComment.mockResolvedValue({});
 			const { onReload } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(2));
 		});
@@ -513,7 +515,7 @@ describe('Comment', () => {
 			likeComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { onReload } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
 			expect(onReload).not.toHaveBeenCalled();
@@ -523,7 +525,7 @@ describe('Comment', () => {
 			likeComment.mockRejectedValue(new Error('network down'));
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
 		});
@@ -532,7 +534,7 @@ describe('Comment', () => {
 			likeComment.mockRejectedValue({ code: 'COMMENT_NOT_FOUND', status: 404 });
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			expect(await screen.findByText('This comment no longer exists')).toBeInTheDocument();
 		});
@@ -541,7 +543,7 @@ describe('Comment', () => {
 			unlikeComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			renderComment({ comment: { ...baseComment, likes: ['user1'] } });
 
-			userEvent.click(screen.getByRole('button', { name: 'Unlike comment' }));
+			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
 
 			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
 		});
@@ -550,7 +552,7 @@ describe('Comment', () => {
 			likeComment.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(screen.queryByText("Couldn't update your like. Try again.")).not.toBeInTheDocument();
@@ -560,9 +562,9 @@ describe('Comment', () => {
 			likeComment.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce({});
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 			await screen.findByText("Couldn't update your like. Try again.");
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(2));
 		});
@@ -571,8 +573,8 @@ describe('Comment', () => {
 			likeComment.mockResolvedValue({});
 			const { onReload } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			expect(likeComment).toHaveBeenCalledWith({ commentId: 'r1' });
@@ -580,97 +582,97 @@ describe('Comment', () => {
 	});
 
 	describe('replying', () => {
-		it('opens a reply box when Reply is clicked', () => {
+		it('opens a reply box when Reply is clicked', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toBeInTheDocument();
 		});
 
-		it('puts the cursor in the reply box as soon as it opens', () => {
+		it('puts the cursor in the reply box as soon as it opens', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveFocus();
 		});
 
-		it('puts the cursor after the mention in the reply box', () => {
+		it('puts the cursor after the mention in the reply box', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...').selectionStart).toBe('@alice '.length);
 		});
 
-		it('focuses the reply box opened under a reply', () => {
+		it('focuses the reply box opened under a reply', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveFocus();
 		});
 
-		it('prefills the reply box with the @username of the author of the comment', () => {
+		it('prefills the reply box with the @username of the author of the comment', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@alice ');
 		});
 
-		it('keeps Post disabled while the box holds only the mention', () => {
+		it('keeps Post disabled while the box holds only the mention', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
 		});
 
-		it('enables Post once text follows the mention', () => {
+		it('enables Post once text follows the mention', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
 
 			expect(screen.getByRole('button', { name: 'Post' })).toBeEnabled();
 		});
 
-		it('prefills the reply box of a reply with the @username of the author of that reply', () => {
+		it('prefills the reply box of a reply with the @username of the author of that reply', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@bob ');
 		});
 
-		it('opens the reply box under the reply that was clicked', () => {
+		it('opens the reply box under the reply that was clicked', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(within(container.querySelectorAll('.comment-reply')[1]).getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(within(container.querySelectorAll('.comment-reply')[1]).getByRole('button', { name: 'Reply' }));
 
 			expect(within(container.querySelectorAll('.comment-reply')[1]).getByPlaceholderText('Write a reply...')).toHaveValue('@carol ');
 			expect(within(container.querySelectorAll('.comment-reply')[0]).queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument();
 		});
 
-		it('closes the reply box when Reply is clicked again', () => {
+		it('closes the reply box when Reply is clicked again', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument();
 		});
 
-		it('keeps Post disabled while the reply is empty or only spaces', () => {
+		it('keeps Post disabled while the reply is empty or only spaces', async () => {
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), '   ');
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), '   ');
 
 			expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
 		});
@@ -679,9 +681,9 @@ describe('Comment', () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() =>
 				expect(addComment).toHaveBeenCalledWith({
@@ -697,10 +699,10 @@ describe('Comment', () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() =>
 				expect(addComment).toHaveBeenCalledWith({
@@ -718,10 +720,10 @@ describe('Comment', () => {
 			addComment.mockResolvedValue(savedReply);
 			const { container, onReload } = renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledWith(savedReply));
 			await waitFor(() => expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument());
@@ -732,10 +734,10 @@ describe('Comment', () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.clear(screen.getByPlaceholderText('Write a reply...'));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.clear(screen.getByPlaceholderText('Write a reply...'));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() =>
 				expect(addComment).toHaveBeenCalledWith({
@@ -751,10 +753,10 @@ describe('Comment', () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.clear(screen.getByPlaceholderText('Write a reply...'));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks @alice');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.clear(screen.getByPlaceholderText('Write a reply...'));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks @alice');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(addComment).toHaveBeenCalledWith(expect.objectContaining({ text: 'Thanks @alice', mentionedUserId: null })));
 		});
@@ -763,10 +765,10 @@ describe('Comment', () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			renderComment({ comment: { ...baseComment, userId: null } });
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.clear(screen.getByPlaceholderText('Write a reply...'));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), '@undefined hi');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.clear(screen.getByPlaceholderText('Write a reply...'));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), '@undefined hi');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(addComment).toHaveBeenCalledWith(expect.objectContaining({ mentionedUserId: null })));
 		});
@@ -775,9 +777,9 @@ describe('Comment', () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			const { onReload } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
 			await waitFor(() => expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument());
@@ -789,9 +791,9 @@ describe('Comment', () => {
 			addComment.mockResolvedValue(savedReply);
 			const { onReload } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(onReload).toHaveBeenCalledWith(savedReply));
 		});
@@ -800,9 +802,9 @@ describe('Comment', () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			renderComment({ comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			expect(await screen.findByRole('button', { name: 'Hide replies' })).toBeInTheDocument();
 		});
@@ -811,9 +813,9 @@ describe('Comment', () => {
 			addComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			expect(await screen.findByText("Couldn't post your reply. Try again.")).toBeInTheDocument();
 		});
@@ -826,9 +828,9 @@ describe('Comment', () => {
 			addComment.mockRejectedValue({ code, status });
 			renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			expect(await screen.findByText(copy)).toBeInTheDocument();
 		});
@@ -837,9 +839,9 @@ describe('Comment', () => {
 			addComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { onReload } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 			await screen.findByText("Couldn't post your reply. Try again.");
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@alice Thanks');
@@ -850,9 +852,9 @@ describe('Comment', () => {
 			addComment.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = renderComment();
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(screen.queryByText("Couldn't post your reply. Try again.")).not.toBeInTheDocument();
@@ -868,48 +870,48 @@ describe('Comment', () => {
 			expect(screen.getByRole('button', { name: 'Reply' })).toBeInTheDocument();
 		});
 
-		it('sends the guest to /log-in with the current URL, hash included, when the heart is clicked', () => {
+		it('sends the guest to /log-in with the current URL, hash included, when the heart is clicked', async () => {
 			renderComment({ user: null });
 
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 			expect(likeComment).not.toHaveBeenCalled();
 		});
 
-		it('sends the guest to /log-in with the current URL when Reply is clicked', () => {
+		it('sends the guest to /log-in with the current URL when Reply is clicked', async () => {
 			renderComment({ user: null });
 
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 			expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument();
 		});
 
-		it('sends the guest to /log-in when Reply on a reply is clicked, opening no reply box', () => {
+		it('sends the guest to /log-in when Reply on a reply is clicked, opening no reply box', async () => {
 			const { container } = renderComment({ user: null, comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 			expect(screen.queryByPlaceholderText('Write a reply...')).not.toBeInTheDocument();
 		});
 
-		it('sends the guest to /log-in when the heart of a reply is clicked', () => {
+		it('sends the guest to /log-in when the heart of a reply is clicked', async () => {
 			renderComment({ user: null, comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 			expect(likeComment).not.toHaveBeenCalled();
 		});
 
-		it('still lets the guest view the replies', () => {
+		it('still lets the guest view the replies', async () => {
 			const { container } = renderComment({ user: null, comment: { ...baseComment, replies } });
 
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			expect(getReplyTexts(container)).toEqual(['first reply', 'second reply']);
 			expect(mockNavigate).not.toHaveBeenCalled();

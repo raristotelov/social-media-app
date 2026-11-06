@@ -16,10 +16,10 @@ export const installBottomSheetEnvironment = ({ isMobile = true, prefersReducedM
 		[REDUCED_MOTION_MEDIA_QUERY]: prefersReducedMotion,
 	};
 
-	window.matchMedia = jest.fn((query) => ({
+	window.matchMedia = vi.fn((query) => ({
 		matches: Boolean(matchesByQuery[query]),
-		addEventListener: jest.fn(),
-		removeEventListener: jest.fn(),
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
 	}));
 
 	Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => SHEET_HEIGHT });

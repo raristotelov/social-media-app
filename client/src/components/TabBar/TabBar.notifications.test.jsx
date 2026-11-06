@@ -1,6 +1,5 @@
-import '@testing-library/jest-dom';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import NotificationsContext from '../../contexts/NotificationsContext';
@@ -12,7 +11,7 @@ const member = { _id: 'user1', username: 'johndoe', following: [] };
 const renderTabBar = ({ unreadCount = 0, user = member, path = '/user-feed' } = {}) =>
 	render(
 		<LoggedInUserContext.Provider value={{ loggedInUser: user }}>
-			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: jest.fn() }}>
+			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: vi.fn() }}>
 				<MemoryRouter initialEntries={[path]}>
 					<TabBar />
 				</MemoryRouter>

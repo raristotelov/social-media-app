@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { useForm } from '../../hooks/useForm';
 import { validateSignUp } from '../../utils/validators';

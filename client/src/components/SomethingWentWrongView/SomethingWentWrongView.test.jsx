@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -12,8 +11,8 @@ describe('SomethingWentWrongView', () => {
 	let mockAssign;
 
 	beforeEach(() => {
-		mockReload = jest.fn();
-		mockAssign = jest.fn();
+		mockReload = vi.fn();
+		mockAssign = vi.fn();
 
 		delete window.location;
 		window.location = { ...originalLocation, reload: mockReload, assign: mockAssign };
@@ -41,19 +40,23 @@ describe('SomethingWentWrongView', () => {
 		expect(screen.getByText(APP_NAME)).toBeInTheDocument();
 	});
 
-	it('reloads the current page when Reload is clicked', () => {
+	it('reloads the current page when Reload is clicked', async () => {
+		const user = userEvent.setup();
+
 		render(<SomethingWentWrongView />);
 
-		userEvent.click(screen.getByRole('button', { name: 'Reload' }));
+		await user.click(screen.getByRole('button', { name: 'Reload' }));
 
 		expect(mockReload).toHaveBeenCalledTimes(1);
 		expect(mockAssign).not.toHaveBeenCalled();
 	});
 
-	it('loads / fresh when Go home is clicked', () => {
+	it('loads / fresh when Go home is clicked', async () => {
+		const user = userEvent.setup();
+
 		render(<SomethingWentWrongView />);
 
-		userEvent.click(screen.getByRole('button', { name: 'Go home' }));
+		await user.click(screen.getByRole('button', { name: 'Go home' }));
 
 		expect(mockAssign).toHaveBeenCalledTimes(1);
 		expect(mockAssign).toHaveBeenCalledWith('/');

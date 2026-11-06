@@ -1,12 +1,12 @@
 import { requestFactory } from './requester';
 import { getNotifications, getUnreadNotificationCount, markAllNotificationsRead } from './notificationService';
 
-jest.mock('./requester');
+vi.mock('./requester');
 
 describe('notificationService', () => {
 	describe('getUnreadNotificationCount', () => {
 		it('gets the unread count endpoint without a token', async () => {
-			const get = jest.fn().mockResolvedValue({ count: 3 });
+			const get = vi.fn().mockResolvedValue({ count: 3 });
 
 			requestFactory.mockReturnValue({ get });
 
@@ -21,7 +21,7 @@ describe('notificationService', () => {
 		let get;
 
 		beforeEach(() => {
-			get = jest.fn().mockResolvedValue({ notifications: [], hasMore: false, nextCursor: null });
+			get = vi.fn().mockResolvedValue({ notifications: [], hasMore: false, nextCursor: null });
 			requestFactory.mockReturnValue({ get });
 		});
 
@@ -51,7 +51,7 @@ describe('notificationService', () => {
 
 	describe('markAllNotificationsRead', () => {
 		it('posts the cutoff to the mark-all-read endpoint', async () => {
-			const post = jest.fn().mockResolvedValue(undefined);
+			const post = vi.fn().mockResolvedValue(undefined);
 
 			requestFactory.mockReturnValue({ post });
 

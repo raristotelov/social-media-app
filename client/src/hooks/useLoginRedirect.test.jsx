@@ -1,12 +1,12 @@
 import { renderHook } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import useLoginRedirect from './useLoginRedirect';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 
-jest.mock('react-router-dom', () => ({
-	...jest.requireActual('react-router-dom'),
+vi.mock('react-router', async () => ({
+	...(await vi.importActual('react-router')),
 	useNavigate: () => mockNavigate,
 }));
 
@@ -18,7 +18,7 @@ const renderRedirectAt = (entry) => {
 
 describe('useLoginRedirect', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 	});
 
 	it('does not navigate until the returned function is called', () => {

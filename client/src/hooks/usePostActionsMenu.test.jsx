@@ -102,7 +102,7 @@ describe('usePostActionsMenu', () => {
 	});
 
 	it('does not listen for outside clicks while closed', () => {
-		const addEventListenerSpy = jest.spyOn(document, 'addEventListener');
+		const addEventListenerSpy = vi.spyOn(document, 'addEventListener');
 
 		renderMenuHook();
 
@@ -112,7 +112,7 @@ describe('usePostActionsMenu', () => {
 	});
 
 	it('removes its listeners once the menu closes', () => {
-		const removeEventListenerSpy = jest.spyOn(document, 'removeEventListener');
+		const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
 		const { result } = renderMenuHook();
 
 		act(() => result.current.toggleMenu());

@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -8,39 +7,41 @@ import Popup from './Popup';
 
 describe('Popup', () => {
 	it('renders the title when given', () => {
-		render(<Popup title='Edit profile' onClosePopupClick={jest.fn()} />);
+		render(<Popup title='Edit profile' onClosePopupClick={vi.fn()} />);
 
 		expect(screen.getByRole('heading', { name: 'Edit profile' })).toBeInTheDocument();
 	});
 
 	it('omits the title when none is given', () => {
-		render(<Popup onClosePopupClick={jest.fn()} />);
+		render(<Popup onClosePopupClick={vi.fn()} />);
 
 		expect(screen.queryByRole('heading')).not.toBeInTheDocument();
 	});
 
-	it('calls onClosePopupClick when the close button is clicked', () => {
-		const onClosePopupClick = jest.fn();
+	it('calls onClosePopupClick when the close button is clicked', async () => {
+		const user = userEvent.setup();
+		const onClosePopupClick = vi.fn();
 		render(<Popup onClosePopupClick={onClosePopupClick} />);
 
-		userEvent.click(screen.getByRole('button', { name: 'Close' }));
+		await user.click(screen.getByRole('button', { name: 'Close' }));
 
 		expect(onClosePopupClick).toHaveBeenCalledTimes(1);
 	});
 
-	it('calls onClosePopupClick when Escape is pressed', () => {
-		const onClosePopupClick = jest.fn();
+	it('calls onClosePopupClick when Escape is pressed', async () => {
+		const user = userEvent.setup();
+		const onClosePopupClick = vi.fn();
 		render(<Popup onClosePopupClick={onClosePopupClick} />);
 
-		userEvent.keyboard('{Escape}');
+		await user.keyboard('{Escape}');
 
 		expect(onClosePopupClick).toHaveBeenCalledTimes(1);
 	});
 
 	describe('with a popup nested inside another', () => {
 		const renderNested = () => {
-			const onCloseOuter = jest.fn();
-			const onCloseInner = jest.fn();
+			const onCloseOuter = vi.fn();
+			const onCloseInner = vi.fn();
 
 			const rendered = render(
 				<Popup title='Outer' onClosePopupClick={onCloseOuter}>
@@ -51,31 +52,34 @@ describe('Popup', () => {
 			return { ...rendered, onCloseOuter, onCloseInner };
 		};
 
-		it('closes only the top popup on Escape', () => {
+		it('closes only the top popup on Escape', async () => {
+			const user = userEvent.setup();
 			const { onCloseOuter, onCloseInner } = renderNested();
 
-			userEvent.keyboard('{Escape}');
+			await user.keyboard('{Escape}');
 
 			expect(onCloseInner).toHaveBeenCalledTimes(1);
 			expect(onCloseOuter).not.toHaveBeenCalled();
 		});
 
-		it('closes the outer popup on Escape once the inner one is gone', () => {
-			const onCloseOuter = jest.fn();
+		it('closes the outer popup on Escape once the inner one is gone', async () => {
+			const user = userEvent.setup();
+			const onCloseOuter = vi.fn();
 			const { rerender } = render(
 				<Popup title='Outer' onClosePopupClick={onCloseOuter}>
-					<Popup title='Inner' onClosePopupClick={jest.fn()} />
+					<Popup title='Inner' onClosePopupClick={vi.fn()} />
 				</Popup>,
 			);
 
 			rerender(<Popup title='Outer' onClosePopupClick={onCloseOuter} />);
-			userEvent.keyboard('{Escape}');
+			await user.keyboard('{Escape}');
 
 			expect(onCloseOuter).toHaveBeenCalledTimes(1);
 		});
 
-		it('closes the outer popup on Escape when its children are not popups', () => {
-			const onCloseOuter = jest.fn();
+		it('closes the outer popup on Escape when its children are not popups', async () => {
+			const user = userEvent.setup();
+			const onCloseOuter = vi.fn();
 
 			render(
 				<Popup onClosePopupClick={onCloseOuter}>
@@ -83,45 +87,48 @@ describe('Popup', () => {
 				</Popup>,
 			);
 
-			userEvent.keyboard('{Escape}');
+			await user.keyboard('{Escape}');
 
 			expect(onCloseOuter).toHaveBeenCalledTimes(1);
 		});
 
-		it('still closes the inner popup with its own close button', () => {
+		it('still closes the inner popup with its own close button', async () => {
+			const user = userEvent.setup();
 			const { onCloseOuter, onCloseInner } = renderNested();
 
 			const innerClose = screen.getAllByRole('button', { name: 'Close' })[1];
 
-			userEvent.click(innerClose);
+			await user.click(innerClose);
 
 			expect(onCloseInner).toHaveBeenCalledTimes(1);
 			expect(onCloseOuter).not.toHaveBeenCalled();
 		});
 	});
 
-	it('ignores other keys', () => {
-		const onClosePopupClick = jest.fn();
+	it('ignores other keys', async () => {
+		const user = userEvent.setup();
+		const onClosePopupClick = vi.fn();
 		render(<Popup onClosePopupClick={onClosePopupClick} />);
 
-		userEvent.keyboard('{Enter}');
+		await user.keyboard('{Enter}');
 
 		expect(onClosePopupClick).not.toHaveBeenCalled();
 	});
 
-	it('stops listening for Escape once closed', () => {
-		const onClosePopupClick = jest.fn();
+	it('stops listening for Escape once closed', async () => {
+		const user = userEvent.setup();
+		const onClosePopupClick = vi.fn();
 		const { unmount } = render(<Popup onClosePopupClick={onClosePopupClick} />);
 
 		unmount();
-		userEvent.keyboard('{Escape}');
+		await user.keyboard('{Escape}');
 
 		expect(onClosePopupClick).not.toHaveBeenCalled();
 	});
 
 	it('renders its children', () => {
 		render(
-			<Popup onClosePopupClick={jest.fn()}>
+			<Popup onClosePopupClick={vi.fn()}>
 				<p>Popup content</p>
 			</Popup>,
 		);
@@ -130,33 +137,33 @@ describe('Popup', () => {
 	});
 
 	it('keeps the default container and body classes when no extra classes are given', () => {
-		const { container } = render(<Popup onClosePopupClick={jest.fn()} />);
+		const { container } = render(<Popup onClosePopupClick={vi.fn()} />);
 
 		expect(container.querySelector('.popup-container')).toBeInTheDocument();
 		expect(container.querySelector('.popup-body')).toBeInTheDocument();
 	});
 
 	it('adds className to the container while keeping popup-container', () => {
-		const { container } = render(<Popup className='delete-post-popup' onClosePopupClick={jest.fn()} />);
+		const { container } = render(<Popup className='delete-post-popup' onClosePopupClick={vi.fn()} />);
 
 		expect(container.firstChild).toHaveClass('popup-container', 'delete-post-popup');
 	});
 
 	it('adds bodyClassName to the body while keeping popup-body', () => {
-		const { container } = render(<Popup bodyClassName='bottom-sheet' onClosePopupClick={jest.fn()} />);
+		const { container } = render(<Popup bodyClassName='bottom-sheet' onClosePopupClick={vi.fn()} />);
 
 		expect(container.querySelector('.popup-body')).toHaveClass('popup-body', 'bottom-sheet');
 	});
 
 	it('does not put className on the body or bodyClassName on the container', () => {
-		const { container } = render(<Popup className='outer-extra' bodyClassName='inner-extra' onClosePopupClick={jest.fn()} />);
+		const { container } = render(<Popup className='outer-extra' bodyClassName='inner-extra' onClosePopupClick={vi.fn()} />);
 
 		expect(container.firstChild).not.toHaveClass('inner-extra');
 		expect(container.querySelector('.popup-body')).not.toHaveClass('outer-extra');
 	});
 
 	it('does not leak "undefined" into the class names when the extra classes are omitted', () => {
-		const { container } = render(<Popup onClosePopupClick={jest.fn()} />);
+		const { container } = render(<Popup onClosePopupClick={vi.fn()} />);
 
 		expect(container.firstChild.className).toBe('popup-container');
 		expect(container.querySelector('.popup-body').className).toBe('popup-body');
@@ -164,7 +171,7 @@ describe('Popup', () => {
 
 	describe('as a bottom sheet', () => {
 		const renderSheet = (props = {}) => {
-			const onClosePopupClick = jest.fn();
+			const onClosePopupClick = vi.fn();
 			const rendered = render(
 				<Popup title='Comments' isBottomSheet onClosePopupClick={onClosePopupClick} {...props}>
 					<p>Sheet content</p>
@@ -211,7 +218,7 @@ describe('Popup', () => {
 
 		it('has no handle, sheet class or drag zone when it is not a bottom sheet', () => {
 			const { container } = render(
-				<Popup title='Edit profile' onClosePopupClick={jest.fn()}>
+				<Popup title='Edit profile' onClosePopupClick={vi.fn()}>
 					<p>Content</p>
 				</Popup>,
 			);
@@ -277,7 +284,7 @@ describe('Popup', () => {
 
 		it('does not drag when the popup is not a bottom sheet', () => {
 			const { container } = render(
-				<Popup title='Edit profile' onClosePopupClick={jest.fn()}>
+				<Popup title='Edit profile' onClosePopupClick={vi.fn()}>
 					<p>Content</p>
 				</Popup>,
 			);
@@ -309,10 +316,11 @@ describe('Popup', () => {
 			expect(onClosePopupClick).toHaveBeenCalledTimes(1);
 		});
 
-		it('still closes with the close button', () => {
+		it('still closes with the close button', async () => {
+			const user = userEvent.setup();
 			const { onClosePopupClick } = renderSheet();
 
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClosePopupClick).toHaveBeenCalledTimes(1);
 		});

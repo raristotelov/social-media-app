@@ -1,0 +1,127 @@
+const js = require('@eslint/js');
+const globals = require('globals');
+const react = require('eslint-plugin-react');
+const reactHooks = require('eslint-plugin-react-hooks');
+const jsxA11y = require('eslint-plugin-jsx-a11y');
+
+const VITEST_GLOBALS = {
+	describe: 'readonly',
+	it: 'readonly',
+	test: 'readonly',
+	expect: 'readonly',
+	vi: 'readonly',
+	beforeAll: 'readonly',
+	beforeEach: 'readonly',
+	afterAll: 'readonly',
+	afterEach: 'readonly',
+};
+
+const CYPRESS_GLOBALS = {
+	cy: 'readonly',
+	Cypress: 'readonly',
+	describe: 'readonly',
+	context: 'readonly',
+	it: 'readonly',
+	before: 'readonly',
+	beforeEach: 'readonly',
+	after: 'readonly',
+	afterEach: 'readonly',
+	expect: 'readonly',
+	assert: 'readonly',
+};
+
+module.exports = [
+	{
+		ignores: ['dist/**', 'build/**', 'coverage/**', 'cypress/screenshots/**', 'cypress/videos/**', 'cypress/downloads/**'],
+	},
+	js.configs.recommended,
+	{
+		files: ['**/*.{js,jsx,mjs}'],
+		languageOptions: {
+			ecmaVersion: 'latest',
+			sourceType: 'module',
+			parserOptions: { ecmaFeatures: { jsx: true } },
+		},
+		rules: {
+			semi: ['error', 'always'],
+			quotes: ['error', 'single', { avoidEscape: true }],
+			'jsx-quotes': ['error', 'prefer-single'],
+			'comma-dangle': ['error', 'always-multiline'],
+			'max-len': ['error', { code: 150, ignoreStrings: true, ignoreTemplateLiterals: true }],
+			'arrow-parens': ['error', 'always'],
+			'no-multiple-empty-lines': ['error', { max: 1 }],
+			'no-unused-vars': ['warn', { args: 'none', ignoreRestSiblings: true }],
+		},
+	},
+	{
+		files: ['src/**/*.{js,jsx}'],
+		languageOptions: {
+			globals: globals.browser,
+		},
+		plugins: {
+			react,
+			'react-hooks': reactHooks,
+			'jsx-a11y': jsxA11y,
+		},
+		settings: { react: { version: 'detect' } },
+		rules: {
+			'react/jsx-newline': ['error', { prevent: false }],
+			'react/jsx-uses-vars': 'warn',
+			'react/jsx-no-comment-textnodes': 'warn',
+			'react/jsx-no-duplicate-props': 'warn',
+			'react/jsx-no-target-blank': 'warn',
+			'react/jsx-no-undef': 'error',
+			'react/jsx-pascal-case': ['warn', { allowAllCaps: true, ignore: [] }],
+			'react/no-danger-with-children': 'warn',
+			'react/no-direct-mutation-state': 'warn',
+			'react/no-is-mounted': 'warn',
+			'react/no-typos': 'error',
+			'react/require-render-return': 'error',
+			'react/style-prop-object': 'warn',
+			'react-hooks/rules-of-hooks': 'error',
+			'react-hooks/exhaustive-deps': 'warn',
+			'jsx-a11y/alt-text': 'warn',
+			'jsx-a11y/anchor-has-content': 'warn',
+			'jsx-a11y/anchor-is-valid': ['warn', { aspects: ['noHref', 'invalidHref'] }],
+			'jsx-a11y/aria-activedescendant-has-tabindex': 'warn',
+			'jsx-a11y/aria-props': 'warn',
+			'jsx-a11y/aria-proptypes': 'warn',
+			'jsx-a11y/aria-role': ['warn', { ignoreNonDOM: true }],
+			'jsx-a11y/aria-unsupported-elements': 'warn',
+			'jsx-a11y/heading-has-content': 'warn',
+			'jsx-a11y/iframe-has-title': 'warn',
+			'jsx-a11y/img-redundant-alt': 'warn',
+			'jsx-a11y/no-access-key': 'warn',
+			'jsx-a11y/no-distracting-elements': 'warn',
+			'jsx-a11y/no-redundant-roles': 'warn',
+			'jsx-a11y/role-has-required-aria-props': 'warn',
+			'jsx-a11y/role-supports-aria-props': 'warn',
+			'jsx-a11y/scope': 'warn',
+		},
+	},
+	{
+		files: ['src/**/*.test.{js,jsx}', 'src/setupTests.js', 'src/testUtils/**/*.js'],
+		languageOptions: {
+			globals: VITEST_GLOBALS,
+		},
+	},
+	{
+		files: ['cypress/e2e/**/*.js', 'cypress/support/api.js', 'cypress/support/e2e.js'],
+		languageOptions: {
+			globals: { ...globals.browser, ...CYPRESS_GLOBALS },
+		},
+	},
+	{
+		files: ['cypress/support/testUser.js', 'cypress/support/testUsersDb.js', 'cypress.config.js', 'eslint.config.js'],
+		languageOptions: {
+			sourceType: 'commonjs',
+			globals: globals.node,
+		},
+	},
+	{
+		files: ['vite.config.mjs'],
+		languageOptions: {
+			globals: globals.node,
+		},
+	},
+];

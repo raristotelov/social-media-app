@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 
 import { HEADER_HEIGHT_CSS_VARIABLE, MOBILE_MEDIA_QUERY, TAB_BAR_HEIGHT_CSS_VARIABLE } from '../constants/layout';
 

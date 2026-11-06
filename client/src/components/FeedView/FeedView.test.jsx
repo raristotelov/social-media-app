@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowedUsersPosts, likeUserPost } from '../../services/userPostService';
@@ -15,11 +14,11 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import FeedView from './FeedView';
 
-jest.mock('../../services/userPostService');
-jest.mock('../../services/commentService');
-jest.mock('../../services/storyService');
-jest.mock('../../services/suggestionService');
-jest.mock('../../services/userService');
+vi.mock('../../services/userPostService');
+vi.mock('../../services/commentService');
+vi.mock('../../services/storyService');
+vi.mock('../../services/suggestionService');
+vi.mock('../../services/userService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', following: ['user2', 'user3'] };
 
@@ -28,10 +27,10 @@ const buildSuggestion = (id, group = 'popular') => ({ _id: id, username: `name-$
 const EMPTY_SUGGESTIONS = { suggestions: [], reserve: [], isCarouselDismissed: false };
 
 const setViewport = (isDesktop) => {
-	window.matchMedia = jest.fn((query) => ({
+	window.matchMedia = vi.fn((query) => ({
 		matches: isDesktop && query === DESKTOP_MEDIA_QUERY,
-		addEventListener: jest.fn(),
-		removeEventListener: jest.fn(),
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
 	}));
 };
 
@@ -67,7 +66,7 @@ const buildDeferred = () => {
 	return deferred;
 };
 
-const buildFeedTree = ({ user, endSession, updateLoggedInUser = jest.fn() }) => (
+const buildFeedTree = ({ user, endSession, updateLoggedInUser = vi.fn() }) => (
 	<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser, endSession }}>
 		<ToastProvider>
 			<MemoryRouter initialEntries={['/user-feed']}>
@@ -77,7 +76,7 @@ const buildFeedTree = ({ user, endSession, updateLoggedInUser = jest.fn() }) => 
 	</LoggedInUserContext.Provider>
 );
 
-const renderFeed = ({ user = loggedInUser, endSession = jest.fn() } = {}) => {
+const renderFeed = ({ user = loggedInUser, endSession = vi.fn() } = {}) => {
 	const rendered = render(buildFeedTree({ user, endSession }));
 
 	const rerenderWithUser = (refreshedUser) => rendered.rerender(buildFeedTree({ user: refreshedUser, endSession }));
@@ -87,11 +86,14 @@ const renderFeed = ({ user = loggedInUser, endSession = jest.fn() } = {}) => {
 
 const getRenderedPostIds = () => Array.from(document.querySelectorAll('article.user-post')).map((article) => article.id);
 
+let user;
+
 describe('FeedView', () => {
 	const originalMatchMedia = window.matchMedia;
 
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		getStoryTray.mockResolvedValue([]);
 		getSuggestions.mockResolvedValue(EMPTY_SUGGESTIONS);
 		followUser.mockResolvedValue({ user: loggedInUser });
@@ -195,7 +197,7 @@ describe('FeedView', () => {
 			getStoryTray.mockResolvedValue(trayEntries);
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 			expect(getStoryTray).toHaveBeenCalledTimes(1);
@@ -214,7 +216,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockResolvedValue(feedPage([]));
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Add to your story' }));
+			await user.click(await screen.findByRole('button', { name: 'Add to your story' }));
 
 			expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
 		});
@@ -374,7 +376,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage(feedPosts));
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2);
@@ -385,7 +387,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage([]));
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await screen.findByText('Your feed is empty')).toBeInTheDocument();
 		});
@@ -394,7 +396,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2));
 			expect(await screen.findByRole('button', { name: 'Retry' })).toBeEnabled();
@@ -407,7 +409,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockReturnValueOnce(retryRequest.promise);
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled());
 
@@ -432,7 +434,7 @@ describe('FeedView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
 
 			expect(await within(articles[1]).findByText('1 like')).toBeInTheDocument();
 		});
@@ -444,7 +446,7 @@ describe('FeedView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
 			await within(articles[1]).findByText('1 like');
 
 			expect(within(articles[0]).getByText('0 likes')).toBeInTheDocument();
@@ -458,7 +460,7 @@ describe('FeedView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[2]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[2]).getByRole('button', { name: 'Like post' }));
 			await within(articles[2]).findByText('1 like');
 
 			expect(getRenderedPostIds()).toEqual(['post3', 'post2', 'post1']);
@@ -479,8 +481,8 @@ describe('FeedView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.type(within(articles[0]).getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(within(articles[0]).getByRole('button', { name: 'Post' }));
+			await user.type(within(articles[0]).getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(within(articles[0]).getByRole('button', { name: 'Post' }));
 
 			expect(await within(articles[0]).findByRole('button', { name: '1 comment' })).toBeInTheDocument();
 			expect(within(articles[0]).getByText('Nice shot')).toBeInTheDocument();
@@ -494,7 +496,7 @@ describe('FeedView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[0]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[0]).getByRole('button', { name: 'Like post' }));
 
 			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
 			expect(within(articles[0]).getByText('0 likes')).toBeInTheDocument();
@@ -577,7 +579,7 @@ describe('FeedView', () => {
 		it('removes a followed user from the sidebar without reloading the feed', async () => {
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-s1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-s1' }));
 
 			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-s1' })).not.toBeInTheDocument());
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
@@ -588,7 +590,7 @@ describe('FeedView', () => {
 			const { rerenderWithUser } = renderFeed();
 
 			await screen.findAllByRole('article');
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-s1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-s1' }));
 			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-s1' })).not.toBeInTheDocument());
 
 			rerenderWithUser({ ...loggedInUser, following: ['s1'] });
@@ -696,7 +698,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
+			await user.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
 
 			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
 			await waitFor(() => expect(dismissSuggestionsCarousel).toHaveBeenCalledWith());
@@ -707,7 +709,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-c1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-c1' }));
 
 			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-c1' })).not.toBeInTheDocument());
 			expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
@@ -718,7 +720,7 @@ describe('FeedView', () => {
 			const { rerenderWithUser } = renderFeed();
 
 			await screen.findAllByRole('article');
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-c1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-c1' }));
 			await waitFor(() => expect(screen.queryByRole('button', { name: 'Follow name-c1' })).not.toBeInTheDocument());
 
 			rerenderWithUser({ ...loggedInUser, following: ['c1'] });
@@ -733,7 +735,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage(feedPosts));
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await screen.findByRole('region', { name: 'Suggested for you' })).toBeInTheDocument();
 			expect(getFeedChildKinds()).toEqual(['post3', 'post2', 'post1', 'carousel']);
@@ -840,7 +842,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(feedPage([]));
 			renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await getSuggestionsList()).toBeInTheDocument();
 		});
@@ -852,7 +854,7 @@ describe('FeedView', () => {
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				renderFeed();
 
-				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 				expect(await screen.findByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
 
@@ -872,7 +874,7 @@ describe('FeedView', () => {
 				rerenderWithUser({ ...loggedInUser, bio: 'refreshed' });
 				expect(getFollowedUsersPosts).toHaveBeenCalledTimes(1);
 
-				userEvent.click(screen.getByRole('button', { name: 'Follow name-p1' }));
+				await user.click(screen.getByRole('button', { name: 'Follow name-p1' }));
 
 				await screen.findAllByRole('article');
 				expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2);
@@ -883,7 +885,7 @@ describe('FeedView', () => {
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				renderFeed();
 
-				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 				await screen.findAllByRole('article');
 
 				expect(screen.getByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
@@ -894,7 +896,7 @@ describe('FeedView', () => {
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				renderFeed();
 
-				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 				await screen.findAllByRole('article');
 
 				expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
@@ -908,7 +910,7 @@ describe('FeedView', () => {
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockReturnValueOnce(reload.promise);
 				renderFeed();
 
-				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 				await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2));
 
 				expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
@@ -922,7 +924,7 @@ describe('FeedView', () => {
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
 				renderFeed();
 
-				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 				await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(2));
 
 				expect(screen.queryByText("Couldn't load your feed")).not.toBeInTheDocument();
@@ -935,7 +937,7 @@ describe('FeedView', () => {
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockRejectedValueOnce({ code: 'UNAUTHENTICATED', status: 401 });
 				const { endSession } = renderFeed();
 
-				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 				await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			});
@@ -944,7 +946,7 @@ describe('FeedView', () => {
 				followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 				renderFeed();
 
-				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 				expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
 				expect(screen.getByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();
@@ -959,7 +961,7 @@ describe('FeedView', () => {
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage(followedPosts));
 				const rendered = renderFeed();
 
-				userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+				await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 				await screen.findAllByRole('article');
 
 				return rendered;
@@ -969,7 +971,7 @@ describe('FeedView', () => {
 				await followFirstUser();
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([]));
 
-				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+				await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 				expect(await screen.findByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();
 				expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', userIdToUnfollow: 'p1' });
@@ -979,7 +981,7 @@ describe('FeedView', () => {
 				await followFirstUser();
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([]));
 
-				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+				await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 				await waitFor(() => expect(getFollowedUsersPosts).toHaveBeenCalledTimes(3));
 				await waitFor(() => expect(screen.queryByRole('article')).not.toBeInTheDocument());
@@ -989,7 +991,7 @@ describe('FeedView', () => {
 				await followFirstUser();
 				getFollowedUsersPosts.mockResolvedValueOnce(feedPage([]));
 
-				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+				await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 				await waitFor(() => expect(screen.queryByRole('article')).not.toBeInTheDocument());
 				expect(screen.getByRole('heading', { name: 'Your feed is empty' })).toBeInTheDocument();
@@ -1000,7 +1002,7 @@ describe('FeedView', () => {
 				await followFirstUser();
 				unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
-				userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+				await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 				expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
 				expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
@@ -1012,7 +1014,7 @@ describe('FeedView', () => {
 			getFollowedUsersPosts.mockResolvedValueOnce(feedPage([])).mockResolvedValueOnce(feedPage([buildPost('fresh1', 'name-p1')]));
 			const { unmount } = renderFeed();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 			await screen.findAllByRole('article');
 			unmount();
 

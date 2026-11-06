@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useContext } from 'react';
@@ -12,7 +11,7 @@ import { NOTIFICATIONS_POLL_INTERVAL_MS } from '../../constants/notifications';
 
 import NotificationsProvider from './NotificationsProvider';
 
-jest.mock('../../services/notificationService');
+vi.mock('../../services/notificationService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe' };
 
@@ -30,7 +29,7 @@ const CountProbe = () => {
 	);
 };
 
-const buildTree = ({ user = loggedInUser, endSession = jest.fn() } = {}) => (
+const buildTree = ({ user = loggedInUser, endSession = vi.fn() } = {}) => (
 	<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
 		<NotificationsProvider>
 			<CountProbe />
@@ -48,7 +47,7 @@ const setVisibility = (state) => {
 
 const advance = async (ms) => {
 	await act(async () => {
-		jest.advanceTimersByTime(ms);
+		vi.advanceTimersByTime(ms);
 	});
 };
 
@@ -59,15 +58,18 @@ const flush = async () => {
 };
 
 describe('NotificationsProvider', () => {
+	let user;
+
 	beforeEach(() => {
-		jest.useFakeTimers();
-		jest.clearAllMocks();
+		vi.useFakeTimers();
+		vi.resetAllMocks();
+		user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 		Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 		getUnreadNotificationCount.mockResolvedValue({ count: 3 });
 	});
 
 	afterEach(() => {
-		jest.useRealTimers();
+		vi.useRealTimers();
 		Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 	});
 
@@ -214,7 +216,7 @@ describe('NotificationsProvider', () => {
 			render(buildTree());
 			await flush();
 
-			userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+			await user.click(screen.getByRole('button', { name: 'Clear' }));
 
 			expect(screen.getByTestId('count')).toHaveTextContent('0');
 		});
@@ -222,7 +224,7 @@ describe('NotificationsProvider', () => {
 		it('lets the next poll bring the count back', async () => {
 			render(buildTree());
 			await flush();
-			userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+			await user.click(screen.getByRole('button', { name: 'Clear' }));
 			getUnreadNotificationCount.mockResolvedValue({ count: 1 });
 			await advance(NOTIFICATIONS_POLL_INTERVAL_MS);
 
@@ -246,7 +248,7 @@ describe('NotificationsProvider', () => {
 				const resolvePoll = deferPoll();
 
 				render(buildTree());
-				userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+				await user.click(screen.getByRole('button', { name: 'Clear' }));
 				resolvePoll({ count: 5 });
 				await flush();
 
@@ -260,7 +262,7 @@ describe('NotificationsProvider', () => {
 				const resolvePoll = deferPoll();
 
 				await advance(NOTIFICATIONS_POLL_INTERVAL_MS);
-				userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+				await user.click(screen.getByRole('button', { name: 'Clear' }));
 				resolvePoll({ count: 9 });
 				await flush();
 
@@ -270,7 +272,7 @@ describe('NotificationsProvider', () => {
 			it('still applies a response from a request that started after the clear', async () => {
 				render(buildTree());
 				await flush();
-				userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+				await user.click(screen.getByRole('button', { name: 'Clear' }));
 
 				const resolvePoll = deferPoll();
 
@@ -285,8 +287,8 @@ describe('NotificationsProvider', () => {
 				const resolvePoll = deferPoll();
 
 				render(buildTree());
-				userEvent.click(screen.getByRole('button', { name: 'Clear' }));
-				userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+				await user.click(screen.getByRole('button', { name: 'Clear' }));
+				await user.click(screen.getByRole('button', { name: 'Clear' }));
 				resolvePoll({ count: 6 });
 				await flush();
 
@@ -316,7 +318,7 @@ describe('NotificationsProvider', () => {
 		});
 
 		it('does not end the session for an ordinary failure', async () => {
-			const endSession = jest.fn();
+			const endSession = vi.fn();
 
 			getUnreadNotificationCount.mockRejectedValue(new RequestError({ code: ERROR_CODES.INTERNAL_ERROR, status: 500, message: 'Failed' }));
 
@@ -327,7 +329,7 @@ describe('NotificationsProvider', () => {
 		});
 
 		it('ends the session when the session is no longer valid', async () => {
-			const endSession = jest.fn();
+			const endSession = vi.fn();
 
 			getUnreadNotificationCount.mockRejectedValue(
 				new RequestError({ code: ERROR_CODES.UNAUTHENTICATED, status: 401, message: 'Unauthorized' }),

@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowedUsersPosts, likeUserPost } from '../../services/userPostService';
@@ -13,11 +12,11 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import FeedView from './FeedView';
 
-jest.mock('../../services/userPostService');
-jest.mock('../../services/commentService');
-jest.mock('../../services/storyService');
-jest.mock('../../services/suggestionService');
-jest.mock('../../services/userService');
+vi.mock('../../services/userPostService');
+vi.mock('../../services/commentService');
+vi.mock('../../services/storyService');
+vi.mock('../../services/suggestionService');
+vi.mock('../../services/userService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', following: ['user2'] };
 const NEAR_BOTTOM_SCROLL_Y = 3500;
@@ -53,10 +52,10 @@ const buildDeferred = () => {
 };
 
 const setViewport = (isDesktop) => {
-	window.matchMedia = jest.fn((query) => ({
+	window.matchMedia = vi.fn((query) => ({
 		matches: isDesktop && query === DESKTOP_MEDIA_QUERY,
-		addEventListener: jest.fn(),
-		removeEventListener: jest.fn(),
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
 	}));
 };
 
@@ -69,7 +68,7 @@ const getRenderedPostIds = () => Array.from(document.querySelectorAll('article.u
 
 const renderFeed = () =>
 	render(
-		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={['/user-feed']}>
 					<FeedView />
@@ -78,12 +77,15 @@ const renderFeed = () =>
 		</LoggedInUserContext.Provider>,
 	);
 
+let user;
+
 describe('FeedView infinite scroll', () => {
 	const originalMatchMedia = window.matchMedia;
 	const originalScrollHeight = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollHeight');
 
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		getStoryTray.mockResolvedValue([]);
 		getSuggestions.mockResolvedValue({ suggestions: [], reserve: [], isCarouselDismissed: false });
 		setViewport(false);
@@ -252,7 +254,7 @@ describe('FeedView infinite scroll', () => {
 
 			await screen.findAllByRole('article');
 			setScroll(NEAR_BOTTOM_SCROLL_Y);
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(getRenderedPostIds()).toEqual(['p3', 'p2']));
 
@@ -288,7 +290,7 @@ describe('FeedView infinite scroll', () => {
 
 			const secondPost = document.getElementById('p2');
 
-			userEvent.click(within(secondPost).getByRole('button', { name: 'Like post' }));
+			await user.click(within(secondPost).getByRole('button', { name: 'Like post' }));
 
 			await waitFor(() => expect(within(secondPost).getByRole('button', { name: 'Unlike post' })).toBeInTheDocument());
 			expect(within(document.getElementById('p3')).getByRole('button', { name: 'Like post' })).toBeInTheDocument();

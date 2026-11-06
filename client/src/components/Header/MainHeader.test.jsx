@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
@@ -9,9 +8,9 @@ import { getUsersProfileData } from '../../services/userService';
 
 import MainHeader from './MainHeader';
 
-jest.mock('../../services/userService');
+vi.mock('../../services/userService');
 
-const renderMainHeader = (loggedInUser, logoutHandler = jest.fn(), searchResults = [], path = '/') => {
+const renderMainHeader = (loggedInUser, logoutHandler = vi.fn(), searchResults = [], path = '/') => {
 	getUsersProfileData.mockResolvedValue(searchResults);
 
 	return render(
@@ -23,9 +22,12 @@ const renderMainHeader = (loggedInUser, logoutHandler = jest.fn(), searchResults
 	);
 };
 
+let user;
+
 describe('MainHeader', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 	});
 
 	it('shows Log in and Sign up links, and still renders the search field, for a guest', () => {
@@ -48,7 +50,7 @@ describe('MainHeader', () => {
 	it('calls getUsersProfileData with the search word once at least two characters have been typed', async () => {
 		renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] });
 
-		userEvent.type(screen.getByPlaceholderText('Search'), 'ab');
+		await user.type(screen.getByPlaceholderText('Search'), 'ab');
 
 		await waitFor(() => expect(getUsersProfileData).toHaveBeenCalledWith({ searchWord: 'ab' }));
 	});
@@ -60,9 +62,9 @@ describe('MainHeader', () => {
 		];
 
 		it('renders the designed result rows with username and follower count', async () => {
-			const { container } = renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, jest.fn(), searchResults);
+			const { container } = renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, vi.fn(), searchResults);
 
-			userEvent.type(screen.getByPlaceholderText('Search'), 'jan');
+			await user.type(screen.getByPlaceholderText('Search'), 'jan');
 
 			expect(await screen.findByText('janedoe')).toHaveClass('search-result-username');
 			expect(screen.getByText('2 followers')).toHaveClass('search-result-followers');
@@ -72,19 +74,19 @@ describe('MainHeader', () => {
 		});
 
 		it('uses the singular for a user with exactly one follower', async () => {
-			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, jest.fn(), [
+			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, vi.fn(), [
 				{ _id: 'user2', username: 'janedoe', followersCount: 1 },
 			]);
 
-			userEvent.type(screen.getByPlaceholderText('Search'), 'jan');
+			await user.type(screen.getByPlaceholderText('Search'), 'jan');
 
 			expect(await screen.findByText('1 follower')).toHaveClass('search-result-followers');
 		});
 
 		it('links each row to the matching profile', async () => {
-			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, jest.fn(), searchResults);
+			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, vi.fn(), searchResults);
 
-			userEvent.type(screen.getByPlaceholderText('Search'), 'jan');
+			await user.type(screen.getByPlaceholderText('Search'), 'jan');
 
 			expect((await screen.findByText('janedoe')).closest('a')).toHaveAttribute('href', '/user/user2');
 		});
@@ -92,24 +94,24 @@ describe('MainHeader', () => {
 		it('shows the designed empty state when nothing matches', async () => {
 			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] });
 
-			userEvent.type(screen.getByPlaceholderText('Search'), 'zz');
+			await user.type(screen.getByPlaceholderText('Search'), 'zz');
 
 			expect(await screen.findByText('No users found')).toBeInTheDocument();
 		});
 
 		it('shows the dropdown to a guest as well', async () => {
-			renderMainHeader(null, jest.fn(), searchResults);
+			renderMainHeader(null, vi.fn(), searchResults);
 
-			userEvent.type(screen.getByPlaceholderText('Search'), 'jan');
+			await user.type(screen.getByPlaceholderText('Search'), 'jan');
 
 			expect(await screen.findByText('2 followers')).toBeInTheDocument();
 		});
 
 		it('closes the dropdown and clears the field when a row is clicked', async () => {
-			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, jest.fn(), searchResults);
+			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] }, vi.fn(), searchResults);
 
-			userEvent.type(screen.getByPlaceholderText('Search'), 'jan');
-			userEvent.click(await screen.findByText('janedoe'));
+			await user.type(screen.getByPlaceholderText('Search'), 'jan');
+			await user.click(await screen.findByText('janedoe'));
 
 			expect(screen.queryByText('2 followers')).not.toBeInTheDocument();
 			expect(screen.getByPlaceholderText('Search')).toHaveValue('');
@@ -167,7 +169,7 @@ describe('MainHeader', () => {
 			['a guest', null],
 			['a member', member],
 		])('is current on the popular grid for %s', (_name, user) => {
-			renderMainHeader(user, jest.fn(), [], '/popular-posts');
+			renderMainHeader(user, vi.fn(), [], '/popular-posts');
 
 			expect(screen.getByRole('link', { name: 'Popular' })).toHaveClass('navigation-item-active');
 		});
@@ -176,7 +178,7 @@ describe('MainHeader', () => {
 			['a guest', null],
 			['a member', member],
 		])('is current on the popular posts view for %s', (_name, user) => {
-			renderMainHeader(user, jest.fn(), [], '/popular-posts/posts');
+			renderMainHeader(user, vi.fn(), [], '/popular-posts/posts');
 
 			expect(screen.getByRole('link', { name: 'Popular' })).toHaveClass('navigation-item-active');
 		});
@@ -188,13 +190,13 @@ describe('MainHeader', () => {
 			['a member', member, '/user/user1'],
 			['a member', member, '/user/user2/posts'],
 		])('is not current for %s at %s', (_name, user, path) => {
-			renderMainHeader(user, jest.fn(), [], path);
+			renderMainHeader(user, vi.fn(), [], path);
 
 			expect(screen.getByRole('link', { name: 'Popular' })).not.toHaveClass('navigation-item-active');
 		});
 
 		it('marks Log in as current at /log-in, not Popular', () => {
-			renderMainHeader(null, jest.fn(), [], '/log-in');
+			renderMainHeader(null, vi.fn(), [], '/log-in');
 
 			expect(screen.getByRole('link', { name: 'Log in' })).toHaveClass('navigation-item-active');
 		});
@@ -206,31 +208,31 @@ describe('MainHeader', () => {
 
 			return render(
 				<LoggedInUserContext.Provider value={{ loggedInUser: { _id: 'user1', username: 'johndoe', following: [] } }}>
-					<ToastContext.Provider value={{ showToast: jest.fn(), dismissToast: jest.fn() }}>
+					<ToastContext.Provider value={{ showToast: vi.fn(), dismissToast: vi.fn() }}>
 						<MemoryRouter>
-							<MainHeader logoutHandler={jest.fn()} />
+							<MainHeader logoutHandler={vi.fn()} />
 						</MemoryRouter>
 					</ToastContext.Provider>
 				</LoggedInUserContext.Provider>,
 			);
 		};
 
-		it('opens the Change Password popup from the account menu and closes the menu', () => {
+		it('opens the Change Password popup from the account menu and closes the menu', async () => {
 			renderLoggedInHeader();
 
-			userEvent.click(screen.getByRole('button', { name: /johndoe/ }));
-			userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+			await user.click(screen.getByRole('button', { name: /johndoe/ }));
+			await user.click(screen.getByRole('button', { name: 'Change password' }));
 
 			expect(screen.getByRole('heading', { name: 'Change Password' })).toBeInTheDocument();
 			expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
 		});
 
-		it('closes the popup again with Cancel', () => {
+		it('closes the popup again with Cancel', async () => {
 			renderLoggedInHeader();
 
-			userEvent.click(screen.getByRole('button', { name: /johndoe/ }));
-			userEvent.click(screen.getByRole('button', { name: 'Change password' }));
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await user.click(screen.getByRole('button', { name: /johndoe/ }));
+			await user.click(screen.getByRole('button', { name: 'Change password' }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(screen.queryByRole('heading', { name: 'Change Password' })).not.toBeInTheDocument();
 		});

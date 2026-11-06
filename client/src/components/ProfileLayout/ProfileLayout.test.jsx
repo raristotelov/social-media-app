@@ -1,8 +1,7 @@
-import '@testing-library/jest-dom';
 import { useContext } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import NotFoundContext from '../../contexts/NotFoundContext';
@@ -12,8 +11,8 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 import NotFoundProvider from '../NotFoundProvider/NotFoundProvider';
 import ProfileLayout from './ProfileLayout';
 
-jest.mock('../../services/userService');
-jest.mock('../../services/userPostService');
+vi.mock('../../services/userService');
+vi.mock('../../services/userPostService');
 
 const validProfile = { _id: 'user2', username: 'janedoe', posts: [], followers: [], following: [] };
 
@@ -25,7 +24,7 @@ const FlagProbe = () => {
 
 const renderLayoutAt = (path) =>
 	render(
-		<LoggedInUserContext.Provider value={{ loggedInUser: null, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: null, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 			<ToastProvider>
 				<NotFoundProvider>
 					<MemoryRouter initialEntries={[path]}>
@@ -48,7 +47,7 @@ const renderLayoutAt = (path) =>
 
 describe('ProfileLayout', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 	});
 
 	describe('when the user does not exist', () => {
@@ -83,10 +82,12 @@ describe('ProfileLayout', () => {
 		});
 
 		it('shows the profile and clears the not found mark after navigating to a valid profile', async () => {
+			const user = userEvent.setup();
+
 			renderLayoutAt('/user/missing');
 
 			await screen.findByRole('heading', { name: 'Page not found' });
-			userEvent.click(screen.getByRole('link', { name: 'Go to valid profile' }));
+			await user.click(screen.getByRole('link', { name: 'Go to valid profile' }));
 
 			expect(await screen.findByText('Profile outlet')).toBeInTheDocument();
 			expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useContext, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import useLocalStorage from './hooks/useLocalStorage';
 import LoggedInUserContext from './contexts/LoggedInUserContext';

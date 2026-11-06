@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigationType } from 'react-router';
 
 import usePostHashSync from './usePostHashSync';
 
@@ -24,7 +24,7 @@ const buildPostsContainer = (postIds) => {
 		const postElement = document.createElement('article');
 
 		postElement.id = postId;
-		postElement.scrollIntoView = jest.fn();
+		postElement.scrollIntoView = vi.fn();
 		container.appendChild(postElement);
 		postElements[postId] = postElement;
 	});
@@ -93,9 +93,9 @@ describe('usePostHashSync', () => {
 		originalInnerHeight = window.innerHeight;
 		originalMatchMedia = window.matchMedia;
 		window.innerHeight = VIEWPORT_HEIGHT;
-		window.matchMedia = jest.fn(() => ({ matches: isMobileViewport }));
+		window.matchMedia = vi.fn(() => ({ matches: isMobileViewport }));
 
-		requestFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+		requestFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
 			const frameId = nextFrameId;
 
 			nextFrameId += 1;
@@ -103,10 +103,10 @@ describe('usePostHashSync', () => {
 
 			return frameId;
 		});
-		cancelFrameSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+		cancelFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
 			queuedFrames.delete(frameId);
 		});
-		computedStyleSpy = jest.spyOn(window, 'getComputedStyle').mockImplementation(() => ({
+		computedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation(() => ({
 			getPropertyValue: (name) => cssVariables[name] ?? '',
 		}));
 	});

@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 
 import { NOTIFICATION_TARGET_STATE_KEY, NOTIFICATION_TYPES } from '../../constants/notifications';
 
@@ -34,7 +33,7 @@ const buildNotification = (overrides = {}) => ({
 });
 
 const renderRow = (notification, { isUnread = false } = {}) => {
-	const onClick = jest.fn();
+	const onClick = vi.fn();
 
 	const rendered = render(
 		<MemoryRouter initialEntries={['/user-feed']}>
@@ -50,6 +49,12 @@ const renderRow = (notification, { isUnread = false } = {}) => {
 };
 
 describe('NotificationRow', () => {
+	let user;
+
+	beforeEach(() => {
+		user = userEvent.setup();
+	});
+
 	describe('content', () => {
 		it.each([
 			[NOTIFICATION_TYPES.FOLLOW, null, 'started following you.'],
@@ -128,27 +133,27 @@ describe('NotificationRow', () => {
 	});
 
 	describe('navigation', () => {
-		it('opens the actor profile when a follow row is clicked', () => {
+		it('opens the actor profile when a follow row is clicked', async () => {
 			renderRow(buildNotification({ type: NOTIFICATION_TYPES.FOLLOW, post: null }));
 
-			userEvent.click(screen.getByRole('link', { name: 'janedoe started following you.' }));
+			await user.click(screen.getByRole('link', { name: 'janedoe started following you.' }));
 
 			expect(screen.getByTestId('path')).toHaveTextContent('/user/user2');
 		});
 
-		it('opens the posts view of the post owner scrolled to the post when a like row is clicked', () => {
+		it('opens the posts view of the post owner scrolled to the post when a like row is clicked', async () => {
 			renderRow(buildNotification());
 
-			userEvent.click(screen.getByRole('link', { name: 'janedoe liked your post.' }));
+			await user.click(screen.getByRole('link', { name: 'janedoe liked your post.' }));
 
 			expect(screen.getByTestId('path')).toHaveTextContent('/user/user1/posts');
 			expect(screen.getByTestId('hash')).toHaveTextContent('#post1');
 		});
 
-		it('does not ask to open the comments for a like row', () => {
+		it('does not ask to open the comments for a like row', async () => {
 			renderRow(buildNotification());
 
-			userEvent.click(screen.getByRole('link', { name: 'janedoe liked your post.' }));
+			await user.click(screen.getByRole('link', { name: 'janedoe liked your post.' }));
 
 			expect(JSON.parse(screen.getByTestId('state').textContent)[NOTIFICATION_TARGET_STATE_KEY]).toEqual({
 				postId: 'post1',
@@ -158,10 +163,10 @@ describe('NotificationRow', () => {
 
 		it.each([[NOTIFICATION_TYPES.COMMENT_LIKE], [NOTIFICATION_TYPES.COMMENT], [NOTIFICATION_TYPES.REPLY], [NOTIFICATION_TYPES.REPLY_ON_POST]])(
 			'opens the post with its comments when a %s row is clicked',
-			(type) => {
+			async (type) => {
 				const { container } = renderRow(buildNotification({ type, excerpt: 'lovely colours' }));
 
-				userEvent.click(container.querySelector('.notification-row-target'));
+				await user.click(container.querySelector('.notification-row-target'));
 
 				expect(screen.getByTestId('path')).toHaveTextContent('/user/user1/posts');
 				expect(JSON.parse(screen.getByTestId('state').textContent)[NOTIFICATION_TARGET_STATE_KEY]).toEqual({
@@ -171,44 +176,44 @@ describe('NotificationRow', () => {
 			},
 		);
 
-		it('opens the actor profile, not the post, when the name is clicked', () => {
+		it('opens the actor profile, not the post, when the name is clicked', async () => {
 			renderRow(buildNotification());
 
-			userEvent.click(screen.getByText('janedoe'));
+			await user.click(screen.getByText('janedoe'));
 
 			expect(screen.getByTestId('path')).toHaveTextContent('/user/user2');
 		});
 
-		it('opens the actor profile when the avatar is clicked', () => {
+		it('opens the actor profile when the avatar is clicked', async () => {
 			const { container } = renderRow(buildNotification());
 
-			userEvent.click(container.querySelector('.notification-row-avatar'));
+			await user.click(container.querySelector('.notification-row-avatar'));
 
 			expect(screen.getByTestId('path')).toHaveTextContent('/user/user2');
 		});
 	});
 
 	describe('onClick', () => {
-		it('is called when the row is clicked', () => {
+		it('is called when the row is clicked', async () => {
 			const { onClick } = renderRow(buildNotification());
 
-			userEvent.click(screen.getByRole('link', { name: 'janedoe liked your post.' }));
+			await user.click(screen.getByRole('link', { name: 'janedoe liked your post.' }));
 
 			expect(onClick).toHaveBeenCalledTimes(1);
 		});
 
-		it('is called when the name is clicked', () => {
+		it('is called when the name is clicked', async () => {
 			const { onClick } = renderRow(buildNotification());
 
-			userEvent.click(screen.getByText('janedoe'));
+			await user.click(screen.getByText('janedoe'));
 
 			expect(onClick).toHaveBeenCalledTimes(1);
 		});
 
-		it('is called when the avatar is clicked', () => {
+		it('is called when the avatar is clicked', async () => {
 			const { container, onClick } = renderRow(buildNotification());
 
-			userEvent.click(container.querySelector('.notification-row-avatar'));
+			await user.click(container.querySelector('.notification-row-avatar'));
 
 			expect(onClick).toHaveBeenCalledTimes(1);
 		});

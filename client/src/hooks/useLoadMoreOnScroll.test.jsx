@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, renderHook } from '@testing-library/react';
 
 import { LIST_LOAD_MORE_DISTANCE_PX, LOAD_MORE_DISTANCE_PX } from '../constants/layout';
@@ -50,7 +49,7 @@ describe('useLoadMoreOnScroll', () => {
 		Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: VIEWPORT_HEIGHT });
 		setPage({ scrollY: 0 });
 
-		requestFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+		requestFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
 			const frameId = nextFrameId;
 
 			nextFrameId += 1;
@@ -58,7 +57,7 @@ describe('useLoadMoreOnScroll', () => {
 
 			return frameId;
 		});
-		cancelFrameSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+		cancelFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
 			queuedFrames.delete(frameId);
 		});
 	});
@@ -73,7 +72,7 @@ describe('useLoadMoreOnScroll', () => {
 	});
 
 	it('loads more when the page is already near its bottom as the hook starts', () => {
-		const onLoadMore = jest.fn();
+		const onLoadMore = vi.fn();
 
 		setPage({ scrollY: scrollYWithDistanceToBottom(100) });
 		renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
@@ -83,7 +82,7 @@ describe('useLoadMoreOnScroll', () => {
 	});
 
 	it('loads more when the page is too short to scroll, so the next batch fills the screen', () => {
-		const onLoadMore = jest.fn();
+		const onLoadMore = vi.fn();
 
 		setPage({ scrollY: 0, scrollHeight: VIEWPORT_HEIGHT });
 		renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
@@ -93,7 +92,7 @@ describe('useLoadMoreOnScroll', () => {
 	});
 
 	it('does not load more while the bottom is far away', () => {
-		const onLoadMore = jest.fn();
+		const onLoadMore = vi.fn();
 
 		renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
 		runQueuedFrames();
@@ -102,7 +101,7 @@ describe('useLoadMoreOnScroll', () => {
 	});
 
 	it('loads more when scrolling brings the bottom within the distance', () => {
-		const onLoadMore = jest.fn();
+		const onLoadMore = vi.fn();
 
 		renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
 		runQueuedFrames();
@@ -112,7 +111,7 @@ describe('useLoadMoreOnScroll', () => {
 	});
 
 	it('loads more when the bottom is exactly the distance away', () => {
-		const onLoadMore = jest.fn();
+		const onLoadMore = vi.fn();
 
 		renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
 		runQueuedFrames();
@@ -122,7 +121,7 @@ describe('useLoadMoreOnScroll', () => {
 	});
 
 	it('does not load more while the bottom is just beyond the distance', () => {
-		const onLoadMore = jest.fn();
+		const onLoadMore = vi.fn();
 
 		renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
 		runQueuedFrames();
@@ -133,7 +132,7 @@ describe('useLoadMoreOnScroll', () => {
 	});
 
 	it('checks once per frame however many scroll events arrive', () => {
-		const onLoadMore = jest.fn();
+		const onLoadMore = vi.fn();
 
 		renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
 		runQueuedFrames();
@@ -153,7 +152,7 @@ describe('useLoadMoreOnScroll', () => {
 	});
 
 	it('loads more when the window is resized to leave the bottom within reach', () => {
-		const onLoadMore = jest.fn();
+		const onLoadMore = vi.fn();
 
 		setPage({ scrollY: scrollYWithDistanceToBottom(LOAD_MORE_DISTANCE_PX + 500) });
 		renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
@@ -170,7 +169,7 @@ describe('useLoadMoreOnScroll', () => {
 
 	describe('when disabled', () => {
 		it('never loads more, even at the bottom of the page', () => {
-			const onLoadMore = jest.fn();
+			const onLoadMore = vi.fn();
 
 			setPage({ scrollY: scrollYWithDistanceToBottom(0) });
 			renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: false }));
@@ -181,13 +180,13 @@ describe('useLoadMoreOnScroll', () => {
 		});
 
 		it('schedules no frame at all', () => {
-			renderHook(() => useLoadMoreOnScroll({ onLoadMore: jest.fn(), isEnabled: false }));
+			renderHook(() => useLoadMoreOnScroll({ onLoadMore: vi.fn(), isEnabled: false }));
 
 			expect(requestFrameSpy).not.toHaveBeenCalled();
 		});
 
 		it('starts watching once it becomes enabled', () => {
-			const onLoadMore = jest.fn();
+			const onLoadMore = vi.fn();
 
 			setPage({ scrollY: scrollYWithDistanceToBottom(0) });
 
@@ -205,7 +204,7 @@ describe('useLoadMoreOnScroll', () => {
 		});
 
 		it('stops watching once it becomes disabled', () => {
-			const onLoadMore = jest.fn();
+			const onLoadMore = vi.fn();
 
 			const { rerender } = renderHook(({ isEnabled }) => useLoadMoreOnScroll({ onLoadMore, isEnabled }), { initialProps: { isEnabled: true } });
 
@@ -219,7 +218,7 @@ describe('useLoadMoreOnScroll', () => {
 
 	describe('on unmount', () => {
 		it('stops listening to scroll', () => {
-			const onLoadMore = jest.fn();
+			const onLoadMore = vi.fn();
 
 			const { unmount } = renderHook(() => useLoadMoreOnScroll({ onLoadMore, isEnabled: true }));
 
@@ -231,7 +230,7 @@ describe('useLoadMoreOnScroll', () => {
 		});
 
 		it('stops listening to resize', () => {
-			const onLoadMore = jest.fn();
+			const onLoadMore = vi.fn();
 
 			setPage({ scrollY: scrollYWithDistanceToBottom(0) });
 
@@ -250,7 +249,7 @@ describe('useLoadMoreOnScroll', () => {
 		});
 
 		it('cancels a check that is waiting for its frame', () => {
-			const onLoadMore = jest.fn();
+			const onLoadMore = vi.fn();
 
 			setPage({ scrollY: scrollYWithDistanceToBottom(0) });
 
@@ -266,8 +265,8 @@ describe('useLoadMoreOnScroll', () => {
 
 	describe('when the callback changes', () => {
 		it('checks again with the new callback, which is how the next batch follows the last', () => {
-			const firstCallback = jest.fn();
-			const secondCallback = jest.fn();
+			const firstCallback = vi.fn();
+			const secondCallback = vi.fn();
 
 			setPage({ scrollY: scrollYWithDistanceToBottom(0) });
 
@@ -309,7 +308,7 @@ describe('useLoadMoreOnScroll', () => {
 			runQueuedFrames();
 		};
 
-		const renderElementHook = (element, { isEnabled = true, onLoadMore = jest.fn() } = {}) => {
+		const renderElementHook = (element, { isEnabled = true, onLoadMore = vi.fn() } = {}) => {
 			const elementRef = { current: element };
 			const rendered = renderHook((props) => useLoadMoreOnScroll({ elementRef, onLoadMore, ...props }), {
 				initialProps: { isEnabled },

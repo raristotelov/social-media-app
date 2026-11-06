@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import { APP_NAME } from '../../constants/app';
 
@@ -15,7 +14,7 @@ const suggestion = {
 };
 
 const renderCard = (overrides = {}) => {
-	const onFollowClick = jest.fn();
+	const onFollowClick = vi.fn();
 
 	render(
 		<MemoryRouter>
@@ -81,19 +80,21 @@ describe('SuggestionCard', () => {
 		expect(button).not.toHaveClass('button-secondary');
 	});
 
-	it('follows the user when Follow is clicked', () => {
+	it('follows the user when Follow is clicked', async () => {
+		const user = userEvent.setup();
 		const { onFollowClick } = renderCard();
 
-		userEvent.click(screen.getByRole('button', { name: 'Follow alice' }));
+		await user.click(screen.getByRole('button', { name: 'Follow alice' }));
 
 		expect(onFollowClick).toHaveBeenCalledTimes(1);
 		expect(onFollowClick).toHaveBeenCalledWith('user2');
 	});
 
-	it('does not follow when the profile link is clicked', () => {
+	it('does not follow when the profile link is clicked', async () => {
+		const user = userEvent.setup();
 		const { onFollowClick } = renderCard();
 
-		userEvent.click(screen.getByRole('link', { name: 'alice' }));
+		await user.click(screen.getByRole('link', { name: 'alice' }));
 
 		expect(onFollowClick).not.toHaveBeenCalled();
 	});

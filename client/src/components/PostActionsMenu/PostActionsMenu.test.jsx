@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -6,7 +5,7 @@ import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBott
 
 import PostActionsMenu from './PostActionsMenu';
 
-const renderMenu = (props = {}) => render(<PostActionsMenu onEditClick={jest.fn()} onDeleteClick={jest.fn()} onClose={jest.fn()} {...props} />);
+const renderMenu = (props = {}) => render(<PostActionsMenu onEditClick={vi.fn()} onDeleteClick={vi.fn()} onClose={vi.fn()} {...props} />);
 
 describe('PostActionsMenu', () => {
 	it('offers Edit and Delete', () => {
@@ -16,35 +15,38 @@ describe('PostActionsMenu', () => {
 		expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
 	});
 
-	it('calls onEditClick when Edit is clicked', () => {
-		const onEditClick = jest.fn();
+	it('calls onEditClick when Edit is clicked', async () => {
+		const user = userEvent.setup();
+		const onEditClick = vi.fn();
 		renderMenu({ onEditClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+		await user.click(screen.getByRole('button', { name: 'Edit' }));
 
 		expect(onEditClick).toHaveBeenCalledTimes(1);
 	});
 
-	it('calls onDeleteClick when Delete is clicked', () => {
-		const onDeleteClick = jest.fn();
+	it('calls onDeleteClick when Delete is clicked', async () => {
+		const user = userEvent.setup();
+		const onDeleteClick = vi.fn();
 		renderMenu({ onDeleteClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+		await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 		expect(onDeleteClick).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not call onClose when an option is clicked', () => {
-		const onClose = jest.fn();
+	it('does not call onClose when an option is clicked', async () => {
+		const user = userEvent.setup();
+		const onClose = vi.fn();
 		renderMenu({ onClose });
 
-		userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+		await user.click(screen.getByRole('button', { name: 'Edit' }));
 
 		expect(onClose).not.toHaveBeenCalled();
 	});
 
 	it('calls onClose when the area outside the menu is pressed', () => {
-		const onClose = jest.fn();
+		const onClose = vi.fn();
 		const { container } = renderMenu({ onClose });
 
 		fireEvent.mouseDown(container.firstChild);
@@ -53,7 +55,7 @@ describe('PostActionsMenu', () => {
 	});
 
 	it('does not call onClose when the menu itself is pressed', () => {
-		const onClose = jest.fn();
+		const onClose = vi.fn();
 		renderMenu({ onClose });
 
 		fireEvent.mouseDown(screen.getByRole('button', { name: 'Edit' }));
@@ -80,7 +82,7 @@ describe('PostActionsMenu', () => {
 		});
 
 		it('slides out and then calls onClose when the handle is dragged down past 25%', () => {
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderMenu({ onClose });
 
 			dragDown(getHandle(container), 120);
@@ -93,7 +95,7 @@ describe('PostActionsMenu', () => {
 		});
 
 		it('springs back and stays open on a short drag', () => {
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderMenu({ onClose });
 
 			dragDown(getHandle(container), 40);
@@ -104,7 +106,7 @@ describe('PostActionsMenu', () => {
 		});
 
 		it('does not start a drag from an option', () => {
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderMenu({ onClose });
 
 			dragDown(screen.getByRole('button', { name: 'Delete' }), 300);
@@ -115,8 +117,8 @@ describe('PostActionsMenu', () => {
 		});
 
 		it('does not call onEditClick or onDeleteClick when closed by a drag', () => {
-			const onEditClick = jest.fn();
-			const onDeleteClick = jest.fn();
+			const onEditClick = vi.fn();
+			const onDeleteClick = vi.fn();
 			const { container } = renderMenu({ onEditClick, onDeleteClick });
 
 			dragDown(getHandle(container), 120);
@@ -128,7 +130,7 @@ describe('PostActionsMenu', () => {
 
 		it('does not drag on a screen of 600px or wider', () => {
 			installBottomSheetEnvironment({ isMobile: false });
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderMenu({ onClose });
 
 			dragDown(getHandle(container), 300);

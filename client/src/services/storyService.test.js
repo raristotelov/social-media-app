@@ -1,7 +1,7 @@
 import { requestFactory } from './requester';
 import { addStory, deleteStory, getStoryTray, getStoryViewers, getUserStories, markStoryViewed } from './storyService';
 
-jest.mock('./requester');
+vi.mock('./requester');
 
 describe('storyService', () => {
 	describe('addStory', () => {
@@ -9,7 +9,7 @@ describe('storyService', () => {
 		let post;
 
 		beforeEach(() => {
-			post = jest.fn().mockResolvedValue({ _id: 'story1' });
+			post = vi.fn().mockResolvedValue({ _id: 'story1' });
 			requestFactory.mockReturnValue({ post });
 		});
 
@@ -37,7 +37,7 @@ describe('storyService', () => {
 
 	describe('getStoryTray', () => {
 		it('gets the tray endpoint', async () => {
-			const get = jest.fn().mockResolvedValue([{ isOwn: true }]);
+			const get = vi.fn().mockResolvedValue([{ isOwn: true }]);
 
 			requestFactory.mockReturnValue({ get });
 
@@ -50,7 +50,7 @@ describe('storyService', () => {
 
 	describe('getUserStories', () => {
 		it("gets that user's stories endpoint", async () => {
-			const get = jest.fn().mockResolvedValue({ user: {}, stories: [] });
+			const get = vi.fn().mockResolvedValue({ user: {}, stories: [] });
 
 			requestFactory.mockReturnValue({ get });
 
@@ -63,7 +63,7 @@ describe('storyService', () => {
 
 	describe('markStoryViewed', () => {
 		it('posts to the view endpoint of that story with no body', async () => {
-			const post = jest.fn().mockResolvedValue({});
+			const post = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ post });
 
@@ -76,7 +76,7 @@ describe('storyService', () => {
 
 	describe('getStoryViewers', () => {
 		it('gets the viewers endpoint of that story', async () => {
-			const get = jest.fn().mockResolvedValue([{ _id: 'viewer1' }]);
+			const get = vi.fn().mockResolvedValue([{ _id: 'viewer1' }]);
 
 			requestFactory.mockReturnValue({ get });
 
@@ -89,7 +89,7 @@ describe('storyService', () => {
 
 	describe('deleteStory', () => {
 		it('sends a DELETE to that story', async () => {
-			const del = jest.fn().mockResolvedValue({});
+			const del = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ delete: del });
 

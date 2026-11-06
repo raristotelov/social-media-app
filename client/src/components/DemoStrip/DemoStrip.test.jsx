@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
@@ -9,17 +8,17 @@ import { demoLogin } from '../../services/userService';
 
 import DemoStrip from './DemoStrip';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 let mockIsMobile = false;
 
-jest.mock('react-router-dom', () => ({
-	...jest.requireActual('react-router-dom'),
+vi.mock('react-router', async () => ({
+	...(await vi.importActual('react-router')),
 	useNavigate: () => mockNavigate,
 }));
 
-jest.mock('../../services/userService');
+vi.mock('../../services/userService');
 
-jest.mock('../../hooks/useMediaQuery', () => () => mockIsMobile);
+vi.mock('../../hooks/useMediaQuery', () => ({ default: () => mockIsMobile }));
 
 const GUEST_COPY = 'Explore the app without signing up';
 const GUEST_COPY_MOBILE = 'Explore without signing up';
@@ -43,7 +42,7 @@ const buildUi = ({ loggedInUser, setLoggedInUser, showToast }) => (
 	</LoggedInUserContext.Provider>
 );
 
-const renderStrip = ({ loggedInUser = null, setLoggedInUser = jest.fn(), showToast = jest.fn() } = {}) => {
+const renderStrip = ({ loggedInUser = null, setLoggedInUser = vi.fn(), showToast = vi.fn() } = {}) => {
 	const context = { loggedInUser, setLoggedInUser, showToast };
 	const result = render(buildUi(context));
 
@@ -52,9 +51,12 @@ const renderStrip = ({ loggedInUser = null, setLoggedInUser = jest.fn(), showToa
 
 const renderDemoVisitorStrip = (overrides = {}) => renderStrip({ loggedInUser: demoVisitor, ...overrides });
 
+let user;
+
 describe('DemoStrip', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		sessionStorage.clear();
 		mockIsMobile = false;
 	});
@@ -98,35 +100,35 @@ describe('DemoStrip', () => {
 		});
 
 		describe('closing the strip', () => {
-			it('should hide the strip when the close button is clicked', () => {
+			it('should hide the strip when the close button is clicked', async () => {
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Close' }));
+				await user.click(screen.getByRole('button', { name: 'Close' }));
 
 				expect(screen.queryByText(GUEST_COPY)).not.toBeInTheDocument();
 				expect(screen.queryByRole('button', { name: 'Try the demo' })).not.toBeInTheDocument();
 			});
 
-			it('should remember the dismissal in session storage', () => {
+			it('should remember the dismissal in session storage', async () => {
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Close' }));
+				await user.click(screen.getByRole('button', { name: 'Close' }));
 
 				expect(sessionStorage.getItem(GUEST_DISMISSED_KEY)).toBe('true');
 			});
 
-			it('should not use local storage, so a new tab shows the strip again', () => {
+			it('should not use local storage, so a new tab shows the strip again', async () => {
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Close' }));
+				await user.click(screen.getByRole('button', { name: 'Close' }));
 
 				expect(localStorage.getItem(GUEST_DISMISSED_KEY)).toBeNull();
 			});
 
-			it('should stay hidden after a reload in the same tab', () => {
+			it('should stay hidden after a reload in the same tab', async () => {
 				const first = renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Close' }));
+				await user.click(screen.getByRole('button', { name: 'Close' }));
 				first.unmount();
 
 				renderStrip();
@@ -157,7 +159,7 @@ describe('DemoStrip', () => {
 
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+				await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 				await waitFor(() => expect(demoLogin).toHaveBeenCalledTimes(1));
 			});
@@ -167,7 +169,7 @@ describe('DemoStrip', () => {
 
 				const { setLoggedInUser } = renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+				await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 				await waitFor(() => expect(setLoggedInUser).toHaveBeenCalledWith(demoVisitor));
 			});
@@ -177,7 +179,7 @@ describe('DemoStrip', () => {
 
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+				await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 				await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
 
@@ -190,7 +192,7 @@ describe('DemoStrip', () => {
 
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+				await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 				await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/user-feed', { replace: true }));
 			});
@@ -200,7 +202,7 @@ describe('DemoStrip', () => {
 
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+				await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 				await waitFor(() => expect(demoLogin).toHaveBeenCalledWith());
 			});
@@ -216,7 +218,7 @@ describe('DemoStrip', () => {
 
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+				await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 				const busyButton = await screen.findByRole('button', { name: 'Starting...' });
 
@@ -239,8 +241,8 @@ describe('DemoStrip', () => {
 
 				renderStrip();
 
-				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
-				userEvent.click(await screen.findByRole('button', { name: 'Starting...' }));
+				await user.click(screen.getByRole('button', { name: 'Try the demo' }));
+				await user.click(await screen.findByRole('button', { name: 'Starting...' }));
 
 				expect(demoLogin).toHaveBeenCalledTimes(1);
 
@@ -255,7 +257,7 @@ describe('DemoStrip', () => {
 
 					const { showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalledWith("Couldn't start the demo. Try again."));
 				});
@@ -265,7 +267,7 @@ describe('DemoStrip', () => {
 
 					const { showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalledWith('Too many demo accounts from this connection. Try again later.'));
 				});
@@ -275,7 +277,7 @@ describe('DemoStrip', () => {
 
 					const { showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalledWith('The demo is busy right now. Try again later.'));
 				});
@@ -285,7 +287,7 @@ describe('DemoStrip', () => {
 
 					const { showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalled());
 
@@ -298,7 +300,7 @@ describe('DemoStrip', () => {
 
 					const { showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalledWith("Couldn't start the demo. Try again."));
 				});
@@ -308,7 +310,7 @@ describe('DemoStrip', () => {
 
 					const { setLoggedInUser, showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalled());
 
@@ -321,7 +323,7 @@ describe('DemoStrip', () => {
 
 					const { showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalled());
 
@@ -333,7 +335,7 @@ describe('DemoStrip', () => {
 
 					const { showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalled());
 
@@ -345,11 +347,11 @@ describe('DemoStrip', () => {
 
 					const { setLoggedInUser, showToast } = renderStrip();
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalled());
 
-					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+					await user.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(setLoggedInUser).toHaveBeenCalledWith(demoVisitor));
 				});
@@ -399,26 +401,26 @@ describe('DemoStrip', () => {
 			expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
 		});
 
-		it('should hide the notice when the close button is clicked', () => {
+		it('should hide the notice when the close button is clicked', async () => {
 			renderDemoVisitorStrip();
 
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(screen.queryByText(NOTICE_LEAD)).not.toBeInTheDocument();
 		});
 
-		it('should remember the dismissal in session storage', () => {
+		it('should remember the dismissal in session storage', async () => {
 			renderDemoVisitorStrip();
 
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(sessionStorage.getItem(NOTICE_DISMISSED_KEY)).toBe('true');
 		});
 
-		it('should stay hidden after a reload in the same tab', () => {
+		it('should stay hidden after a reload in the same tab', async () => {
 			const first = renderDemoVisitorStrip();
 
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 			first.unmount();
 
 			renderDemoVisitorStrip();

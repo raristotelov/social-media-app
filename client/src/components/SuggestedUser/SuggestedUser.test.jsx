@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import { APP_NAME } from '../../constants/app';
 
@@ -15,8 +14,8 @@ const popularSuggestion = {
 };
 
 const renderSuggestedUser = ({ suggestion = popularSuggestion, actionStyle = 'button', isFollowed = false } = {}) => {
-	const onFollowClick = jest.fn();
-	const onUnfollowClick = jest.fn();
+	const onFollowClick = vi.fn();
+	const onUnfollowClick = vi.fn();
 
 	render(
 		<MemoryRouter>
@@ -34,6 +33,12 @@ const renderSuggestedUser = ({ suggestion = popularSuggestion, actionStyle = 'bu
 };
 
 describe('SuggestedUser', () => {
+	let user;
+
+	beforeEach(() => {
+		user = userEvent.setup();
+	});
+
 	describe('the reason line', () => {
 		it('says "Followed by X" for a mutual suggestion', () => {
 			renderSuggestedUser({
@@ -88,10 +93,10 @@ describe('SuggestedUser', () => {
 			expect(screen.getByRole('link').querySelector('img')).not.toBeInTheDocument();
 		});
 
-		it('does not follow when the link is clicked', () => {
+		it('does not follow when the link is clicked', async () => {
 			const { onFollowClick } = renderSuggestedUser();
 
-			userEvent.click(screen.getByRole('link'));
+			await user.click(screen.getByRole('link'));
 
 			expect(onFollowClick).not.toHaveBeenCalled();
 		});
@@ -107,10 +112,10 @@ describe('SuggestedUser', () => {
 			expect(button).not.toHaveClass('button-secondary');
 		});
 
-		it('follows the user when Follow is clicked', () => {
+		it('follows the user when Follow is clicked', async () => {
 			const { onFollowClick, onUnfollowClick } = renderSuggestedUser();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow alice' }));
+			await user.click(screen.getByRole('button', { name: 'Follow alice' }));
 
 			expect(onFollowClick).toHaveBeenCalledWith('user2');
 			expect(onUnfollowClick).not.toHaveBeenCalled();
@@ -126,10 +131,10 @@ describe('SuggestedUser', () => {
 			expect(screen.queryByRole('button', { name: 'Follow alice' })).not.toBeInTheDocument();
 		});
 
-		it('unfollows the user when Unfollow is clicked', () => {
+		it('unfollows the user when Unfollow is clicked', async () => {
 			const { onFollowClick, onUnfollowClick } = renderSuggestedUser({ isFollowed: true });
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow alice' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow alice' }));
 
 			expect(onUnfollowClick).toHaveBeenCalledWith('user2');
 			expect(onFollowClick).not.toHaveBeenCalled();
@@ -146,10 +151,10 @@ describe('SuggestedUser', () => {
 			expect(button).not.toHaveClass('button-classname');
 		});
 
-		it('follows the user when clicked', () => {
+		it('follows the user when clicked', async () => {
 			const { onFollowClick } = renderSuggestedUser({ actionStyle: 'link' });
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow alice' }));
+			await user.click(screen.getByRole('button', { name: 'Follow alice' }));
 
 			expect(onFollowClick).toHaveBeenCalledWith('user2');
 		});

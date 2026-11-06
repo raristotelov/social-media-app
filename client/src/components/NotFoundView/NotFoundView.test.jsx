@@ -1,18 +1,17 @@
-import '@testing-library/jest-dom';
 import { useContext } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import NotFoundContext from '../../contexts/NotFoundContext';
 
 import NotFoundProvider from '../NotFoundProvider/NotFoundProvider';
 import NotFoundView from './NotFoundView';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 
-jest.mock('react-router-dom', () => ({
-	...jest.requireActual('react-router-dom'),
+vi.mock('react-router', async () => ({
+	...(await vi.importActual('react-router')),
 	useNavigate: () => mockNavigate,
 }));
 
@@ -40,7 +39,7 @@ const renderNotFoundView = () => {
 
 describe('NotFoundView', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 	});
 
 	it('shows the heading "Page not found"', () => {
@@ -62,10 +61,12 @@ describe('NotFoundView', () => {
 		expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 	});
 
-	it('navigates to / when Go home is clicked', () => {
+	it('navigates to / when Go home is clicked', async () => {
+		const user = userEvent.setup();
+
 		renderNotFoundView();
 
-		userEvent.click(screen.getByRole('button', { name: 'Go home' }));
+		await user.click(screen.getByRole('button', { name: 'Go home' }));
 
 		expect(mockNavigate).toHaveBeenCalledTimes(1);
 		expect(mockNavigate).toHaveBeenCalledWith('/');

@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getUsersProfileData, getFollowers, getFollowing, followUser, unfollowUser, updateUserProfileData } from '../../services/userService';
@@ -15,23 +14,21 @@ import ProfileLayout from '../ProfileLayout/ProfileLayout';
 
 import ProfileView from './ProfileView';
 
-jest.mock('../../services/userService');
-jest.mock('../../services/userPostService');
-jest.mock('../../utils/images', () => ({
-	...jest.requireActual('../../utils/images'),
-	resizeImage: jest.fn(),
+vi.mock('../../services/userService');
+vi.mock('../../services/userPostService');
+vi.mock('../../utils/images', async () => ({
+	...(await vi.importActual('../../utils/images')),
+	resizeImage: vi.fn(),
 }));
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 
-jest.mock('react-router-dom', () => {
-	const actual = jest.requireActual('react-router-dom');
+vi.mock('react-router', async () => ({
+	...(await vi.importActual('react-router')),
+	useNavigate: () => mockNavigate,
+}));
 
-	return {
-		...actual,
-		useNavigate: () => mockNavigate,
-	};
-});
+let user;
 
 const profileUser = {
 	_id: 'user2',
@@ -46,7 +43,7 @@ const renderProfileView = (loggedInUser) => {
 	getUsersProfileData.mockResolvedValue([profileUser]);
 
 	return render(
-		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={['/user/user2']}>
 					<Routes>
@@ -62,7 +59,8 @@ const renderProfileView = (loggedInUser) => {
 
 describe('ProfileView', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 	});
 
 	it('renders the profile content for a guest and navigates to /log-in instead of calling followUser when Follow is clicked', async () => {
@@ -70,7 +68,7 @@ describe('ProfileView', () => {
 
 		expect(await screen.findByText('janedoe')).toBeInTheDocument();
 
-		userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+		await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 		expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2' } });
 		expect(followUser).not.toHaveBeenCalled();
@@ -83,7 +81,7 @@ describe('ProfileView', () => {
 
 		expect(await screen.findByText('janedoe')).toBeInTheDocument();
 
-		userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+		await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 		await waitFor(() => expect(followUser).toHaveBeenCalledWith({ userId: 'user1', userIdToFollow: 'user2' }));
 	});
@@ -97,7 +95,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 	const ownUser = { _id: 'user2', username: 'janedoe', following: [] };
 
-	const renderProfile = ({ loggedInUser = ownUser, profile = {}, updateLoggedInUser = jest.fn(), endSession = jest.fn() } = {}) => {
+	const renderProfile = ({ loggedInUser = ownUser, profile = {}, updateLoggedInUser = vi.fn(), endSession = vi.fn() } = {}) => {
 		getUsersProfileData.mockResolvedValue([{ ...profileUser, posts, ...profile }]);
 
 		const rendered = render(
@@ -127,20 +125,21 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 	const getTileActionButtons = () => screen.getAllByRole('button', { name: 'Post actions' });
 
-	const openDeleteConfirmForTile = (index) => {
-		userEvent.click(getTileActionButtons()[index]);
-		userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+	const openDeleteConfirmForTile = async (index) => {
+		await user.click(getTileActionButtons()[index]);
+		await user.click(screen.getByRole('button', { name: 'Delete' }));
 	};
 
-	const openEditFormForTile = (index) => {
-		userEvent.click(getTileActionButtons()[index]);
-		userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+	const openEditFormForTile = async (index) => {
+		await user.click(getTileActionButtons()[index]);
+		await user.click(screen.getByRole('button', { name: 'Edit' }));
 	};
 
 	const getPostsCountText = () => document.querySelector('.profile-stat').textContent;
 
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 	});
 
 	describe('post actions visibility', () => {
@@ -167,7 +166,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('opens a menu with Edit and Delete from a tile', async () => {
 			await renderOwnProfile();
 
-			userEvent.click(getTileActionButtons()[0]);
+			await user.click(getTileActionButtons()[0]);
 
 			expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
@@ -209,26 +208,26 @@ describe('ProfileView post actions and profile picture removal', () => {
 		const resizedFile = new File(['(resized)'], 'new.jpg', { type: 'image/jpeg' });
 
 		beforeEach(() => {
-			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
-			global.URL.revokeObjectURL = jest.fn();
+			globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+			globalThis.URL.revokeObjectURL = vi.fn();
 			resizeImage.mockResolvedValue(resizedFile);
 		});
 
 		afterEach(() => {
-			jest.restoreAllMocks();
+			vi.restoreAllMocks();
 		});
 
-		const submitUpload = () => {
-			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
-			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Third caption');
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+		const submitUpload = async () => {
+			await user.click(screen.getByRole('button', { name: /Upload Picture/ }));
+			await user.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Third caption');
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 		};
 
 		it('opens the Create popup on the Post tab from the upload tile', async () => {
 			await renderOwnProfile();
 
-			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
+			await user.click(screen.getByRole('button', { name: /Upload Picture/ }));
 
 			expect(screen.getByRole('tab', { name: 'Post' })).toHaveAttribute('aria-selected', 'true');
 			expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'false');
@@ -238,8 +237,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('lets you switch to the Story tab from the profile, which has no caption', async () => {
 			await renderOwnProfile();
 
-			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
-			userEvent.click(screen.getByRole('tab', { name: 'Story' }));
+			await user.click(screen.getByRole('button', { name: /Upload Picture/ }));
+			await user.click(screen.getByRole('tab', { name: 'Story' }));
 
 			expect(screen.queryByPlaceholderText('Write a caption...')).not.toBeInTheDocument();
 		});
@@ -247,8 +246,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('closes the Create popup without uploading when Cancel is clicked', async () => {
 			await renderOwnProfile();
 
-			userEvent.click(screen.getByRole('button', { name: /Upload Picture/ }));
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await user.click(screen.getByRole('button', { name: /Upload Picture/ }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
 			expect(addUserPost).not.toHaveBeenCalled();
@@ -258,7 +257,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			addUserPost.mockResolvedValue(savedPost);
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			await waitFor(() => expect(screen.getAllByAltText('user-post')).toHaveLength(3));
 			expect(getPostsCountText()).toBe('3posts');
@@ -268,7 +267,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			addUserPost.mockResolvedValue(savedPost);
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			await waitFor(() => expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Third caption' }));
 			expect(resizeImage).toHaveBeenCalledTimes(1);
@@ -290,7 +289,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			});
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			await waitFor(() => expect(addUserPost).toHaveBeenCalled());
 			expect(callOrder).toEqual(['resize', 'request']);
@@ -300,7 +299,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			addUserPost.mockResolvedValue(savedPost);
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			await waitFor(() => expect(screen.queryByRole('tablist')).not.toBeInTheDocument());
 		});
@@ -315,7 +314,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			);
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			await waitFor(() => expect(addUserPost).toHaveBeenCalledTimes(1));
 			expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled();
@@ -329,7 +328,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			addUserPost.mockRejectedValue({ code: 'IMAGE_TOO_LARGE', fields: { image: 'IMAGE_TOO_LARGE' }, status: 413 });
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			const message = await screen.findByText('This image is over 10 MB');
 			expect(message).toHaveClass('field-error');
@@ -341,7 +340,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			addUserPost.mockRejectedValue({ code: 'IMAGE_TYPE_INVALID', fields: { image: 'IMAGE_TYPE_INVALID' }, status: 400 });
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			expect(await screen.findByText('Choose a JPEG, PNG or WebP image')).toHaveClass('field-error');
 		});
@@ -352,17 +351,17 @@ describe('ProfileView post actions and profile picture removal', () => {
 
 			expect(getPostsCountText()).toBe('0posts');
 
-			submitUpload();
+			await submitUpload();
 
 			await waitFor(() => expect(getPostsCountText()).toBe('1post'));
 		});
 
 		it('leaves the post count unchanged when the save fails', async () => {
 			addUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			jest.spyOn(console, 'log').mockImplementation(() => {});
+			vi.spyOn(console, 'log').mockImplementation(() => {});
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			await waitFor(() => expect(addUserPost).toHaveBeenCalled());
 			expect(screen.getAllByAltText('user-post')).toHaveLength(2);
@@ -373,7 +372,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			addUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			const message = await screen.findByText("Couldn't upload the picture. Try again.");
 			expect(message).toHaveClass('form-error');
@@ -384,7 +383,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			resizeImage.mockRejectedValue(new Error('The source image could not be decoded'));
 			await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			expect(await screen.findByText("Couldn't upload the picture. Try again.")).toBeInTheDocument();
 			expect(addUserPost).not.toHaveBeenCalled();
@@ -394,7 +393,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			addUserPost.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = await renderOwnProfile();
 
-			submitUpload();
+			await submitUpload();
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(document.querySelector('.form-error')).not.toBeInTheDocument();
@@ -405,7 +404,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('shows a confirmation with Delete and Cancel and sends nothing yet', async () => {
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
+			await openDeleteConfirmForTile(0);
 
 			expect(screen.getByText(/permanently deleted/i)).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
@@ -416,8 +415,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('leaves the grid and post count unchanged and sends nothing when Cancel is clicked', async () => {
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(screen.queryByText(/permanently deleted/i)).not.toBeInTheDocument();
 			expect(screen.getAllByAltText('user-post')).toHaveLength(2);
@@ -428,8 +427,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('leaves everything unchanged when the confirmation is dismissed with the close icon', async () => {
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(screen.queryByText(/permanently deleted/i)).not.toBeInTheDocument();
 			expect(screen.getAllByAltText('user-post')).toHaveLength(2);
@@ -440,8 +439,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockResolvedValue(undefined);
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(1);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(1);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(deleteUserPost).toHaveBeenCalledWith({ userPostId: 'post2' }));
 		});
@@ -450,8 +449,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockResolvedValue(undefined);
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(screen.getAllByAltText('user-post')).toHaveLength(1));
 			expect(screen.getByAltText('user-post')).toHaveAttribute('src', posts[1].imageUrl);
@@ -463,8 +462,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockResolvedValue(undefined);
 			await renderOwnProfile({ profile: { posts: [{ ...posts[0] }] } });
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(screen.queryByAltText('user-post')).not.toBeInTheDocument());
 			expect(getPostsCountText()).toBe('0posts');
@@ -474,8 +473,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockResolvedValue(undefined);
 			await renderOwnProfile({ profile: { posts: [posts[0]] } });
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(screen.queryByText(/permanently deleted/i)).not.toBeInTheDocument());
 			expect(deleteUserPost).toHaveBeenCalledTimes(1);
@@ -492,8 +491,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			);
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled());
 
@@ -509,8 +508,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockRejectedValue({ code, status });
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			expect(await within(screen.getByRole('alert')).findByText(copy)).toBeInTheDocument();
 			expect(screen.queryByText(/permanently deleted/i)).not.toBeInTheDocument();
@@ -522,8 +521,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			expect(await within(screen.getByRole('alert')).findByText("Couldn't delete the post. Try again.")).toBeInTheDocument();
 			expect(screen.queryByText(/permanently deleted/i)).not.toBeInTheDocument();
@@ -533,8 +532,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockRejectedValue(new Error('network down'));
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			expect(await screen.findByText("Couldn't delete the post. Try again.")).toBeInTheDocument();
 		});
@@ -543,8 +542,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
@@ -555,13 +554,13 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(undefined);
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 			await screen.findByText("Couldn't delete the post. Try again.");
 
-			openDeleteConfirmForTile(0);
+			await openDeleteConfirmForTile(0);
 			expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(screen.getAllByAltText('user-post')).toHaveLength(1));
 			expect(deleteUserPost).toHaveBeenCalledTimes(2);
@@ -573,12 +572,12 @@ describe('ProfileView post actions and profile picture removal', () => {
 				.mockRejectedValueOnce({ code: 'POST_FORBIDDEN', status: 403 });
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 			await screen.findByText('This post no longer exists');
 
-			openDeleteConfirmForTile(1);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(1);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			expect(await screen.findByText('You can only change your own posts')).toBeInTheDocument();
 			expect(screen.queryByText('This post no longer exists')).not.toBeInTheDocument();
@@ -588,11 +587,11 @@ describe('ProfileView post actions and profile picture removal', () => {
 			deleteUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			await renderOwnProfile();
 
-			openDeleteConfirmForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirmForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 			await screen.findByText("Couldn't delete the post. Try again.");
 
-			openDeleteConfirmForTile(0);
+			await openDeleteConfirmForTile(0);
 
 			expect(document.querySelector('.delete-post-confirm .form-error')).not.toBeInTheDocument();
 		});
@@ -602,7 +601,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('opens the Edit Picture popup prefilled with the post caption', async () => {
 			await renderOwnProfile();
 
-			openEditFormForTile(1);
+			await openEditFormForTile(1);
 
 			expect(screen.getByRole('heading', { name: 'Edit Picture' })).toBeInTheDocument();
 			expect(screen.getByPlaceholderText('Write a caption...')).toHaveValue('Second caption');
@@ -612,8 +611,8 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('closes without sending anything when Save is clicked on an untouched form', async () => {
 			await renderOwnProfile();
 
-			openEditFormForTile(0);
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await openEditFormForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Picture' })).not.toBeInTheDocument());
 			expect(updateUserPostCaption).not.toHaveBeenCalled();
@@ -622,9 +621,9 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('closes without sending anything when Cancel is clicked after typing', async () => {
 			await renderOwnProfile();
 
-			openEditFormForTile(0);
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' more');
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await openEditFormForTile(0);
+			await user.type(screen.getByPlaceholderText('Write a caption...'), ' more');
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(screen.queryByRole('heading', { name: 'Edit Picture' })).not.toBeInTheDocument();
 			expect(updateUserPostCaption).not.toHaveBeenCalled();
@@ -634,10 +633,10 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserPostCaption.mockResolvedValue({ ...posts[0], caption: 'Edited caption' });
 			await renderOwnProfile();
 
-			openEditFormForTile(0);
-			userEvent.clear(screen.getByPlaceholderText('Write a caption...'));
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await openEditFormForTile(0);
+			await user.clear(screen.getByPlaceholderText('Write a caption...'));
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(updateUserPostCaption).toHaveBeenCalledWith({ userPostId: 'post1', caption: 'Edited caption' }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Picture' })).not.toBeInTheDocument());
@@ -647,19 +646,19 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserPostCaption.mockResolvedValue({ ...posts[0], caption: 'Edited caption' });
 			await renderOwnProfile();
 
-			openEditFormForTile(0);
-			userEvent.clear(screen.getByPlaceholderText('Write a caption...'));
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await openEditFormForTile(0);
+			await user.clear(screen.getByPlaceholderText('Write a caption...'));
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Picture' })).not.toBeInTheDocument());
 
-			openEditFormForTile(0);
+			await openEditFormForTile(0);
 
 			expect(screen.getByPlaceholderText('Write a caption...')).toHaveValue('Edited caption');
 			expect(screen.getByAltText('post')).toHaveAttribute('src', posts[0].imageUrl);
 
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-			openEditFormForTile(1);
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
+			await openEditFormForTile(1);
 
 			expect(screen.getByPlaceholderText('Write a caption...')).toHaveValue('Second caption');
 			expect(screen.getAllByAltText('user-post')).toHaveLength(2);
@@ -669,9 +668,9 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserPostCaption.mockRejectedValue({ code: 'POST_FORBIDDEN', status: 403 });
 			await renderOwnProfile();
 
-			openEditFormForTile(0);
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' more');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await openEditFormForTile(0);
+			await user.type(screen.getByPlaceholderText('Write a caption...'), ' more');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			expect(await screen.findByText('You can only change your own posts')).toHaveClass('form-error');
 			expect(screen.getByRole('heading', { name: 'Edit Picture' })).toBeInTheDocument();
@@ -681,9 +680,9 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserPostCaption.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			await renderOwnProfile();
 
-			openEditFormForTile(0);
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' more');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await openEditFormForTile(0);
+			await user.type(screen.getByPlaceholderText('Write a caption...'), ' more');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			expect(await screen.findByText("Couldn't save the caption. Try again.")).toBeInTheDocument();
 		});
@@ -692,9 +691,9 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserPostCaption.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = await renderOwnProfile();
 
-			openEditFormForTile(0);
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' more');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await openEditFormForTile(0);
+			await user.type(screen.getByPlaceholderText('Write a caption...'), ' more');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(document.querySelector('.form-error')).not.toBeInTheDocument();
@@ -704,13 +703,13 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserPostCaption.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			await renderOwnProfile();
 
-			openEditFormForTile(0);
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), ' more');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await openEditFormForTile(0);
+			await user.type(screen.getByPlaceholderText('Write a caption...'), ' more');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 			await screen.findByText("Couldn't save the caption. Try again.");
 
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-			openEditFormForTile(0);
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
+			await openEditFormForTile(0);
 
 			expect(screen.getByPlaceholderText('Write a caption...')).toHaveValue('First caption');
 		});
@@ -722,15 +721,15 @@ describe('ProfileView post actions and profile picture removal', () => {
 		const profile = { email: 'jane@example.com' };
 
 		beforeEach(() => {
-			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
-			global.URL.revokeObjectURL = jest.fn();
+			globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+			globalThis.URL.revokeObjectURL = vi.fn();
 			resizeImage.mockResolvedValue(resizedFile);
 		});
 
-		const chooseProfilePictureAndSubmit = () => {
-			userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
-			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+		const chooseProfilePictureAndSubmit = async () => {
+			await user.click(screen.getByRole('button', { name: 'Edit Profile' }));
+			await user.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 		};
 
 		it('resizes the chosen file and sends the resized file to the server', async () => {
@@ -739,7 +738,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserProfileData.mockResolvedValue({ user: updatedUser });
 			await renderOwnProfile({ profile });
 
-			chooseProfilePictureAndSubmit();
+			await chooseProfilePictureAndSubmit();
 
 			await waitFor(() =>
 				expect(updateUserProfileData).toHaveBeenCalledWith({
@@ -766,7 +765,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			});
 			await renderOwnProfile({ profile });
 
-			chooseProfilePictureAndSubmit();
+			await chooseProfilePictureAndSubmit();
 
 			await waitFor(() => expect(updateUserProfileData).toHaveBeenCalled());
 			expect(callOrder).toEqual(['resize', 'request']);
@@ -778,7 +777,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserProfileData.mockResolvedValue({ user: updatedUser });
 			const { updateLoggedInUser } = await renderOwnProfile({ profile });
 
-			chooseProfilePictureAndSubmit();
+			await chooseProfilePictureAndSubmit();
 
 			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith({ user: updatedUser }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Profile' })).not.toBeInTheDocument());
@@ -788,10 +787,10 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserProfileData.mockResolvedValue({ user: { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] } });
 			await renderOwnProfile({ profile });
 
-			userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
-			userEvent.clear(screen.getByPlaceholderText('Bio'));
-			userEvent.type(screen.getByPlaceholderText('Bio'), 'New bio');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.click(screen.getByRole('button', { name: 'Edit Profile' }));
+			await user.clear(screen.getByPlaceholderText('Bio'));
+			await user.type(screen.getByPlaceholderText('Bio'), 'New bio');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() =>
 				expect(updateUserProfileData).toHaveBeenCalledWith(expect.objectContaining({ updatedProfileData: { bio: 'New bio' } })),
@@ -803,7 +802,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserProfileData.mockRejectedValue({ code: 'IMAGE_TOO_LARGE', fields: { profilePicture: 'IMAGE_TOO_LARGE' }, status: 413 });
 			await renderOwnProfile({ profile });
 
-			chooseProfilePictureAndSubmit();
+			await chooseProfilePictureAndSubmit();
 
 			expect(await screen.findByText('This image is over 10 MB')).toHaveClass('field-error');
 			expect(screen.getByRole('heading', { name: 'Edit Profile' })).toBeInTheDocument();
@@ -813,7 +812,7 @@ describe('ProfileView post actions and profile picture removal', () => {
 			resizeImage.mockRejectedValue(new Error('The source image could not be decoded'));
 			await renderOwnProfile({ profile });
 
-			chooseProfilePictureAndSubmit();
+			await chooseProfilePictureAndSubmit();
 
 			expect(await screen.findByText("Couldn't save your profile. Try again.")).toHaveClass('form-error');
 			expect(updateUserProfileData).not.toHaveBeenCalled();
@@ -828,11 +827,11 @@ describe('ProfileView post actions and profile picture removal', () => {
 		};
 
 		beforeEach(() => {
-			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
-			global.URL.revokeObjectURL = jest.fn();
+			globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+			globalThis.URL.revokeObjectURL = vi.fn();
 		});
 
-		const openEditProfile = () => userEvent.click(screen.getByRole('button', { name: 'Edit Profile' }));
+		const openEditProfile = () => user.click(screen.getByRole('button', { name: 'Edit Profile' }));
 
 		it('sends profilePicture: null without uploading anything and refreshes the logged-in user on Save', async () => {
 			const updatedUser = { _id: 'user2', username: 'janedoe', posts, followers: [], following: [] };
@@ -840,9 +839,9 @@ describe('ProfileView post actions and profile picture removal', () => {
 			updateUserProfileData.mockResolvedValue({ user: updatedUser });
 			const { updateLoggedInUser } = await renderOwnProfile({ profile: profileWithPicture });
 
-			openEditProfile();
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await openEditProfile();
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() =>
 				expect(updateUserProfileData).toHaveBeenCalledWith({
@@ -858,9 +857,9 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('sends nothing when Cancel is clicked after removing the picture', async () => {
 			await renderOwnProfile({ profile: profileWithPicture });
 
-			openEditProfile();
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await openEditProfile();
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(screen.queryByRole('heading', { name: 'Edit Profile' })).not.toBeInTheDocument();
 			expect(updateUserProfileData).not.toHaveBeenCalled();
@@ -869,10 +868,10 @@ describe('ProfileView post actions and profile picture removal', () => {
 		it('still shows the picture when Edit Profile is reopened after Cancel', async () => {
 			await renderOwnProfile({ profile: profileWithPicture });
 
-			openEditProfile();
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-			openEditProfile();
+			await openEditProfile();
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
+			await openEditProfile();
 
 			expect(screen.getByAltText('preview')).toHaveAttribute('src', profileWithPicture.profilePicture.imageUrl);
 		});
@@ -883,9 +882,9 @@ describe('ProfileView errors', () => {
 	const ownUser = { _id: 'user2', username: 'janedoe', following: [] };
 	const otherUser = { _id: 'user1', username: 'johndoe', following: [] };
 
-	const renderProfile = ({ loggedInUser = otherUser, endSession = jest.fn() } = {}) => {
+	const renderProfile = ({ loggedInUser = otherUser, endSession = vi.fn() } = {}) => {
 		const rendered = render(
-			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession }}>
 				<ToastProvider>
 					<NotFoundProvider>
 						<MemoryRouter initialEntries={['/user/user2']}>
@@ -904,7 +903,8 @@ describe('ProfileView errors', () => {
 	};
 
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 	});
 
 	describe('when the profile fails to load', () => {
@@ -939,7 +939,7 @@ describe('ProfileView errors', () => {
 
 			renderProfile();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await screen.findByText('janedoe')).toBeInTheDocument();
 			expect(getUsersProfileData).toHaveBeenCalledTimes(2);
@@ -952,7 +952,7 @@ describe('ProfileView errors', () => {
 
 			renderProfile();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			await waitFor(() => expect(getUsersProfileData).toHaveBeenCalledTimes(2));
 			expect(await screen.findByRole('button', { name: 'Retry' })).toBeEnabled();
@@ -970,7 +970,7 @@ describe('ProfileView errors', () => {
 
 			renderProfile();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled());
 
@@ -1009,9 +1009,9 @@ describe('ProfileView errors', () => {
 
 			const rendered = renderProfile({ loggedInUser: ownUser });
 
-			userEvent.click(await screen.findByRole('button', { name: 'Edit Profile' }));
-			userEvent.type(screen.getByPlaceholderText('Bio'), 'New bio');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.click(await screen.findByRole('button', { name: 'Edit Profile' }));
+			await user.type(screen.getByPlaceholderText('Bio'), 'New bio');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			return rendered;
 		};
@@ -1046,7 +1046,7 @@ describe('ProfileView errors', () => {
 
 			const { endSession } = renderProfile();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow' }));
 
 			expect(await within(screen.getByRole('alert')).findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
 			expect(followUser).toHaveBeenCalledTimes(1);
@@ -1061,7 +1061,7 @@ describe('ProfileView errors', () => {
 
 			const { endSession } = renderProfile({ loggedInUser: { ...otherUser, following: ['user2'] } });
 
-			userEvent.click(await screen.findByRole('button', { name: 'Unfollow' }));
+			await user.click(await screen.findByRole('button', { name: 'Unfollow' }));
 
 			expect(await within(screen.getByRole('alert')).findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
 			expect(unfollowUser).toHaveBeenCalledTimes(1);
@@ -1076,7 +1076,7 @@ describe('ProfileView errors', () => {
 
 			renderProfile();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow' }));
 
 			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
 		});
@@ -1087,7 +1087,7 @@ describe('ProfileView errors', () => {
 
 			renderProfile({ loggedInUser: { ...otherUser, following: ['user2'] } });
 
-			userEvent.click(await screen.findByRole('button', { name: 'Unfollow' }));
+			await user.click(await screen.findByRole('button', { name: 'Unfollow' }));
 
 			expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
 		});
@@ -1098,7 +1098,7 @@ describe('ProfileView errors', () => {
 
 			const { endSession } = renderProfile();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
@@ -1110,7 +1110,7 @@ describe('ProfileView errors', () => {
 
 			const { endSession } = renderProfile({ loggedInUser: { ...otherUser, following: ['user2'] } });
 
-			userEvent.click(await screen.findByRole('button', { name: 'Unfollow' }));
+			await user.click(await screen.findByRole('button', { name: 'Unfollow' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 		});
@@ -1135,8 +1135,8 @@ describe('ProfileView optimistic follow and unfollow', () => {
 	};
 
 	const renderProfile = async ({ loggedInUser = viewer, profileData = profile } = {}) => {
-		const updateLoggedInUser = jest.fn();
-		const endSession = jest.fn();
+		const updateLoggedInUser = vi.fn();
+		const endSession = vi.fn();
 
 		getUsersProfileData.mockResolvedValue([profileData]);
 
@@ -1162,7 +1162,8 @@ describe('ProfileView optimistic follow and unfollow', () => {
 	const getFollowersCountText = () => document.querySelectorAll('.profile-stat')[1].textContent;
 
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 	});
 
 	describe('Follow', () => {
@@ -1170,7 +1171,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			followUser.mockReturnValue(buildDeferred().promise);
 			await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 			expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument();
 			expect(getFollowersCountText()).toBe('1follower');
@@ -1180,7 +1181,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			followUser.mockReturnValue(buildDeferred().promise);
 			await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 			expect(followUser).toHaveBeenCalledWith({ userId: 'user1', userIdToFollow: 'user2' });
 			expect(followUser).toHaveBeenCalledTimes(1);
@@ -1192,7 +1193,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			followUser.mockResolvedValue(serverResponse);
 			const { updateLoggedInUser } = await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith(serverResponse));
 			expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument();
@@ -1203,7 +1204,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			followUser.mockResolvedValue({ user: viewerFollowingProfile });
 			const { updateLoggedInUser } = await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalled());
 			expect(getUsersProfileData).toHaveBeenCalledTimes(1);
@@ -1213,7 +1214,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { updateLoggedInUser, endSession } = await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
@@ -1227,9 +1228,9 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			followUser.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce({ user: viewerFollowingProfile });
 			const { updateLoggedInUser } = await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 			await screen.findByText("Couldn't follow this user. Try again.");
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledTimes(1));
 			expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument();
@@ -1239,7 +1240,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			followUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
@@ -1248,7 +1249,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 		it('sends a guest to /log-in with the current path, and changes neither the button nor the count', async () => {
 			await renderProfile({ loggedInUser: null });
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2' } });
 			expect(followUser).not.toHaveBeenCalled();
@@ -1264,7 +1265,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 
 			expect(getFollowersCountText()).toBe('1follower');
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
 			expect(getFollowersCountText()).toBe('0followers');
@@ -1274,7 +1275,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			unfollowUser.mockReturnValue(buildDeferred().promise);
 			await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'user1', userIdToUnfollow: 'user2' });
 		});
@@ -1283,7 +1284,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { updateLoggedInUser, endSession } = await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 			expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Unfollow' })).toBeInTheDocument();
@@ -1296,7 +1297,7 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			unfollowUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = await renderProfile({ loggedInUser: viewerFollowingProfile, profileData: followedProfile });
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 		});
@@ -1308,8 +1309,8 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			unfollowUser.mockReturnValue(buildDeferred().promise);
 			await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 			expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument();
 			expect(getFollowersCountText()).toBe('0followers');
@@ -1325,8 +1326,8 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			unfollowUser.mockReturnValue(unfollowRequest.promise);
 			const { updateLoggedInUser } = await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 			unfollowRequest.resolve(unfollowResponse);
 			await waitFor(() => expect(updateLoggedInUser).toHaveBeenCalledWith(unfollowResponse));
@@ -1346,8 +1347,8 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			unfollowUser.mockReturnValue(buildDeferred().promise);
 			await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 			followRequest.reject({ code: 'INTERNAL_ERROR', status: 500 });
 
@@ -1365,8 +1366,8 @@ describe('ProfileView optimistic follow and unfollow', () => {
 			unfollowUser.mockReturnValue(unfollowRequest.promise);
 			const { updateLoggedInUser } = await renderProfile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Follow' }));
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow' }));
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow' }));
 
 			followRequest.resolve({ user: { ...viewer, following: ['user2'] } });
 			await followRequest.promise;
@@ -1407,7 +1408,7 @@ describe('ProfileView followers and following popup', () => {
 		getFollowing.mockResolvedValue(followingRows);
 
 		render(
-			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 				<ToastProvider>
 					<MemoryRouter initialEntries={['/user/user2']}>
 						<Routes>
@@ -1424,7 +1425,8 @@ describe('ProfileView followers and following popup', () => {
 	};
 
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 	});
 
 	it('shows no popup until a count is clicked', async () => {
@@ -1437,7 +1439,7 @@ describe('ProfileView followers and following popup', () => {
 	it('opens the Followers popup listing the profile followers when the followers count is clicked', async () => {
 		await renderProfile();
 
-		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+		await user.click(screen.getByRole('button', { name: '2followers' }));
 
 		expect(screen.getByRole('heading', { name: 'Followers' })).toBeInTheDocument();
 		expect(await screen.findByText('firstfollower')).toBeInTheDocument();
@@ -1449,7 +1451,7 @@ describe('ProfileView followers and following popup', () => {
 	it('opens the Following popup listing the users the profile follows when the following count is clicked', async () => {
 		await renderProfile();
 
-		userEvent.click(screen.getByRole('button', { name: '1 following' }));
+		await user.click(screen.getByRole('button', { name: '1following' }));
 
 		expect(screen.getByRole('heading', { name: 'Following' })).toBeInTheDocument();
 		expect(await screen.findByText('followedone')).toBeInTheDocument();
@@ -1460,7 +1462,7 @@ describe('ProfileView followers and following popup', () => {
 	it('lets a guest open the popup', async () => {
 		await renderProfile({ loggedInUser: null });
 
-		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+		await user.click(screen.getByRole('button', { name: '2followers' }));
 
 		expect(await screen.findByText('firstfollower')).toBeInTheDocument();
 	});
@@ -1468,16 +1470,16 @@ describe('ProfileView followers and following popup', () => {
 	it('does not open a popup for a zero count', async () => {
 		await renderProfile({ profileData: { ...profile, followers: [], following: [] } });
 
-		expect(screen.queryByRole('button', { name: '0 followers' })).not.toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: '0 following' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: '0followers' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: '0following' })).not.toBeInTheDocument();
 	});
 
 	it('closes the popup with the close button', async () => {
 		await renderProfile();
 
-		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+		await user.click(screen.getByRole('button', { name: '2followers' }));
 		await screen.findByText('firstfollower');
-		userEvent.click(screen.getByRole('button', { name: 'Close' }));
+		await user.click(screen.getByRole('button', { name: 'Close' }));
 
 		expect(screen.queryByRole('heading', { name: 'Followers' })).not.toBeInTheDocument();
 	});
@@ -1485,8 +1487,8 @@ describe('ProfileView followers and following popup', () => {
 	it('closes the popup and opens that profile when a row is clicked', async () => {
 		await renderProfile();
 
-		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
-		userEvent.click(await screen.findByRole('link', { name: /secondfollower/ }));
+		await user.click(screen.getByRole('button', { name: '2followers' }));
+		await user.click(await screen.findByRole('link', { name: /secondfollower/ }));
 
 		expect(screen.queryByRole('heading', { name: 'Followers' })).not.toBeInTheDocument();
 		await waitFor(() => expect(document.querySelector('.username')).toHaveTextContent('secondfollower'));
@@ -1497,7 +1499,7 @@ describe('ProfileView followers and following popup', () => {
 		await renderProfile({ loggedInUser: { _id: 'follower2', username: 'secondfollower', following: ['user2'] } });
 		getFollowers.mockResolvedValue([followerRows[1], followerRows[0]]);
 
-		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+		await user.click(screen.getByRole('button', { name: '2followers' }));
 		await screen.findByText('firstfollower');
 
 		const usernames = Array.from(document.querySelectorAll('.user-list-results .search-result-username')).map((row) => row.textContent);
@@ -1509,8 +1511,8 @@ describe('ProfileView followers and following popup', () => {
 		followUser.mockReturnValue(new Promise(() => {}));
 		await renderProfile();
 
-		userEvent.click(screen.getByRole('button', { name: 'Follow' }));
-		userEvent.click(screen.getByRole('button', { name: '3 followers' }));
+		await user.click(screen.getByRole('button', { name: 'Follow' }));
+		await user.click(screen.getByRole('button', { name: '3followers' }));
 
 		await screen.findByText('firstfollower');
 		expect(getFollowers).toHaveBeenCalledWith({ userId: 'user2' });
@@ -1520,7 +1522,7 @@ describe('ProfileView followers and following popup', () => {
 		await renderProfile();
 		getFollowers.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
-		userEvent.click(screen.getByRole('button', { name: '2 followers' }));
+		await user.click(screen.getByRole('button', { name: '2followers' }));
 
 		expect(await screen.findByText("Couldn't load this list")).toBeInTheDocument();
 		expect(screen.getByText('janedoe')).toBeInTheDocument();

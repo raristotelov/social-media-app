@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -22,8 +21,8 @@ describe('PostCaption', () => {
 	const getMoreButton = () => screen.queryByRole('button', { name: /more/ });
 
 	beforeEach(() => {
-		scrollHeightSpy = jest.spyOn(Element.prototype, 'scrollHeight', 'get');
-		clientHeightSpy = jest.spyOn(Element.prototype, 'clientHeight', 'get');
+		scrollHeightSpy = vi.spyOn(Element.prototype, 'scrollHeight', 'get');
+		clientHeightSpy = vi.spyOn(Element.prototype, 'clientHeight', 'get');
 		setFittingLayout();
 	});
 
@@ -70,32 +69,38 @@ describe('PostCaption', () => {
 		expect(container.querySelector('.post-caption')).toHaveClass('post-caption-clamped');
 	});
 
-	it('expands the full caption when "more" is clicked', () => {
+	it('expands the full caption when "more" is clicked', async () => {
+		const user = userEvent.setup();
+
 		setOverflowingLayout();
 
 		const { container } = render(<PostCaption username='janedoe' caption={CAPTION} />);
 
-		userEvent.click(getMoreButton());
+		await user.click(getMoreButton());
 
 		expect(container.querySelector('.post-caption')).not.toHaveClass('post-caption-clamped');
 	});
 
-	it('removes the "more" control once expanded', () => {
+	it('removes the "more" control once expanded', async () => {
+		const user = userEvent.setup();
+
 		setOverflowingLayout();
 
 		render(<PostCaption username='janedoe' caption={CAPTION} />);
 
-		userEvent.click(getMoreButton());
+		await user.click(getMoreButton());
 
 		expect(getMoreButton()).not.toBeInTheDocument();
 	});
 
-	it('keeps the whole caption text in the page after expanding', () => {
+	it('keeps the whole caption text in the page after expanding', async () => {
+		const user = userEvent.setup();
+
 		setOverflowingLayout();
 
 		const { container } = render(<PostCaption username='janedoe' caption={CAPTION} />);
 
-		userEvent.click(getMoreButton());
+		await user.click(getMoreButton());
 
 		expect(container.querySelector('.post-caption')).toHaveTextContent(CAPTION);
 	});
@@ -153,7 +158,7 @@ describe('PostCaption', () => {
 	});
 
 	it('stops listening for resizes once unmounted', () => {
-		const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+		const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
 		const { unmount } = render(<PostCaption username='janedoe' caption={CAPTION} />);
 
 		unmount();

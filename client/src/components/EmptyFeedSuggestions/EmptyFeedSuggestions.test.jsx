@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getSuggestions } from '../../services/suggestionService';
@@ -11,8 +10,8 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import EmptyFeedSuggestions from './EmptyFeedSuggestions';
 
-jest.mock('../../services/suggestionService');
-jest.mock('../../services/userService');
+vi.mock('../../services/suggestionService');
+vi.mock('../../services/userService');
 
 const loggedInUser = { _id: 'me', username: 'johndoe', following: [] };
 
@@ -23,11 +22,11 @@ const suggestions = [
 	...['n1', 'n2', 'n3'].map((id) => buildSuggestion(id, 'new')),
 ];
 
-const renderList = ({ result = { suggestions, reserve: [], isCarouselDismissed: false }, onFollowChange = jest.fn() } = {}) => {
+const renderList = ({ result = { suggestions, reserve: [], isCarouselDismissed: false }, onFollowChange = vi.fn() } = {}) => {
 	getSuggestions.mockResolvedValue(result);
 
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<EmptyFeedSuggestions onFollowChange={onFollowChange} />
@@ -39,9 +38,12 @@ const renderList = ({ result = { suggestions, reserve: [], isCarouselDismissed: 
 	return { ...rendered, onFollowChange };
 };
 
+let user;
+
 describe('EmptyFeedSuggestions', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		followUser.mockResolvedValue({ user: loggedInUser });
 		unfollowUser.mockResolvedValue({ user: loggedInUser });
 	});
@@ -89,7 +91,7 @@ describe('EmptyFeedSuggestions', () => {
 		getSuggestions.mockReturnValue(new Promise(() => {}));
 
 		render(
-			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<EmptyFeedSuggestions />
@@ -105,7 +107,7 @@ describe('EmptyFeedSuggestions', () => {
 		getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
 		render(
-			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<EmptyFeedSuggestions />
@@ -133,7 +135,7 @@ describe('EmptyFeedSuggestions', () => {
 			followUser.mockReturnValue(new Promise(() => {}));
 			renderList();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			const unfollowButton = screen.getByRole('button', { name: 'Unfollow name-p1' });
 
@@ -145,7 +147,7 @@ describe('EmptyFeedSuggestions', () => {
 		it('sends the follow request', async () => {
 			renderList();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			await waitFor(() => expect(followUser).toHaveBeenCalledWith({ userId: 'me', userIdToFollow: 'p1' }));
 		});
@@ -153,7 +155,7 @@ describe('EmptyFeedSuggestions', () => {
 		it('tells the feed to reload its posts once the follow succeeded', async () => {
 			const { onFollowChange } = renderList();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			await waitFor(() => expect(onFollowChange).toHaveBeenCalledTimes(1));
 		});
@@ -162,7 +164,7 @@ describe('EmptyFeedSuggestions', () => {
 			followUser.mockReturnValue(new Promise(() => {}));
 			const { onFollowChange } = renderList();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			expect(onFollowChange).not.toHaveBeenCalled();
 		});
@@ -171,7 +173,7 @@ describe('EmptyFeedSuggestions', () => {
 			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { onFollowChange } = renderList();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Follow name-p1' })).not.toHaveClass('button-secondary');
@@ -181,7 +183,7 @@ describe('EmptyFeedSuggestions', () => {
 		it('leaves the other rows alone', async () => {
 			renderList();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			await screen.findByRole('button', { name: 'Unfollow name-p1' });
 
@@ -193,7 +195,7 @@ describe('EmptyFeedSuggestions', () => {
 		const followFirst = async () => {
 			const rendered = renderList();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 			await screen.findByRole('button', { name: 'Unfollow name-p1' });
 			await waitFor(() => expect(rendered.onFollowChange).toHaveBeenCalledTimes(1));
 
@@ -204,7 +206,7 @@ describe('EmptyFeedSuggestions', () => {
 			await followFirst();
 			unfollowUser.mockReturnValue(new Promise(() => {}));
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 			expect(screen.getByRole('button', { name: 'Follow name-p1' })).not.toHaveClass('button-secondary');
 		});
@@ -212,7 +214,7 @@ describe('EmptyFeedSuggestions', () => {
 		it('sends the unfollow request', async () => {
 			await followFirst();
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 			await waitFor(() => expect(unfollowUser).toHaveBeenCalledWith({ userId: 'me', userIdToUnfollow: 'p1' }));
 		});
@@ -220,7 +222,7 @@ describe('EmptyFeedSuggestions', () => {
 		it('tells the feed to reload its posts once the unfollow succeeded', async () => {
 			const { onFollowChange } = await followFirst();
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 			await waitFor(() => expect(onFollowChange).toHaveBeenCalledTimes(2));
 		});
@@ -229,7 +231,7 @@ describe('EmptyFeedSuggestions', () => {
 			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { onFollowChange } = await followFirst();
 
-			userEvent.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
 
 			expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toHaveClass('button-secondary');

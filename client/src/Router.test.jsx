@@ -1,38 +1,41 @@
-import '@testing-library/jest-dom';
 import { Fragment } from 'react';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigationType } from 'react-router';
 
 import LoggedInUserContext from './contexts/LoggedInUserContext';
 
 import Router from './Router';
 
-jest.mock('./components/SignUpView/SignUpView', () => () => <p>Sign up view</p>);
-jest.mock('./components/LoginView/LoginView', () => () => <p>Login view</p>);
-jest.mock('./components/ProfileView/ProfileView', () => () => <p>Profile view</p>);
-jest.mock('./components/ProfilePostsView/ProfilePostsView', () => () => <p>Profile posts view</p>);
-jest.mock('./components/ProfileLayout/ProfileLayout', () => {
-	const { Outlet } = require('react-router-dom');
+vi.mock('./components/SignUpView/SignUpView', () => ({ default: () => <p>Sign up view</p> }));
+vi.mock('./components/LoginView/LoginView', () => ({ default: () => <p>Login view</p> }));
+vi.mock('./components/ProfileView/ProfileView', () => ({ default: () => <p>Profile view</p> }));
+vi.mock('./components/ProfilePostsView/ProfilePostsView', () => ({ default: () => <p>Profile posts view</p> }));
+vi.mock('./components/ProfileLayout/ProfileLayout', async () => {
+	const { Outlet } = await import('react-router');
 
-	return () => (
-		<div data-testid='profile-layout'>
-			<Outlet />
-		</div>
-	);
+	return {
+		default: () => (
+			<div data-testid='profile-layout'>
+				<Outlet />
+			</div>
+		),
+	};
 });
-jest.mock('./components/FeedView/FeedView', () => () => <p>Feed view</p>);
-jest.mock('./components/PopularPostsLayout/PopularPostsLayout', () => {
-	const { Outlet } = require('react-router-dom');
+vi.mock('./components/FeedView/FeedView', () => ({ default: () => <p>Feed view</p> }));
+vi.mock('./components/PopularPostsLayout/PopularPostsLayout', async () => {
+	const { Outlet } = await import('react-router');
 
-	return () => (
-		<div data-testid='popular-posts-layout'>
-			<Outlet />
-		</div>
-	);
+	return {
+		default: () => (
+			<div data-testid='popular-posts-layout'>
+				<Outlet />
+			</div>
+		),
+	};
 });
-jest.mock('./components/PopularPostsView/PopularPostsView', () => () => <p>Popular posts view</p>);
-jest.mock('./components/PopularPostsPostsView/PopularPostsPostsView', () => () => <p>Popular posts posts view</p>);
-jest.mock('./components/NotFoundView/NotFoundView', () => () => <p>Not found view</p>);
+vi.mock('./components/PopularPostsView/PopularPostsView', () => ({ default: () => <p>Popular posts view</p> }));
+vi.mock('./components/PopularPostsPostsView/PopularPostsPostsView', () => ({ default: () => <p>Popular posts posts view</p> }));
+vi.mock('./components/NotFoundView/NotFoundView', () => ({ default: () => <p>Not found view</p> }));
 
 const LOGGED_IN_USER = { _id: 'user1', username: 'johndoe' };
 

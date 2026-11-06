@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -7,7 +6,7 @@ import ImageInput from './ImageInput';
 const initialPicture = 'https://example.com/current.jpg';
 
 const renderImageInput = (props = {}) => {
-	const onChange = jest.fn();
+	const onChange = vi.fn();
 	const utils = render(<ImageInput onChange={onChange} {...props} />);
 
 	return { ...utils, onChange, fileInput: utils.container.querySelector('input[type="file"]') };
@@ -27,11 +26,13 @@ const buildFileOfSize = (size, { name = 'photo.jpg', type = 'image/jpeg' } = {})
 
 describe('ImageInput', () => {
 	let openPickerSpy;
+	let user;
 
 	beforeEach(() => {
-		global.URL.createObjectURL = jest.fn(() => 'blob:preview');
-		global.URL.revokeObjectURL = jest.fn();
-		openPickerSpy = jest.spyOn(HTMLInputElement.prototype, 'click');
+		user = userEvent.setup({ applyAccept: false });
+		globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+		globalThis.URL.revokeObjectURL = vi.fn();
+		openPickerSpy = vi.spyOn(HTMLInputElement.prototype, 'click');
 	});
 
 	afterEach(() => {
@@ -39,11 +40,11 @@ describe('ImageInput', () => {
 	});
 
 	describe('choosing a picture', () => {
-		it('calls onChange with the chosen file', () => {
+		it('calls onChange with the chosen file', async () => {
 			const { onChange, fileInput } = renderImageInput();
 			const file = buildFile();
 
-			userEvent.upload(fileInput, file);
+			await user.upload(fileInput, file);
 
 			expect(onChange).toHaveBeenCalledWith(file);
 		});
@@ -69,12 +70,12 @@ describe('ImageInput', () => {
 			['image/jpeg', 'photo.jpg'],
 			['image/png', 'photo.png'],
 			['image/webp', 'photo.webp'],
-		])('accepts a %s file', (type, name) => {
-			const onInvalidFile = jest.fn();
+		])('accepts a %s file', async (type, name) => {
+			const onInvalidFile = vi.fn();
 			const { onChange, fileInput } = renderImageInput({ onInvalidFile });
 			const file = buildFileOfSize(1024, { name, type });
 
-			userEvent.upload(fileInput, file);
+			await user.upload(fileInput, file);
 
 			expect(onChange).toHaveBeenCalledWith(file);
 			expect(onInvalidFile).not.toHaveBeenCalled();
@@ -86,106 +87,106 @@ describe('ImageInput', () => {
 			['a PDF', 'document.pdf', 'application/pdf'],
 			['a text file', 'notes.txt', 'text/plain'],
 			['a file with no detectable type', 'mystery', ''],
-		])('rejects %s with the type message and does not pass it on', (_name, fileName, type) => {
-			const onInvalidFile = jest.fn();
+		])('rejects %s with the type message and does not pass it on', async (_name, fileName, type) => {
+			const onInvalidFile = vi.fn();
 			const { onChange, fileInput } = renderImageInput({ onInvalidFile });
 
-			userEvent.upload(fileInput, buildFileOfSize(1024, { name: fileName, type }));
+			await user.upload(fileInput, buildFileOfSize(1024, { name: fileName, type }));
 
 			expect(onInvalidFile).toHaveBeenCalledTimes(1);
 			expect(onInvalidFile).toHaveBeenCalledWith('Choose a JPEG, PNG or WebP image');
 			expect(onChange).not.toHaveBeenCalled();
 		});
 
-		it('clears the file input after rejecting a wrong type, so the same file can be chosen again', () => {
-			const { fileInput } = renderImageInput({ onInvalidFile: jest.fn() });
-			const valueSetterSpy = jest.spyOn(fileInput, 'value', 'set');
+		it('clears the file input after rejecting a wrong type, so the same file can be chosen again', async () => {
+			const { fileInput } = renderImageInput({ onInvalidFile: vi.fn() });
 
-			userEvent.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
+			await user.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
 
-			expect(valueSetterSpy).toHaveBeenCalledWith('');
+			expect(fileInput.files).toHaveLength(0);
+			expect(fileInput.value).toBe('');
 		});
 
-		it('does not show a preview for a rejected file', () => {
-			const { container, fileInput } = renderImageInput({ onInvalidFile: jest.fn() });
+		it('does not show a preview for a rejected file', async () => {
+			const { container, fileInput } = renderImageInput({ onInvalidFile: vi.fn() });
 
-			userEvent.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
+			await user.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
 
 			expect(container.querySelector('.preview-wrapper')).toHaveClass('hidden');
-			expect(global.URL.createObjectURL).not.toHaveBeenCalled();
+			expect(globalThis.URL.createObjectURL).not.toHaveBeenCalled();
 		});
 
-		it('keeps the current picture when a wrong file is chosen as a replacement', () => {
-			const { onChange, fileInput } = renderImageInput({ initialValue: initialPicture, onInvalidFile: jest.fn() });
+		it('keeps the current picture when a wrong file is chosen as a replacement', async () => {
+			const { onChange, fileInput } = renderImageInput({ initialValue: initialPicture, onInvalidFile: vi.fn() });
 
-			userEvent.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
+			await user.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }));
 
 			expect(onChange).not.toHaveBeenCalled();
 			expect(screen.getByAltText('preview')).toHaveAttribute('src', initialPicture);
 		});
 
-		it('does not throw when a wrong file is chosen and no onInvalidFile handler is given', () => {
+		it('does not throw when a wrong file is chosen and no onInvalidFile handler is given', async () => {
 			const { onChange, fileInput } = renderImageInput();
 
-			expect(() => userEvent.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }))).not.toThrow();
+			await expect(user.upload(fileInput, buildFileOfSize(1024, { name: 'notes.txt', type: 'text/plain' }))).resolves.toBeUndefined();
 			expect(onChange).not.toHaveBeenCalled();
 		});
 	});
 
 	describe('file size', () => {
-		it('accepts a file of exactly 10 MB', () => {
-			const onInvalidFile = jest.fn();
+		it('accepts a file of exactly 10 MB', async () => {
+			const onInvalidFile = vi.fn();
 			const { onChange, fileInput } = renderImageInput({ onInvalidFile });
 			const file = buildFileOfSize(MAX_BYTES);
 
-			userEvent.upload(fileInput, file);
+			await user.upload(fileInput, file);
 
 			expect(onChange).toHaveBeenCalledWith(file);
 			expect(onInvalidFile).not.toHaveBeenCalled();
 		});
 
-		it('rejects a file one byte over 10 MB with the size message and does not pass it on', () => {
-			const onInvalidFile = jest.fn();
+		it('rejects a file one byte over 10 MB with the size message and does not pass it on', async () => {
+			const onInvalidFile = vi.fn();
 			const { onChange, fileInput } = renderImageInput({ onInvalidFile });
 
-			userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
+			await user.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
 
 			expect(onInvalidFile).toHaveBeenCalledTimes(1);
 			expect(onInvalidFile).toHaveBeenCalledWith('This image is over 10 MB');
 			expect(onChange).not.toHaveBeenCalled();
 		});
 
-		it('clears the file input after rejecting an oversized file', () => {
-			const { fileInput } = renderImageInput({ onInvalidFile: jest.fn() });
-			const valueSetterSpy = jest.spyOn(fileInput, 'value', 'set');
+		it('clears the file input after rejecting an oversized file', async () => {
+			const { fileInput } = renderImageInput({ onInvalidFile: vi.fn() });
 
-			userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
+			await user.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
 
-			expect(valueSetterSpy).toHaveBeenCalledWith('');
+			expect(fileInput.files).toHaveLength(0);
+			expect(fileInput.value).toBe('');
 		});
 
-		it('does not show a preview for an oversized file', () => {
-			const { container, fileInput } = renderImageInput({ onInvalidFile: jest.fn() });
+		it('does not show a preview for an oversized file', async () => {
+			const { container, fileInput } = renderImageInput({ onInvalidFile: vi.fn() });
 
-			userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
+			await user.upload(fileInput, buildFileOfSize(MAX_BYTES + 1));
 
 			expect(container.querySelector('.preview-wrapper')).toHaveClass('hidden');
 		});
 
-		it('checks the type before the size, so an oversized wrong-type file gets the type message', () => {
-			const onInvalidFile = jest.fn();
+		it('checks the type before the size, so an oversized wrong-type file gets the type message', async () => {
+			const onInvalidFile = vi.fn();
 			const { fileInput } = renderImageInput({ onInvalidFile });
 
-			userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1, { name: 'video.mp4', type: 'video/mp4' }));
+			await user.upload(fileInput, buildFileOfSize(MAX_BYTES + 1, { name: 'video.mp4', type: 'video/mp4' }));
 
 			expect(onInvalidFile).toHaveBeenCalledTimes(1);
 			expect(onInvalidFile).toHaveBeenCalledWith('Choose a JPEG, PNG or WebP image');
 		});
 
-		it('does not throw when an oversized file is chosen and no onInvalidFile handler is given', () => {
+		it('does not throw when an oversized file is chosen and no onInvalidFile handler is given', async () => {
 			const { onChange, fileInput } = renderImageInput();
 
-			expect(() => userEvent.upload(fileInput, buildFileOfSize(MAX_BYTES + 1))).not.toThrow();
+			await expect(user.upload(fileInput, buildFileOfSize(MAX_BYTES + 1))).resolves.toBeUndefined();
 			expect(onChange).not.toHaveBeenCalled();
 		});
 	});
@@ -197,28 +198,28 @@ describe('ImageInput', () => {
 			expect(screen.getByAltText('preview')).toHaveAttribute('src', initialPicture);
 		});
 
-		it('opens the file picker when the picture is clicked', () => {
+		it('opens the file picker when the picture is clicked', async () => {
 			renderImageInput({ initialValue: initialPicture });
 			openPickerSpy.mockClear();
 
-			userEvent.click(screen.getByAltText('preview'));
+			await user.click(screen.getByAltText('preview'));
 
 			expect(openPickerSpy).toHaveBeenCalledTimes(1);
 		});
 
-		it('opens the file picker when Change is clicked', () => {
+		it('opens the file picker when Change is clicked', async () => {
 			renderImageInput({ initialValue: initialPicture });
 			openPickerSpy.mockClear();
 
-			userEvent.click(screen.getByRole('button', { name: 'Change' }));
+			await user.click(screen.getByRole('button', { name: 'Change' }));
 
 			expect(openPickerSpy).toHaveBeenCalledTimes(1);
 		});
 
-		it('shows the new file as the preview after choosing a replacement', () => {
+		it('shows the new file as the preview after choosing a replacement', async () => {
 			const { fileInput } = renderImageInput({ initialValue: initialPicture });
 
-			userEvent.upload(fileInput, buildFile());
+			await user.upload(fileInput, buildFile());
 
 			expect(screen.getByAltText('preview')).toHaveAttribute('src', 'blob:preview');
 		});
@@ -246,10 +247,10 @@ describe('ImageInput', () => {
 			expect(screen.getByAltText('preview')).toHaveAttribute('src', initialPicture);
 		});
 
-		it('blurs a newly chosen file too', () => {
+		it('blurs a newly chosen file too', async () => {
 			const { container, fileInput } = renderImageInput({ hasBlurredBackdrop: true });
 
-			userEvent.upload(fileInput, buildFile());
+			await user.upload(fileInput, buildFile());
 
 			expect(container.querySelector('.preview-backdrop img')).toHaveAttribute('src', 'blob:preview');
 		});
@@ -263,7 +264,7 @@ describe('ImageInput', () => {
 		});
 
 		it('is rendered inside a visible preview when onRemove is given and a picture is present', () => {
-			renderImageInput({ initialValue: initialPicture, onRemove: jest.fn() });
+			renderImageInput({ initialValue: initialPicture, onRemove: vi.fn() });
 
 			const removeButton = screen.getByRole('button', { name: 'Remove picture' });
 
@@ -271,56 +272,56 @@ describe('ImageInput', () => {
 		});
 
 		it('sits inside a hidden preview when no picture is present', () => {
-			renderImageInput({ onRemove: jest.fn() });
+			renderImageInput({ onRemove: vi.fn() });
 
 			expect(screen.getByRole('button', { name: 'Remove picture' }).closest('.preview-wrapper')).toHaveClass('hidden');
 		});
 
-		it('calls onRemove, and not onChange, when clicked', () => {
-			const onRemove = jest.fn();
+		it('calls onRemove, and not onChange, when clicked', async () => {
+			const onRemove = vi.fn();
 			const { onChange } = renderImageInput({ initialValue: initialPicture, onRemove });
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
 
 			expect(onRemove).toHaveBeenCalledTimes(1);
 			expect(onChange).not.toHaveBeenCalled();
 		});
 
-		it('does not open the file picker when clicked', () => {
-			renderImageInput({ initialValue: initialPicture, onRemove: jest.fn() });
+		it('does not open the file picker when clicked', async () => {
+			renderImageInput({ initialValue: initialPicture, onRemove: vi.fn() });
 			openPickerSpy.mockClear();
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
 
 			expect(openPickerSpy).not.toHaveBeenCalled();
 		});
 
-		it('hides the preview and shows the empty input after removal', () => {
-			const { container } = renderImageInput({ initialValue: initialPicture, onRemove: jest.fn() });
+		it('hides the preview and shows the empty input after removal', async () => {
+			const { container } = renderImageInput({ initialValue: initialPicture, onRemove: vi.fn() });
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
 
 			expect(container.querySelector('.preview-wrapper')).toHaveClass('hidden');
 			expect(container.querySelector('.image-input-wrapper')).not.toHaveClass('hidden');
 		});
 
-		it('hides the preview and shows the empty input after removing a freshly chosen file', () => {
-			const { container, fileInput } = renderImageInput({ onRemove: jest.fn() });
+		it('hides the preview and shows the empty input after removing a freshly chosen file', async () => {
+			const { container, fileInput } = renderImageInput({ onRemove: vi.fn() });
 
-			userEvent.upload(fileInput, buildFile());
+			await user.upload(fileInput, buildFile());
 			expect(container.querySelector('.preview-wrapper')).not.toHaveClass('hidden');
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
 
 			expect(container.querySelector('.preview-wrapper')).toHaveClass('hidden');
 		});
 
-		it('lets a new file be chosen after removal and shows it as the preview', () => {
-			const { onChange, fileInput } = renderImageInput({ initialValue: initialPicture, onRemove: jest.fn() });
+		it('lets a new file be chosen after removal and shows it as the preview', async () => {
+			const { onChange, fileInput } = renderImageInput({ initialValue: initialPicture, onRemove: vi.fn() });
 			const file = buildFile();
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.upload(fileInput, file);
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.upload(fileInput, file);
 
 			expect(onChange).toHaveBeenCalledWith(file);
 			expect(screen.getByAltText('preview')).toHaveAttribute('src', 'blob:preview');

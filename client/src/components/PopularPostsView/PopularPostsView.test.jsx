@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getPopularPosts, getNextPopularPosts } from '../../services/userPostService';
@@ -13,8 +12,8 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import PopularPostsView from './PopularPostsView';
 
-jest.mock('../../services/userPostService');
-jest.mock('../../services/userService');
+vi.mock('../../services/userPostService');
+vi.mock('../../services/userService');
 
 const SNAPSHOT_TIME = '2026-10-24T10:00:00.000Z';
 
@@ -64,10 +63,10 @@ const memberUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderPopular = ({ entries = ['/popular-posts'], user = memberUser } = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={entries}>
-					<MainHeader logoutHandler={jest.fn()} />
+					<MainHeader logoutHandler={vi.fn()} />
 
 					<Routes>
 						<Route path='/popular-posts' element={<PopularPostsLayout />}>
@@ -92,9 +91,12 @@ const getTileStatTexts = (tileIndex) => Array.from(getTiles()[tileIndex].querySe
 const getInlineError = () => document.querySelector('.load-more-error');
 
 describe('PopularPostsView', () => {
+	let user;
+
 	beforeEach(() => {
-		jest.resetAllMocks();
-		window.HTMLElement.prototype.scrollIntoView = jest.fn();
+		vi.resetAllMocks();
+		user = userEvent.setup();
+		window.HTMLElement.prototype.scrollIntoView = vi.fn();
 		getPopularPosts.mockResolvedValue(buildPage(['p3', 'p2', 'p1']));
 		getNextPopularPosts.mockResolvedValue(buildPage([]));
 	});
@@ -188,7 +190,7 @@ describe('PopularPostsView', () => {
 			renderPopular();
 
 			await screen.findAllByAltText('user-post');
-			userEvent.click(getTileLinks()[1]);
+			await user.click(getTileLinks()[1]);
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 			expect(screen.getByTestId('path')).toHaveTextContent(/^\/popular-posts\/posts$/);
@@ -265,7 +267,7 @@ describe('PopularPostsView', () => {
 
 			renderPopular();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await screen.findAllByAltText('user-post')).toHaveLength(2);
 		});
@@ -393,7 +395,7 @@ describe('PopularPostsView', () => {
 
 			renderPopular();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(getTiles()).toHaveLength(5));
 			expect(getInlineError()).not.toBeInTheDocument();

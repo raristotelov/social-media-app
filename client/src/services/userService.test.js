@@ -14,12 +14,12 @@ import {
 	updateUserProfileData,
 } from './userService';
 
-jest.mock('./requester');
+vi.mock('./requester');
 
 describe('userService', () => {
 	describe('signUp', () => {
 		it('posts the form data to the sign-up endpoint and resolves with the user', async () => {
-			const post = jest.fn().mockResolvedValue({ _id: 'user1' });
+			const post = vi.fn().mockResolvedValue({ _id: 'user1' });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -31,7 +31,7 @@ describe('userService', () => {
 
 	describe('login', () => {
 		it('posts the credentials to the login endpoint and resolves with the user', async () => {
-			const post = jest.fn().mockResolvedValue({ _id: 'user1' });
+			const post = vi.fn().mockResolvedValue({ _id: 'user1' });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -45,7 +45,7 @@ describe('userService', () => {
 		let post;
 
 		beforeEach(() => {
-			post = jest.fn().mockResolvedValue({ _id: 'visitor1' });
+			post = vi.fn().mockResolvedValue({ _id: 'visitor1' });
 			requestFactory.mockReturnValue({ post });
 		});
 
@@ -75,7 +75,7 @@ describe('userService', () => {
 
 	describe('logout', () => {
 		it('posts to the logout endpoint without a body', async () => {
-			const post = jest.fn().mockResolvedValue({});
+			const post = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ post });
 
@@ -86,7 +86,7 @@ describe('userService', () => {
 		});
 
 		it('rejects with the request error so the caller can keep the user logged in', async () => {
-			requestFactory.mockReturnValue({ post: jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }) });
+			requestFactory.mockReturnValue({ post: vi.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }) });
 
 			await expect(logout()).rejects.toMatchObject({ status: 500 });
 		});
@@ -94,7 +94,7 @@ describe('userService', () => {
 
 	describe('getCurrentUser', () => {
 		it('gets the me endpoint', async () => {
-			const get = jest.fn().mockResolvedValue({ _id: 'user1' });
+			const get = vi.fn().mockResolvedValue({ _id: 'user1' });
 
 			requestFactory.mockReturnValue({ get });
 
@@ -104,13 +104,13 @@ describe('userService', () => {
 		});
 
 		it('resolves with null for a guest', async () => {
-			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue(null) });
+			requestFactory.mockReturnValue({ get: vi.fn().mockResolvedValue(null) });
 
 			await expect(getCurrentUser()).resolves.toBeNull();
 		});
 
 		it('rejects with the request error for an expired session', async () => {
-			requestFactory.mockReturnValue({ get: jest.fn().mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 }) });
+			requestFactory.mockReturnValue({ get: vi.fn().mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 }) });
 
 			await expect(getCurrentUser()).rejects.toMatchObject({ code: 'UNAUTHENTICATED', status: 401 });
 		});
@@ -120,7 +120,7 @@ describe('userService', () => {
 		let patch;
 
 		beforeEach(() => {
-			patch = jest.fn().mockResolvedValue({});
+			patch = vi.fn().mockResolvedValue({});
 			requestFactory.mockReturnValue({ patch });
 		});
 
@@ -145,7 +145,7 @@ describe('userService', () => {
 		let get;
 
 		beforeEach(() => {
-			get = jest.fn().mockResolvedValue([]);
+			get = vi.fn().mockResolvedValue([]);
 			requestFactory.mockReturnValue({ get });
 		});
 
@@ -169,7 +169,7 @@ describe('userService', () => {
 		let get;
 
 		beforeEach(() => {
-			get = jest.fn().mockResolvedValue([]);
+			get = vi.fn().mockResolvedValue([]);
 			requestFactory.mockReturnValue({ get });
 		});
 
@@ -203,7 +203,7 @@ describe('userService', () => {
 
 	describe('followUser and unfollowUser', () => {
 		it('posts to the follow endpoint', async () => {
-			const post = jest.fn().mockResolvedValue({ user: {} });
+			const post = vi.fn().mockResolvedValue({ user: {} });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -214,7 +214,7 @@ describe('userService', () => {
 		});
 
 		it('posts to the unfollow endpoint', async () => {
-			const post = jest.fn().mockResolvedValue({ user: {} });
+			const post = vi.fn().mockResolvedValue({ user: {} });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -230,7 +230,7 @@ describe('userService', () => {
 		let patch;
 
 		beforeEach(() => {
-			patch = jest.fn().mockResolvedValue({ user: {} });
+			patch = vi.fn().mockResolvedValue({ user: {} });
 			requestFactory.mockReturnValue({ patch });
 		});
 

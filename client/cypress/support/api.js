@@ -1,5 +1,5 @@
 // Mirrors client/src/constants/serverUrl.js so specs talk to the same API the app does.
-export const serverUrl = Cypress.env('apiUrl') || 'http://localhost:5000';
+export const serverUrl = Cypress.expose('apiUrl') || 'http://localhost:5000';
 
 export const AUTH_COOKIE_NAME = 'sessionToken';
 

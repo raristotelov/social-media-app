@@ -5,7 +5,7 @@ const URL = 'http://localhost:3030/some/route';
 const buildResponse = ({ status = 200, body, rejectJson = false } = {}) => ({
 	ok: status >= 200 && status < 300,
 	status,
-	json: rejectJson ? jest.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON')) : jest.fn().mockResolvedValue(body),
+	json: rejectJson ? vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON')) : vi.fn().mockResolvedValue(body),
 });
 
 const catchError = async (promise) => {
@@ -20,11 +20,11 @@ const catchError = async (promise) => {
 
 describe('requester', () => {
 	beforeEach(() => {
-		global.fetch = jest.fn();
+		globalThis.fetch = vi.fn();
 	});
 
 	afterEach(() => {
-		delete global.fetch;
+		delete globalThis.fetch;
 	});
 
 	describe('successful requests', () => {

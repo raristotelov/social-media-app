@@ -1,12 +1,12 @@
 import { requestFactory } from './requester';
 import { dismissSuggestionsCarousel, getSuggestions } from './suggestionService';
 
-jest.mock('./requester');
+vi.mock('./requester');
 
 describe('suggestionService', () => {
 	describe('getSuggestions', () => {
 		it.each([['sidebar'], ['carousel'], ['empty-feed']])('gets the suggestions endpoint with the %s placement', async (placement) => {
-			const get = jest.fn().mockResolvedValue({ suggestions: [], reserve: [], isCarouselDismissed: false });
+			const get = vi.fn().mockResolvedValue({ suggestions: [], reserve: [], isCarouselDismissed: false });
 
 			requestFactory.mockReturnValue({ get });
 
@@ -19,13 +19,13 @@ describe('suggestionService', () => {
 		it('resolves with the server result', async () => {
 			const result = { suggestions: [{ _id: 'u2' }], reserve: [{ _id: 'u3' }], isCarouselDismissed: false };
 
-			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue(result) });
+			requestFactory.mockReturnValue({ get: vi.fn().mockResolvedValue(result) });
 
 			await expect(getSuggestions({ placement: 'sidebar' })).resolves.toBe(result);
 		});
 
 		it('encodes the placement in the query string', async () => {
-			const get = jest.fn().mockResolvedValue({});
+			const get = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ get });
 
@@ -37,7 +37,7 @@ describe('suggestionService', () => {
 		it('rejects with the request error', async () => {
 			const error = { code: 'INTERNAL_ERROR', status: 500 };
 
-			requestFactory.mockReturnValue({ get: jest.fn().mockRejectedValue(error) });
+			requestFactory.mockReturnValue({ get: vi.fn().mockRejectedValue(error) });
 
 			await expect(getSuggestions({ placement: 'sidebar' })).rejects.toBe(error);
 		});
@@ -45,7 +45,7 @@ describe('suggestionService', () => {
 
 	describe('dismissSuggestionsCarousel', () => {
 		it('posts to the carousel dismiss endpoint', async () => {
-			const post = jest.fn().mockResolvedValue(undefined);
+			const post = vi.fn().mockResolvedValue(undefined);
 
 			requestFactory.mockReturnValue({ post });
 
@@ -58,7 +58,7 @@ describe('suggestionService', () => {
 		it('rejects with the request error', async () => {
 			const error = { code: 'UNAUTHENTICATED', status: 401 };
 
-			requestFactory.mockReturnValue({ post: jest.fn().mockRejectedValue(error) });
+			requestFactory.mockReturnValue({ post: vi.fn().mockRejectedValue(error) });
 
 			await expect(dismissSuggestionsCarousel()).rejects.toBe(error);
 		});

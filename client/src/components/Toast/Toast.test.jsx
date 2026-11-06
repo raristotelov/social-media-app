@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -6,24 +5,26 @@ import { TOAST_DURATION_MS } from '../../constants/toast';
 
 import Toast from './Toast';
 
-jest.mock('../icons/Alert', () => ({ __esModule: true, default: () => <svg data-testid='alert-icon' /> }));
-jest.mock('../icons/Check', () => ({ __esModule: true, default: () => <svg data-testid='check-icon' /> }));
+vi.mock('../icons/Alert', () => ({ default: () => <svg data-testid='alert-icon' /> }));
+vi.mock('../icons/Check', () => ({ default: () => <svg data-testid='check-icon' /> }));
 
 const MESSAGE = "Couldn't delete the post. Try again.";
 
 const advance = (ms) => {
 	act(() => {
-		jest.advanceTimersByTime(ms);
+		vi.advanceTimersByTime(ms);
 	});
 };
 
+const setupUser = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
 describe('Toast', () => {
 	beforeEach(() => {
-		jest.useFakeTimers();
+		vi.useFakeTimers();
 	});
 
 	afterEach(() => {
-		jest.useRealTimers();
+		vi.useRealTimers();
 	});
 
 	it('is dismissed after 5 seconds', () => {
@@ -31,14 +32,14 @@ describe('Toast', () => {
 	});
 
 	it('renders the message', () => {
-		render(<Toast message={MESSAGE} onDismiss={jest.fn()} />);
+		render(<Toast message={MESSAGE} onDismiss={vi.fn()} />);
 
 		expect(screen.getByText(MESSAGE)).toBeInTheDocument();
 	});
 
 	describe('type', () => {
 		it('defaults to the error look: alert icon, no success class', () => {
-			const { container } = render(<Toast message={MESSAGE} onDismiss={jest.fn()} />);
+			const { container } = render(<Toast message={MESSAGE} onDismiss={vi.fn()} />);
 
 			expect(screen.getByTestId('alert-icon')).toBeInTheDocument();
 			expect(screen.queryByTestId('check-icon')).not.toBeInTheDocument();
@@ -46,13 +47,13 @@ describe('Toast', () => {
 		});
 
 		it('keeps the error look for the error type', () => {
-			render(<Toast message={MESSAGE} type='error' onDismiss={jest.fn()} />);
+			render(<Toast message={MESSAGE} type='error' onDismiss={vi.fn()} />);
 
 			expect(screen.getByTestId('alert-icon')).toBeInTheDocument();
 		});
 
 		it('renders the check icon with the success class for the success type', () => {
-			const { container } = render(<Toast message='Password changed' type='success' onDismiss={jest.fn()} />);
+			const { container } = render(<Toast message='Password changed' type='success' onDismiss={vi.fn()} />);
 
 			expect(screen.getByTestId('check-icon')).toBeInTheDocument();
 			expect(screen.queryByTestId('alert-icon')).not.toBeInTheDocument();
@@ -60,7 +61,7 @@ describe('Toast', () => {
 		});
 
 		it('still shows the message and auto-dismisses after 5 seconds for the success type', () => {
-			const onDismiss = jest.fn();
+			const onDismiss = vi.fn();
 
 			render(<Toast message='Password changed' type='success' onDismiss={onDismiss} />);
 
@@ -73,24 +74,25 @@ describe('Toast', () => {
 	});
 
 	it('renders a close button', () => {
-		render(<Toast message={MESSAGE} onDismiss={jest.fn()} />);
+		render(<Toast message={MESSAGE} onDismiss={vi.fn()} />);
 
 		expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
 	});
 
-	it('calls onDismiss once when the close button is clicked', () => {
-		const onDismiss = jest.fn();
+	it('calls onDismiss once when the close button is clicked', async () => {
+		const user = setupUser();
+		const onDismiss = vi.fn();
 
 		render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 
-		userEvent.click(screen.getByRole('button', { name: 'Close' }));
+		await user.click(screen.getByRole('button', { name: 'Close' }));
 
 		expect(onDismiss).toHaveBeenCalledTimes(1);
 	});
 
 	describe('auto-dismiss', () => {
 		it('does not dismiss before 5 seconds have passed', () => {
-			const onDismiss = jest.fn();
+			const onDismiss = vi.fn();
 
 			render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 			advance(4999);
@@ -99,7 +101,7 @@ describe('Toast', () => {
 		});
 
 		it('dismisses once after 5 seconds', () => {
-			const onDismiss = jest.fn();
+			const onDismiss = vi.fn();
 
 			render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 			advance(5000);
@@ -109,7 +111,7 @@ describe('Toast', () => {
 		});
 
 		it('does not dismiss after it is unmounted', () => {
-			const onDismiss = jest.fn();
+			const onDismiss = vi.fn();
 			const { unmount } = render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 
 			unmount();
@@ -120,25 +122,27 @@ describe('Toast', () => {
 	});
 
 	describe('pausing', () => {
-		it('pauses the timer while hovered', () => {
-			const onDismiss = jest.fn();
+		it('pauses the timer while hovered', async () => {
+			const user = setupUser();
+			const onDismiss = vi.fn();
 
 			render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 			advance(3000);
-			userEvent.hover(screen.getByText(MESSAGE));
+			await user.hover(screen.getByText(MESSAGE));
 			advance(60000);
 
 			expect(onDismiss).not.toHaveBeenCalled();
 		});
 
-		it('resumes with the remaining time when the pointer leaves', () => {
-			const onDismiss = jest.fn();
+		it('resumes with the remaining time when the pointer leaves', async () => {
+			const user = setupUser();
+			const onDismiss = vi.fn();
 
 			render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 			advance(3000);
-			userEvent.hover(screen.getByText(MESSAGE));
+			await user.hover(screen.getByText(MESSAGE));
 			advance(60000);
-			userEvent.unhover(screen.getByText(MESSAGE));
+			await user.unhover(screen.getByText(MESSAGE));
 			advance(1999);
 
 			expect(onDismiss).not.toHaveBeenCalled();
@@ -149,7 +153,7 @@ describe('Toast', () => {
 		});
 
 		it('pauses the timer while the close button has focus', () => {
-			const onDismiss = jest.fn();
+			const onDismiss = vi.fn();
 
 			render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 			advance(3000);
@@ -162,7 +166,7 @@ describe('Toast', () => {
 		});
 
 		it('resumes with the remaining time when focus leaves', () => {
-			const onDismiss = jest.fn();
+			const onDismiss = vi.fn();
 
 			render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 			advance(3000);
@@ -183,7 +187,7 @@ describe('Toast', () => {
 		});
 
 		it('counts only the time spent running across several pauses', () => {
-			const onDismiss = jest.fn();
+			const onDismiss = vi.fn();
 
 			render(<Toast message={MESSAGE} onDismiss={onDismiss} />);
 			advance(2000);

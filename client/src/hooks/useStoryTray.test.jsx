@@ -5,7 +5,7 @@ import { getStoryTray } from '../services/storyService';
 
 import useStoryTray from './useStoryTray';
 
-jest.mock('../services/storyService');
+vi.mock('../services/storyService');
 
 const trayEntries = [{ isOwn: true, isWatched: true, user: { _id: 'me', username: 'me' } }];
 
@@ -21,7 +21,7 @@ const buildDeferred = () => {
 };
 
 const renderStoryTray = () => {
-	const endSession = jest.fn();
+	const endSession = vi.fn();
 	const wrapper = ({ children }) => (
 		<LoggedInUserContext.Provider value={{ loggedInUser: { _id: 'me' }, endSession }}>{children}</LoggedInUserContext.Provider>
 	);
@@ -32,7 +32,7 @@ const renderStoryTray = () => {
 
 describe('useStoryTray', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 	});
 
 	it('starts empty and not loaded', () => {
@@ -58,7 +58,7 @@ describe('useStoryTray', () => {
 	it('loads the tray again when a different user logs in', async () => {
 		getStoryTray.mockResolvedValue(trayEntries);
 
-		const endSession = jest.fn();
+		const endSession = vi.fn();
 		let loggedInUser = { _id: 'me' };
 		const wrapper = ({ children }) => (
 			<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>{children}</LoggedInUserContext.Provider>
@@ -76,7 +76,7 @@ describe('useStoryTray', () => {
 	it('does not load the tray again when the same user object is refreshed', async () => {
 		getStoryTray.mockResolvedValue(trayEntries);
 
-		const endSession = jest.fn();
+		const endSession = vi.fn();
 		let loggedInUser = { _id: 'me', bio: 'a' };
 		const wrapper = ({ children }) => (
 			<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>{children}</LoggedInUserContext.Provider>

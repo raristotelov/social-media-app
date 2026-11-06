@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import LoggedInUserContext from '../contexts/LoggedInUserContext';
@@ -6,9 +5,9 @@ import { getPopularPosts, getNextPopularPosts } from '../services/userPostServic
 
 import usePopularPosts from './usePopularPosts';
 
-jest.mock('../services/userPostService');
-jest.mock('../constants/popularPosts', () => ({
-	...jest.requireActual('../constants/popularPosts'),
+vi.mock('../services/userPostService');
+vi.mock('../constants/popularPosts', async () => ({
+	...(await vi.importActual('../constants/popularPosts')),
 	MAX_SHOWN_POST_IDS: 10,
 }));
 
@@ -44,12 +43,12 @@ const getPostIds = (result) => result.current.posts.map((post) => post._id);
 
 const renderPopularPosts = async ({
 	firstPostId,
-	onFirstPostMissing = jest.fn(),
+	onFirstPostMissing = vi.fn(),
 	loggedInUser = { _id: 'user1' },
 	firstPage = buildPage(['p1', 'p2'], { hasMore: true }),
 	waitForLoad = true,
 } = {}) => {
-	const endSession = jest.fn();
+	const endSession = vi.fn();
 
 	if (firstPage) {
 		getPopularPosts.mockResolvedValue(firstPage);
@@ -67,7 +66,7 @@ const renderPopularPosts = async ({
 
 describe('usePopularPosts', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 	});
 
 	describe('loading the first page', () => {

@@ -1,16 +1,16 @@
 import { requestFactory } from './requester';
 import { getComments, addComment, likeComment, unlikeComment, getCommentLikes } from './commentService';
 
-jest.mock('./requester');
+vi.mock('./requester');
 
 describe('commentService', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 	});
 
 	describe('getComments', () => {
 		it('gets the comments endpoint of the post', async () => {
-			const get = jest.fn().mockResolvedValue([]);
+			const get = vi.fn().mockResolvedValue([]);
 
 			requestFactory.mockReturnValue({ get });
 
@@ -20,7 +20,7 @@ describe('commentService', () => {
 		});
 
 		it('builds the requester without a token, as the session travels in the cookie', async () => {
-			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue([]) });
+			requestFactory.mockReturnValue({ get: vi.fn().mockResolvedValue([]) });
 
 			await getComments({ userPostId: 'post1' });
 
@@ -28,7 +28,7 @@ describe('commentService', () => {
 		});
 
 		it('resolves with the comments', async () => {
-			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue([{ _id: 'c1' }]) });
+			requestFactory.mockReturnValue({ get: vi.fn().mockResolvedValue([{ _id: 'c1' }]) });
 
 			await expect(getComments({ userPostId: 'post1' })).resolves.toEqual([{ _id: 'c1' }]);
 		});
@@ -36,7 +36,7 @@ describe('commentService', () => {
 
 	describe('getCommentLikes', () => {
 		it('gets the likes endpoint of the comment', async () => {
-			const get = jest.fn().mockResolvedValue([]);
+			const get = vi.fn().mockResolvedValue([]);
 
 			requestFactory.mockReturnValue({ get });
 
@@ -49,7 +49,7 @@ describe('commentService', () => {
 
 	describe('addComment', () => {
 		it('posts the post id and text to the comments endpoint', async () => {
-			const post = jest.fn().mockResolvedValue({ _id: 'c1' });
+			const post = vi.fn().mockResolvedValue({ _id: 'c1' });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -65,7 +65,7 @@ describe('commentService', () => {
 		});
 
 		it('includes the parent comment id for a reply', async () => {
-			const post = jest.fn().mockResolvedValue({ _id: 'r1' });
+			const post = vi.fn().mockResolvedValue({ _id: 'r1' });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -80,7 +80,7 @@ describe('commentService', () => {
 		});
 
 		it('includes the mentioned user id for a reply that mentions someone', async () => {
-			const post = jest.fn().mockResolvedValue({ _id: 'r1' });
+			const post = vi.fn().mockResolvedValue({ _id: 'r1' });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -95,7 +95,7 @@ describe('commentService', () => {
 		});
 
 		it('sends a null mentioned user id as null', async () => {
-			const post = jest.fn().mockResolvedValue({ _id: 'r1' });
+			const post = vi.fn().mockResolvedValue({ _id: 'r1' });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -105,7 +105,7 @@ describe('commentService', () => {
 		});
 
 		it('resolves with the saved comment', async () => {
-			requestFactory.mockReturnValue({ post: jest.fn().mockResolvedValue({ _id: 'c1' }) });
+			requestFactory.mockReturnValue({ post: vi.fn().mockResolvedValue({ _id: 'c1' }) });
 
 			await expect(addComment({ userPostId: 'post1', text: 'Nice shot' })).resolves.toEqual({ _id: 'c1' });
 		});
@@ -113,7 +113,7 @@ describe('commentService', () => {
 
 	describe('likeComment', () => {
 		it('posts to the like endpoint of the comment', async () => {
-			const post = jest.fn().mockResolvedValue({});
+			const post = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ post });
 
@@ -126,7 +126,7 @@ describe('commentService', () => {
 
 	describe('unlikeComment', () => {
 		it('posts to the unlike endpoint of the comment', async () => {
-			const post = jest.fn().mockResolvedValue({});
+			const post = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ post });
 

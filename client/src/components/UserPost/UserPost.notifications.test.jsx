@@ -1,6 +1,5 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getComments } from '../../services/commentService';
@@ -9,8 +8,8 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import UserPost from './UserPost';
 
-jest.mock('../../services/userPostService');
-jest.mock('../../services/commentService');
+vi.mock('../../services/userPostService');
+vi.mock('../../services/commentService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe' };
 const author = { _id: 'user2', username: 'janedoe' };
@@ -27,10 +26,10 @@ const post = {
 };
 
 const buildTree = (commentsOpenRequest) => (
-	<LoggedInUserContext.Provider value={{ loggedInUser, endSession: jest.fn() }}>
+	<LoggedInUserContext.Provider value={{ loggedInUser, endSession: vi.fn() }}>
 		<ToastProvider>
 			<MemoryRouter>
-				<UserPost userPostData={post} author={author} commentsOpenRequest={commentsOpenRequest} onPostChange={jest.fn()} />
+				<UserPost userPostData={post} author={author} commentsOpenRequest={commentsOpenRequest} onPostChange={vi.fn()} />
 			</MemoryRouter>
 		</ToastProvider>
 	</LoggedInUserContext.Provider>
@@ -38,7 +37,7 @@ const buildTree = (commentsOpenRequest) => (
 
 describe('UserPost commentsOpenRequest', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 		getComments.mockResolvedValue([]);
 	});
 

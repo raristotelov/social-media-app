@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -36,12 +35,13 @@ describe('Button', () => {
 		expect(screen.getByRole('button')).toHaveClass('button-classname', 'button-secondary', 'custom');
 	});
 
-	it('passes other props on to the button', () => {
-		const onClick = jest.fn();
+	it('passes other props on to the button', async () => {
+		const user = userEvent.setup();
+		const onClick = vi.fn();
 
 		render(<Button label='Follow' type='button' aria-label='Follow alice' onClick={onClick} />);
 
-		userEvent.click(screen.getByRole('button', { name: 'Follow alice' }));
+		await user.click(screen.getByRole('button', { name: 'Follow alice' }));
 
 		expect(onClick).toHaveBeenCalledTimes(1);
 		expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
