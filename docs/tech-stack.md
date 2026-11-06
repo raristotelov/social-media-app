@@ -7,9 +7,8 @@ Overview of the technologies used across the social media app. Versions reflect 
 - **Language:** JavaScript (JSX).
 - **Framework:** React 19, bootstrapped with Create React App (`react-scripts` 5).
 - **Routing:** `react-router-dom` 6.
-- **State:** React Context (`LoggedInUserContext`) + hooks; JWT persisted in `localStorage`.
-- **API calls:** native `fetch` wrapped in a custom `requester` service.
-- **Auth (client):** `jwt-decode` to read the logged-in user from the JWT.
+- **State:** React Context (`LoggedInUserContext`) + hooks; the session is restored on load from `GET /users/me`.
+- **API calls:** native `fetch` wrapped in a custom `requester` service, sent with `credentials: 'include'`.
 - **Styling:** plain CSS, one `.css` file per component; custom fonts (Pacifico, Mada, Vollkorn).
 - **Utilities:** `uuid` for unique image identifiers.
 
@@ -18,7 +17,7 @@ Overview of the technologies used across the social media app. Versions reflect 
 - **Runtime:** Node.js.
 - **Framework:** Express 5.
 - **Auth:** `jsonwebtoken` (JWT signing/verification), `bcrypt` (password hashing).
-- **Config/middleware:** `cors`, `dotenv`.
+- **Config/middleware:** `cors` (explicit `CLIENT_ORIGIN`, `credentials: true`), `cookie-parser`, `dotenv`.
 - **Structure:** router → controllers → services → Mongoose models.
 
 ## Database
@@ -37,7 +36,18 @@ Overview of the technologies used across the social media app. Versions reflect 
 
 ## Auth Model
 
-- JWT-based. Server signs a token on login; client stores it in `localStorage` and sends it as the `X-Authorization` header. Protected routes verify it via `verifyJwtToken` middleware.
+- JWT in an `httpOnly` cookie (`sessionToken`): `sameSite: 'lax'`, `secure` in production, expires with the token. JavaScript can't read it.
+- Set on sign-up, login and demo login; response bodies carry the user, never the token.
+- `GET /users/me` returns the current user, or `null` for a guest. `POST /users/logout` clears the cookie.
+- Protected routes verify it via `verifyJwtToken`; a rejected cookie is cleared.
+- CSRF: no tokens. `sameSite: 'lax'` covers it while client and server share the site (see Hosting).
+
+## Hosting
+
+- **Client:** Vercel.
+- **Server:** Render.
+- **Database:** MongoDB Atlas.
+- **Domain:** client on `sharesnap.app` (`www` redirects to it), server on `api.sharesnap.app`. Same site, so the session cookie works with `sameSite: 'lax'`.
 
 ## Tooling
 

@@ -7,6 +7,7 @@ const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const CommentModel = require('../models/commentModel');
 const { ERROR_CODES } = require('../config/errorCodes');
+const constants = require('../config/constants');
 const { likeUserPost, unlikeUserPost } = require('../services/userPostService');
 const { likeComment } = require('../services/commentService');
 
@@ -45,7 +46,9 @@ describe('likes list endpoints against a real database', () => {
 
 	const get = (path, headers) => fetch(`${baseUrl}${path}`, { headers });
 
-	const authHeaders = (user) => ({ 'X-Authorization': JWT.sign({ userId: String(user._id), username: user.username }, JWT_SECRET) });
+	const sessionCookie = (token) => ({ Cookie: `${constants.AUTH_COOKIE_NAME}=${token}` });
+
+	const authHeaders = (user) => sessionCookie(JWT.sign({ userId: String(user._id), username: user.username }, JWT_SECRET));
 
 	const usernamesOf = async (response) => (await response.json()).map((row) => row.username);
 
@@ -131,7 +134,7 @@ describe('likes list endpoints against a real database', () => {
 
 			const guest = await (await get(getPath())).json();
 			const loggedIn = await (await get(getPath(), authHeaders(liker))).json();
-			const badToken = await get(getPath(), { 'X-Authorization': 'not-a-token' });
+			const badToken = await get(getPath(), sessionCookie('not-a-token'));
 
 			expect(loggedIn).toEqual(guest);
 			expect(badToken.status).toBe(200);

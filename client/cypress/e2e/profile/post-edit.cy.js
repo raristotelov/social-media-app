@@ -3,7 +3,7 @@ import {
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	uploadPostViaApi,
 	getProfileViaApi,
 	editCaptionViaApi,
@@ -12,8 +12,8 @@ import {
 describe('post edit', () => {
 	let user;
 	let otherUser;
-	let jwtToken;
-	let otherJwtToken;
+	let session;
+	let otherSession;
 	let userId;
 	let profilePath;
 	let post;
@@ -35,17 +35,17 @@ describe('post edit', () => {
 		createUserViaApi(user);
 		createUserViaApi(otherUser);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 			profilePath = `/user/${userId}`;
 		});
 
-		loginViaApi(otherUser).then((token) => {
-			otherJwtToken = token;
+		loginViaApi(otherUser).then((loggedInSession) => {
+			otherSession = loggedInSession;
 		});
 
-		cy.then(() => uploadPostViaApi(jwtToken, 'original caption')).then((created) => {
+		cy.then(() => uploadPostViaApi(session, 'original caption')).then((created) => {
 			post = created;
 		});
 
@@ -58,7 +58,7 @@ describe('post edit', () => {
 	});
 
 	it('opens a caption-only popup prefilled with the current caption and the post image', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openEditPopup();
 
@@ -70,7 +70,7 @@ describe('post edit', () => {
 	});
 
 	it('closes without saving when nothing was changed', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openEditPopup();
 		saveButton().click();
@@ -80,7 +80,7 @@ describe('post edit', () => {
 	});
 
 	it('discards the change when Cancel is clicked', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openEditPopup();
 		captionField().type(' with more words');
@@ -95,7 +95,7 @@ describe('post edit', () => {
 	});
 
 	it('saves the new caption, keeps the image, and shows it again after a refresh', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openEditPopup();
 		captionField().clear().type('a brand new caption');
@@ -122,7 +122,7 @@ describe('post edit', () => {
 	});
 
 	it('allows saving an emptied caption', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openEditPopup();
 		captionField().clear();
@@ -140,7 +140,7 @@ describe('post edit', () => {
 			'failingEdit',
 		);
 
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openEditPopup();
 		captionField().type(' more');
@@ -154,7 +154,7 @@ describe('post edit', () => {
 
 	it('works as a full-screen view on mobile', () => {
 		cy.viewport(390, 844);
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		openEditPopup();
 		captionField().clear().type('mobile caption');
@@ -166,7 +166,7 @@ describe('post edit', () => {
 
 	describe('server authorization and validation', () => {
 		it("rejects editing someone else's post and leaves the caption unchanged", () => {
-			cy.then(() => editCaptionViaApi(otherJwtToken, post._id, 'hijacked', false))
+			cy.then(() => editCaptionViaApi(otherSession, post._id, 'hijacked', false))
 				.its('status')
 				.should('eq', 403);
 
@@ -176,7 +176,7 @@ describe('post edit', () => {
 		});
 
 		it('rejects a non-text caption with a 400', () => {
-			cy.then(() => editCaptionViaApi(jwtToken, post._id, 42, false))
+			cy.then(() => editCaptionViaApi(session, post._id, 42, false))
 				.its('status')
 				.should('eq', 400);
 
@@ -186,13 +186,13 @@ describe('post edit', () => {
 		});
 
 		it('answers 404 for a post id that does not exist', () => {
-			cy.then(() => editCaptionViaApi(jwtToken, '64b7f0a1c2d3e4f5a6b7c8e1', 'x', false))
+			cy.then(() => editCaptionViaApi(session, '64b7f0a1c2d3e4f5a6b7c8e1', 'x', false))
 				.its('status')
 				.should('eq', 404);
 		});
 
 		it('answers 404 for a malformed post id', () => {
-			cy.then(() => editCaptionViaApi(jwtToken, 'not-an-id', 'x', false))
+			cy.then(() => editCaptionViaApi(session, 'not-an-id', 'x', false))
 				.its('status')
 				.should('eq', 404);
 		});

@@ -17,7 +17,7 @@ const member = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderMainHeader = ({ unreadCount = 0, user = member } = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession: jest.fn() }}>
 			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: jest.fn() }}>
 				<MemoryRouter>
 					<MainHeader logoutHandler={jest.fn()} />

@@ -3,7 +3,7 @@ import {
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	followUserViaApi,
 	uploadStoryViaApi,
 	getUserStoriesViaApi,
@@ -44,8 +44,8 @@ describe('your own stories: Seen by', () => {
 	const owner = buildTestUser();
 	const viewer = buildTestUser();
 
-	let ownerToken;
-	let viewerToken;
+	let ownerSession;
+	let viewerSession;
 	let ownerId;
 	let stories;
 
@@ -53,21 +53,21 @@ describe('your own stories: Seen by', () => {
 		createUserViaApi(owner);
 		createUserViaApi(viewer);
 
-		loginViaApi(owner).then((token) => {
-			ownerToken = token;
-			ownerId = userIdFromToken(token);
+		loginViaApi(owner).then((session) => {
+			ownerSession = session;
+			ownerId = userIdFromSession(session);
 		});
-		loginViaApi(viewer).then((token) => {
-			viewerToken = token;
+		loginViaApi(viewer).then((session) => {
+			viewerSession = session;
 		});
 
-		cy.then(() => uploadStoryViaApi(ownerToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(ownerSession)).then((story) => {
 			stories = [story];
 		});
-		cy.then(() => uploadStoryViaApi(ownerToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(ownerSession)).then((story) => {
 			stories.push(story);
 		});
-		cy.then(() => recordStoryViewViaApi(viewerToken, stories[0]._id));
+		cy.then(() => recordStoryViewViaApi(viewerSession, stories[0]._id));
 	});
 
 	after(() => {
@@ -76,7 +76,7 @@ describe('your own stories: Seen by', () => {
 	});
 
 	it('counts the viewers of each story separately', () => {
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 
 		cy.get('.story-viewer-seen-by').should('contain.text', 'Seen by 1');
@@ -88,7 +88,7 @@ describe('your own stories: Seen by', () => {
 	});
 
 	it('opens the Viewers list with photo and username only, pausing the story, and resumes when it is closed', () => {
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 		waitForPhotoLoad();
 
@@ -110,7 +110,7 @@ describe('your own stories: Seen by', () => {
 
 	it('shows the Viewers list as a bottom sheet over the story on mobile', () => {
 		cy.viewport(390, 844);
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 
 		cy.contains('.story-viewer-seen-by', 'Seen by 1').click();
@@ -122,7 +122,7 @@ describe('your own stories: Seen by', () => {
 
 	it('shows the Viewers list as a centred popup on desktop', () => {
 		cy.viewport(1440, 900);
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 
 		cy.contains('.story-viewer-seen-by', 'Seen by 1').click();
@@ -137,45 +137,45 @@ describe('your own stories: Seen by', () => {
 	});
 
 	it('does not record a view when you watch your own story', () => {
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 		cy.get('.story-viewer-zone-next').click();
 		waitForPhotoLoad();
 
-		cy.then(() => getStoryViewersViaApi(ownerToken, stories[1]._id))
+		cy.then(() => getStoryViewersViaApi(ownerSession, stories[1]._id))
 			.its('body')
 			.should('have.length', 0);
-		cy.then(() => getStoryViewersViaApi(ownerToken, stories[0]._id))
+		cy.then(() => getStoryViewersViaApi(ownerSession, stories[0]._id))
 			.its('body')
 			.should('have.length', 1);
 	});
 
 	describe('the owner-only rules on the API', () => {
 		it('refuses the viewers of someone else story with 403 STORY_FORBIDDEN', () => {
-			cy.then(() => getStoryViewersViaApi(viewerToken, stories[0]._id, false)).then((response) => {
+			cy.then(() => getStoryViewersViaApi(viewerSession, stories[0]._id, false)).then((response) => {
 				expect(response.status).to.equal(403);
 				expect(response.body.code).to.equal('STORY_FORBIDDEN');
 			});
 		});
 
 		it('refuses to delete someone else story with 403 STORY_FORBIDDEN and leaves it in place', () => {
-			cy.then(() => deleteStoryViaApi(viewerToken, stories[0]._id, false)).then((response) => {
+			cy.then(() => deleteStoryViaApi(viewerSession, stories[0]._id, false)).then((response) => {
 				expect(response.status).to.equal(403);
 				expect(response.body.code).to.equal('STORY_FORBIDDEN');
 			});
 
-			cy.then(() => getUserStoriesViaApi(ownerToken, ownerId))
+			cy.then(() => getUserStoriesViaApi(ownerSession, ownerId))
 				.its('stories')
 				.should('have.length', 2);
 		});
 
 		it('answers 404 STORY_NOT_FOUND for a story that does not exist or has a malformed id', () => {
 			[MISSING_STORY_ID, 'not-an-id'].forEach((storyId) => {
-				cy.then(() => getStoryViewersViaApi(ownerToken, storyId, false)).then((response) => {
+				cy.then(() => getStoryViewersViaApi(ownerSession, storyId, false)).then((response) => {
 					expect(response.status).to.equal(404);
 					expect(response.body.code).to.equal('STORY_NOT_FOUND');
 				});
-				cy.then(() => deleteStoryViaApi(ownerToken, storyId, false)).then((response) => {
+				cy.then(() => deleteStoryViaApi(ownerSession, storyId, false)).then((response) => {
 					expect(response.status).to.equal(404);
 					expect(response.body.code).to.equal('STORY_NOT_FOUND');
 				});
@@ -183,7 +183,7 @@ describe('your own stories: Seen by', () => {
 		});
 
 		it("shows another user's stories oldest first with a watched flag and no viewers count", () => {
-			cy.then(() => getUserStoriesViaApi(viewerToken, ownerId)).then(({ stories: listed }) => {
+			cy.then(() => getUserStoriesViaApi(viewerSession, ownerId)).then(({ stories: listed }) => {
 				expect(listed.map((story) => story._id)).to.deep.equal(stories.map((story) => story._id));
 				expect(listed.map((story) => story.isWatched)).to.deep.equal([true, false]);
 				listed.forEach((story) => expect(story).not.to.have.property('viewersCount'));
@@ -191,7 +191,7 @@ describe('your own stories: Seen by', () => {
 		});
 
 		it('shows your own stories with a viewers count and no watched flag', () => {
-			cy.then(() => getUserStoriesViaApi(ownerToken, ownerId)).then(({ stories: listed }) => {
+			cy.then(() => getUserStoriesViaApi(ownerSession, ownerId)).then(({ stories: listed }) => {
 				expect(listed.map((story) => story.viewersCount)).to.deep.equal([1, 0]);
 				listed.forEach((story) => expect(story).not.to.have.property('isWatched'));
 			});
@@ -202,8 +202,8 @@ describe('your own stories: Seen by', () => {
 describe('your own stories: delete, and views recorded in the browser', () => {
 	let owner;
 	let viewer;
-	let ownerToken;
-	let viewerToken;
+	let ownerSession;
+	let viewerSession;
 	let ownerId;
 	let stories;
 
@@ -218,21 +218,21 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		createUserViaApi(owner);
 		createUserViaApi(viewer);
 
-		loginViaApi(owner).then((token) => {
-			ownerToken = token;
-			ownerId = userIdFromToken(token);
+		loginViaApi(owner).then((session) => {
+			ownerSession = session;
+			ownerId = userIdFromSession(session);
 		});
-		loginViaApi(viewer).then((token) => {
-			viewerToken = token;
+		loginViaApi(viewer).then((session) => {
+			viewerSession = session;
 		});
 
-		cy.then(() => uploadStoryViaApi(ownerToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(ownerSession)).then((story) => {
 			stories = [story];
 		});
-		cy.then(() => uploadStoryViaApi(ownerToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(ownerSession)).then((story) => {
 			stories.push(story);
 		});
-		cy.then(() => recordStoryViewViaApi(viewerToken, stories[0]._id));
+		cy.then(() => recordStoryViewViaApi(viewerSession, stories[0]._id));
 
 		cy.intercept('DELETE', '**/stories/*').as('deleteRequest');
 	});
@@ -243,24 +243,24 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 	});
 
 	it('lists a follower who watched the story in the browser among its viewers', () => {
-		cy.then(() => followUserViaApi(viewerToken, ownerId));
-		visitAsUser('/user-feed', viewerToken);
+		cy.then(() => followUserViaApi(viewerSession, ownerId));
+		visitAsUser('/user-feed', viewerSession);
 
 		cy.contains('.stories-tray .story-circle-label', owner.username).closest('button').click();
 		cy.get('.story-viewer').should('be.visible');
 		waitForPhotoLoad();
 		cy.get('.story-viewer-header button[aria-label="Close"]').click();
 
-		cy.then(() => getStoryViewersViaApi(ownerToken, stories[1]._id))
+		cy.then(() => getStoryViewersViaApi(ownerSession, stories[1]._id))
 			.its('body')
 			.should('have.length', 1);
-		cy.then(() => getStoryViewersViaApi(ownerToken, stories[1]._id))
+		cy.then(() => getStoryViewersViaApi(ownerSession, stories[1]._id))
 			.its('body.0.username')
 			.should('eq', viewer.username);
 	});
 
 	it('opens "Delete story" over a paused story, and Cancel resumes it without deleting', () => {
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 		waitForPhotoLoad();
 
@@ -275,7 +275,7 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		confirmPopup().should('not.exist');
 		cy.get('.story-viewer').should('not.have.class', 'story-viewer-paused');
 		cy.get('@deleteRequest.all').should('have.length', 0);
-		cy.then(() => getUserStoriesViaApi(ownerToken, ownerId))
+		cy.then(() => getUserStoriesViaApi(ownerSession, ownerId))
 			.its('stories')
 			.should('have.length', 2);
 	});
@@ -284,13 +284,13 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		let deletedPublicId;
 		let keptPublicId;
 
-		cy.then(() => getUserStoriesViaApi(ownerToken, ownerId)).then(({ stories: listed }) => {
+		cy.then(() => getUserStoriesViaApi(ownerSession, ownerId)).then(({ stories: listed }) => {
 			deletedPublicId = publicIdFromImageUrl(listed[0].imageUrl);
 			keptPublicId = publicIdFromImageUrl(listed[1].imageUrl);
 		});
 		cy.then(() => cy.task('cloudinaryAssetExists', deletedPublicId)).should('eq', true);
 
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 		cy.get('.story-viewer-segment').should('have.length', 2);
 		waitForPhotoLoad();
@@ -303,20 +303,20 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		cy.get('.story-viewer').should('be.visible');
 		cy.get('.story-viewer-segment').should('have.length', 1);
 
-		cy.then(() => getUserStoriesViaApi(ownerToken, ownerId)).then(({ stories: listed }) => {
+		cy.then(() => getUserStoriesViaApi(ownerSession, ownerId)).then(({ stories: listed }) => {
 			expect(listed.map((story) => story._id)).to.deep.equal([stories[1]._id]);
 		});
 		cy.then(() => cy.task('cloudinaryAssetExists', deletedPublicId)).should('eq', false);
 		cy.then(() => cy.task('cloudinaryAssetExists', keptPublicId)).should('eq', true);
-		cy.then(() => getStoryViewersViaApi(ownerToken, stories[0]._id, false))
+		cy.then(() => getStoryViewersViaApi(ownerSession, stories[0]._id, false))
 			.its('status')
 			.should('eq', 404);
 	});
 
 	it('closes the viewer and leaves only "Add to your story" when the last story is deleted', () => {
-		cy.then(() => deleteStoryViaApi(ownerToken, stories[1]._id));
+		cy.then(() => deleteStoryViaApi(ownerSession, stories[1]._id));
 
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 		waitForPhotoLoad();
 
@@ -333,7 +333,7 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		cy.intercept('DELETE', '**/stories/*', { statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }).as(
 			'failedDelete',
 		);
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 		waitForPhotoLoad();
 
@@ -345,7 +345,7 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		cy.get('.toast-region').should('contain.text', DELETE_ERROR_TOAST);
 		cy.get('.story-viewer').should('not.have.class', 'story-viewer-paused');
 		cy.get('.story-viewer-segment').should('have.length', 2);
-		cy.then(() => getUserStoriesViaApi(ownerToken, ownerId))
+		cy.then(() => getUserStoriesViaApi(ownerSession, ownerId))
 			.its('stories')
 			.should('have.length', 2);
 	});
@@ -354,7 +354,7 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		cy.intercept('DELETE', '**/stories/*', { statusCode: 401, body: { code: 'UNAUTHENTICATED', message: 'Invalid or expired token' } }).as(
 			'failedDelete',
 		);
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 
 		trashButton().click();
@@ -366,7 +366,7 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 
 	it('shows the confirmation as a bottom sheet over the story on mobile', () => {
 		cy.viewport(390, 844);
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 
 		trashButton().click();
@@ -377,7 +377,7 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 
 	it('keeps Seen by bottom-left and the trash bottom-right of the story', () => {
 		cy.viewport(390, 844);
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 		openOwnStory();
 
 		cy.get('.story-viewer-seen-by').then(($seenBy) => {

@@ -7,7 +7,7 @@ import {
 	uploadPostViaApi,
 	followUserViaApi,
 	getFollowingViaApi,
-	userIdFromToken,
+	userIdFromSession,
 } from '../../support/api';
 
 const LIST_SELECTOR = '.empty-feed-suggestions';
@@ -35,24 +35,24 @@ describe('follow suggestions on the empty feed', () => {
 	const failingViewer = buildTestUser();
 	const viewers = [readerViewer, flowViewer, quietFollowViewer, failingViewer];
 
-	const tokens = {};
+	const sessions = {};
 
 	const createAccount = (user) => {
 		createUserViaApi(user);
-		loginViaApi(user).then((token) => {
-			tokens[user.username] = token;
+		loginViaApi(user).then((session) => {
+			sessions[user.username] = session;
 		});
 	};
 
-	const tokenOf = (user) => tokens[user.username];
+	const sessionOf = (user) => sessions[user.username];
 
-	const idOf = (user) => userIdFromToken(tokenOf(user));
+	const idOf = (user) => userIdFromSession(sessionOf(user));
 
 	const row = (user) => cy.contains(ROW_SELECTOR, user.username);
 
 	const visitEmptyFeed = (viewer, width = 1440, height = 900) => {
 		cy.viewport(width, height);
-		visitAsUser('/user-feed', tokenOf(viewer));
+		visitAsUser('/user-feed', sessionOf(viewer));
 	};
 
 	before(() => {
@@ -60,8 +60,8 @@ describe('follow suggestions on the empty feed', () => {
 		createAccount(poster);
 		viewers.forEach(createAccount);
 
-		cy.then(() => uploadPostViaApi(tokenOf(poster), POSTER_CAPTION));
-		cy.then(() => followUserViaApi(tokenOf(quietFollowViewer), idOf(fillers[0])));
+		cy.then(() => uploadPostViaApi(sessionOf(poster), POSTER_CAPTION));
+		cy.then(() => followUserViaApi(sessionOf(quietFollowViewer), idOf(fillers[0])));
 	});
 
 	after(() => {
@@ -161,7 +161,7 @@ describe('follow suggestions on the empty feed', () => {
 			});
 			cy.get('.suggestions-sidebar').should('not.exist');
 
-			cy.then(() => getFollowingViaApi(idOf(flowViewer), tokenOf(flowViewer))).then((following) => {
+			cy.then(() => getFollowingViaApi(idOf(flowViewer), sessionOf(flowViewer))).then((following) => {
 				expect(following.map((user) => user.username)).to.include(poster.username);
 			});
 
@@ -172,7 +172,7 @@ describe('follow suggestions on the empty feed', () => {
 			cy.contains('.feed-empty h1', 'Your feed is empty').should('be.visible');
 			cy.get(ROW_SELECTOR).should('have.length', 8);
 
-			cy.then(() => getFollowingViaApi(idOf(flowViewer), tokenOf(flowViewer))).then((following) => {
+			cy.then(() => getFollowingViaApi(idOf(flowViewer), sessionOf(flowViewer))).then((following) => {
 				expect(following.map((user) => user.username)).not.to.include(poster.username);
 			});
 

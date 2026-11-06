@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, userIdFromToken } from '../../support/api';
+import { createUserViaApi, loginViaApi, userIdFromSession } from '../../support/api';
 
 describe('profile load error', () => {
 	const user = buildTestUser();
@@ -10,8 +10,8 @@ describe('profile load error', () => {
 	before(() => {
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((session) => {
+			userId = userIdFromSession(session);
 			profilePath = `/user/${userId}`;
 		});
 	});

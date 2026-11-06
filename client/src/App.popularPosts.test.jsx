@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import ToastContext from './contexts/ToastContext';
+import { getCurrentUser } from './services/userService';
 import { getPopularPosts, getNextPopularPosts } from './services/userPostService';
 
 import App from './App';
@@ -59,6 +60,7 @@ describe('App with the popular posts pages', () => {
 		window.localStorage.clear();
 		window.matchMedia = jest.fn().mockReturnValue({ matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn() });
 
+		getCurrentUser.mockResolvedValue(null);
 		getPopularPosts.mockResolvedValue({ posts: FIRST_BATCH_IDS.map(buildPost), snapshotTime: SNAPSHOT_TIME, hasMore: true });
 		getNextPopularPosts.mockResolvedValue({ posts: SECOND_BATCH_IDS.map(buildPost), snapshotTime: SNAPSHOT_TIME, hasMore: false });
 	});

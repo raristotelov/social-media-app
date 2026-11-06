@@ -29,7 +29,7 @@ const renderCarousel = ({ result = { suggestions, reserve: [], isCarouselDismiss
 	getSuggestions.mockResolvedValue(result);
 
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<SuggestionsCarousel />
@@ -44,7 +44,7 @@ const renderCarousel = ({ result = { suggestions, reserve: [], isCarouselDismiss
 describe('SuggestionsCarousel', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
-		followUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		followUser.mockResolvedValue({ user: loggedInUser });
 		dismissSuggestionsCarousel.mockResolvedValue(undefined);
 	});
 
@@ -53,7 +53,7 @@ describe('SuggestionsCarousel', () => {
 
 		await screen.findByRole('region', { name: 'Suggested for you' });
 
-		expect(getSuggestions).toHaveBeenCalledWith({ placement: 'carousel', jwtToken: 'token123' });
+		expect(getSuggestions).toHaveBeenCalledWith({ placement: 'carousel' });
 	});
 
 	it('shows the "Suggested for you" heading', async () => {
@@ -82,7 +82,7 @@ describe('SuggestionsCarousel', () => {
 		getSuggestions.mockReturnValue(new Promise(() => {}));
 
 		render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<SuggestionsCarousel />
@@ -98,7 +98,7 @@ describe('SuggestionsCarousel', () => {
 		getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
 		render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<SuggestionsCarousel />
@@ -160,7 +160,7 @@ describe('SuggestionsCarousel', () => {
 
 			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
 
-			await waitFor(() => expect(dismissSuggestionsCarousel).toHaveBeenCalledWith({ jwtToken: 'token123' }));
+			await waitFor(() => expect(dismissSuggestionsCarousel).toHaveBeenCalledWith());
 			expect(dismissSuggestionsCarousel).toHaveBeenCalledTimes(1);
 		});
 

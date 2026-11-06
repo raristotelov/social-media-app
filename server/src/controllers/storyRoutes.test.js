@@ -13,6 +13,7 @@ jest.mock('../services', () => ({
 }));
 
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const JWT = require('jsonwebtoken');
 
 const { storyService } = require('../services');
@@ -50,7 +51,9 @@ describe('story routes', () => {
 	let originalJwtSecret;
 	let consoleErrorSpy;
 
-	const authHeaders = () => ({ 'X-Authorization': JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET) });
+	const authHeaders = () => ({
+		Cookie: `${constants.AUTH_COOKIE_NAME}=${JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET)}`,
+	});
 
 	beforeAll(async () => {
 		originalJwtSecret = process.env.JWT_SECRET;
@@ -58,6 +61,7 @@ describe('story routes', () => {
 
 		const app = express();
 
+		app.use(cookieParser());
 		app.use(express.json());
 		app.use('/stories', storyController);
 		app.use(errorHandler);

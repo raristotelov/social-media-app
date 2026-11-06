@@ -4,7 +4,7 @@ import {
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	uploadPostViaApi,
 	likePostViaApi,
 	addCommentViaApi,
@@ -18,9 +18,9 @@ describe('profile posts view', () => {
 	const soloAuthor = buildTestUser();
 	const commenter = buildTestUser();
 
-	let gridAuthorToken;
-	let soloAuthorToken;
-	let commenterToken;
+	let gridAuthorSession;
+	let soloAuthorSession;
+	let commenterSession;
 	let gridAuthorId;
 	let soloAuthorId;
 	let gridPosts;
@@ -40,31 +40,31 @@ describe('profile posts view', () => {
 		createUserViaApi(soloAuthor);
 		createUserViaApi(commenter);
 
-		loginViaApi(gridAuthor).then((token) => {
-			gridAuthorToken = token;
-			gridAuthorId = userIdFromToken(token);
+		loginViaApi(gridAuthor).then((session) => {
+			gridAuthorSession = session;
+			gridAuthorId = userIdFromSession(session);
 		});
 
-		loginViaApi(soloAuthor).then((token) => {
-			soloAuthorToken = token;
-			soloAuthorId = userIdFromToken(token);
+		loginViaApi(soloAuthor).then((session) => {
+			soloAuthorSession = session;
+			soloAuthorId = userIdFromSession(session);
 		});
 
-		loginViaApi(commenter).then((token) => {
-			commenterToken = token;
+		loginViaApi(commenter).then((session) => {
+			commenterSession = session;
 		});
 
 		gridPosts = [];
 
-		cy.then(() => uploadPostViaApi(gridAuthorToken, 'grid oldest')).then((post) => gridPosts.push(post));
-		cy.then(() => uploadPostViaApi(gridAuthorToken, 'grid middle')).then((post) => gridPosts.push(post));
-		cy.then(() => uploadPostViaApi(gridAuthorToken, 'grid newest')).then((post) => gridPosts.push(post));
+		cy.then(() => uploadPostViaApi(gridAuthorSession, 'grid oldest')).then((post) => gridPosts.push(post));
+		cy.then(() => uploadPostViaApi(gridAuthorSession, 'grid middle')).then((post) => gridPosts.push(post));
+		cy.then(() => uploadPostViaApi(gridAuthorSession, 'grid newest')).then((post) => gridPosts.push(post));
 
-		cy.then(() => uploadPostViaApi(soloAuthorToken, 'solo caption')).then((post) => {
+		cy.then(() => uploadPostViaApi(soloAuthorSession, 'solo caption')).then((post) => {
 			soloPost = post;
 		});
 
-		cy.then(() => addCommentViaApi(commenterToken, soloPost._id, 'a readable comment'));
+		cy.then(() => addCommentViaApi(commenterSession, soloPost._id, 'a readable comment'));
 	});
 
 	after(() => {
@@ -166,7 +166,7 @@ describe('profile posts view', () => {
 		const SCROLL_MARGIN_BELOW_HEADER = 20;
 		const POSITION_TOLERANCE = 2;
 
-		let longAuthorToken;
+		let longAuthorSession;
 		let longAuthorId;
 		let longPosts;
 
@@ -195,15 +195,15 @@ describe('profile posts view', () => {
 		before(() => {
 			createUserViaApi(longAuthor);
 
-			loginViaApi(longAuthor).then((token) => {
-				longAuthorToken = token;
-				longAuthorId = userIdFromToken(token);
+			loginViaApi(longAuthor).then((session) => {
+				longAuthorSession = session;
+				longAuthorId = userIdFromSession(session);
 			});
 
 			longPosts = [];
 
 			Cypress._.times(POST_COUNT, (index) => {
-				cy.then(() => uploadPostViaApi(longAuthorToken, `long ${index}`)).then((post) => longPosts.push(post));
+				cy.then(() => uploadPostViaApi(longAuthorSession, `long ${index}`)).then((post) => longPosts.push(post));
 			});
 		});
 
@@ -341,7 +341,7 @@ describe('profile posts view', () => {
 
 	describe('on the own profile', () => {
 		it('shows the post actions with Edit and Delete on every post', () => {
-			visitAsUser(`${gridPath()}/posts#${gridPosts[1]._id}`, gridAuthorToken);
+			visitAsUser(`${gridPath()}/posts#${gridPosts[1]._id}`, gridAuthorSession);
 
 			cy.get('.user-post').should('have.length', 3);
 			cy.get('.user-post-actions-button').should('have.length', 3);
@@ -353,7 +353,7 @@ describe('profile posts view', () => {
 		});
 
 		it("shows no post actions on another user's posts view", () => {
-			visitAsUser(`${gridPath()}/posts#${gridPosts[1]._id}`, commenterToken);
+			visitAsUser(`${gridPath()}/posts#${gridPosts[1]._id}`, commenterSession);
 
 			cy.get('.user-post').should('have.length', 3);
 			cy.get('.user-post-actions-button').should('not.exist');
@@ -425,15 +425,15 @@ describe('profile posts view', () => {
 	describe('replying to comments', () => {
 		const replyAuthor = buildTestUser();
 
-		let replyAuthorToken;
+		let replyAuthorSession;
 		let replyAuthorId;
 		let commenterId;
 		let replyPost;
 
 		const replyPath = () => `/user/${replyAuthorId}/posts#${replyPost._id}`;
 
-		const openCommentsPopup = (token) => {
-			visitAsUser(replyPath(), token);
+		const openCommentsPopup = (session) => {
+			visitAsUser(replyPath(), session);
 
 			cy.get('.user-post-comments-button').click();
 		};
@@ -452,26 +452,26 @@ describe('profile posts view', () => {
 		before(() => {
 			createUserViaApi(replyAuthor);
 
-			loginViaApi(replyAuthor).then((token) => {
-				replyAuthorToken = token;
-				replyAuthorId = userIdFromToken(token);
-				commenterId = userIdFromToken(commenterToken);
+			loginViaApi(replyAuthor).then((session) => {
+				replyAuthorSession = session;
+				replyAuthorId = userIdFromSession(session);
+				commenterId = userIdFromSession(commenterSession);
 			});
 
-			cy.then(() => uploadPostViaApi(replyAuthorToken, 'reply caption')).then((post) => {
+			cy.then(() => uploadPostViaApi(replyAuthorSession, 'reply caption')).then((post) => {
 				replyPost = post;
 			});
 		});
 
 		after(() => {
-			cy.then(() => deletePostViaApi(replyAuthorToken, replyPost._id, false));
+			cy.then(() => deletePostViaApi(replyAuthorSession, replyPost._id, false));
 			cy.task('deleteTestUser', replyAuthor.email);
 		});
 
 		it('prefills the reply box with the @username of the author and keeps Post disabled until text follows', () => {
-			cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top prefill'));
+			cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top prefill'));
 
-			openCommentsPopup(replyAuthorToken);
+			openCommentsPopup(replyAuthorSession);
 
 			topComment('top prefill').then(($comment) => {
 				replyButtonOf($comment).click();
@@ -486,9 +486,9 @@ describe('profile posts view', () => {
 		});
 
 		it('puts the cursor in the reply box after the mention, while the main comment box stays unfocused', () => {
-			cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top focus'));
+			cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top focus'));
 
-			openCommentsPopup(replyAuthorToken);
+			openCommentsPopup(replyAuthorSession);
 
 			cy.get('.user-post .add-comment-form-input').should('not.have.focus');
 			cy.get('.comments-popup .add-comment-form-input').should('not.have.focus');
@@ -507,9 +507,9 @@ describe('profile posts view', () => {
 		});
 
 		it('keeps Post disabled when only spaces follow the mention', () => {
-			cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top spaces'));
+			cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top spaces'));
 
-			openCommentsPopup(replyAuthorToken);
+			openCommentsPopup(replyAuthorSession);
 
 			topComment('top spaces').then(($comment) => {
 				replyButtonOf($comment).click();
@@ -521,9 +521,9 @@ describe('profile posts view', () => {
 		});
 
 		it('posts a reply that shows the mention as a link to the profile of the replied-to user', () => {
-			cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top mention'));
+			cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top mention'));
 
-			openCommentsPopup(replyAuthorToken);
+			openCommentsPopup(replyAuthorSession);
 
 			topComment('top mention').then(($comment) => {
 				postReplyFrom(replyButtonOf($comment), 'thanks for the mention');
@@ -536,9 +536,9 @@ describe('profile posts view', () => {
 		});
 
 		it('posts a reply without the mention as a plain reply, with no link', () => {
-			cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top plain'));
+			cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top plain'));
 
-			openCommentsPopup(replyAuthorToken);
+			openCommentsPopup(replyAuthorSession);
 
 			topComment('top plain').then(($comment) => {
 				replyButtonOf($comment).click();
@@ -552,15 +552,15 @@ describe('profile posts view', () => {
 		});
 
 		it('replies to a reply under the top-level comment, mentioning the author of that reply', () => {
-			cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top nested')).then((top) => {
+			cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top nested')).then((top) => {
 				cy.then(() =>
-					addCommentViaApi(replyAuthorToken, replyPost._id, `@${commenter.username} first reply`, {
+					addCommentViaApi(replyAuthorSession, replyPost._id, `@${commenter.username} first reply`, {
 						parentCommentId: top._id,
 						mentionedUserId: commenterId,
 					}),
 				);
 
-				openCommentsPopup(commenterToken);
+				openCommentsPopup(commenterSession);
 
 				topComment('top nested').contains('button', 'View replies').click();
 
@@ -585,9 +585,9 @@ describe('profile posts view', () => {
 		});
 
 		it('lets a guest follow the mention link and see Post disabled', () => {
-			cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top guest')).then((top) => {
+			cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top guest')).then((top) => {
 				cy.then(() =>
-					addCommentViaApi(replyAuthorToken, replyPost._id, `@${commenter.username} hello guest`, {
+					addCommentViaApi(replyAuthorSession, replyPost._id, `@${commenter.username} hello guest`, {
 						parentCommentId: top._id,
 						mentionedUserId: commenterId,
 					}),
@@ -605,10 +605,10 @@ describe('profile posts view', () => {
 
 		describe('the server', () => {
 			const addReplyWithMention = (top, text, mentionedUserId) =>
-				cy.then(() => addCommentViaApi(replyAuthorToken, replyPost._id, text, { parentCommentId: top._id, mentionedUserId }));
+				cy.then(() => addCommentViaApi(replyAuthorSession, replyPost._id, text, { parentCommentId: top._id, mentionedUserId }));
 
 			it('saves the mentioned user, with the username, only when the reply starts with their @username', () => {
-				cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top api')).then((top) => {
+				cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top api')).then((top) => {
 					addReplyWithMention(top, `@${commenter.username} yes`, commenterId).then((reply) => {
 						expect(reply.mentionedUserId.username).to.eq(commenter.username);
 					});
@@ -624,7 +624,7 @@ describe('profile posts view', () => {
 			});
 
 			it('saves a plain reply, without an error, for an unknown or malformed user id', () => {
-				cy.then(() => addCommentViaApi(commenterToken, replyPost._id, 'top api invalid')).then((top) => {
+				cy.then(() => addCommentViaApi(commenterSession, replyPost._id, 'top api invalid')).then((top) => {
 					addReplyWithMention(top, `@${commenter.username} unknown`, '64b7f0a1c2d3e4f5a6b7c8d2').then((reply) => {
 						expect(reply.mentionedUserId).to.eq(null);
 					});
@@ -637,7 +637,7 @@ describe('profile posts view', () => {
 
 			it('saves no mentioned user on a top-level comment', () => {
 				cy.then(() =>
-					addCommentViaApi(commenterToken, replyPost._id, `@${commenter.username} top level`, { mentionedUserId: commenterId }),
+					addCommentViaApi(commenterSession, replyPost._id, `@${commenter.username} top level`, { mentionedUserId: commenterId }),
 				).then((comment) => {
 					expect(comment.mentionedUserId).to.eq(null);
 				});
@@ -647,7 +647,7 @@ describe('profile posts view', () => {
 
 	describe('liking a post twice quickly', () => {
 		it('records one like when the like button is double-clicked', () => {
-			visitAsUser(`${soloPath()}/posts#${soloPost._id}`, commenterToken);
+			visitAsUser(`${soloPath()}/posts#${soloPost._id}`, commenterSession);
 
 			cy.intercept('POST', '**/user-posts/like/**').as('likeRequest');
 
@@ -661,8 +661,8 @@ describe('profile posts view', () => {
 		});
 
 		it('records one like when the server receives the like request twice', () => {
-			cy.then(() => likePostViaApi(soloAuthorToken, soloPost._id));
-			cy.then(() => likePostViaApi(soloAuthorToken, soloPost._id));
+			cy.then(() => likePostViaApi(soloAuthorSession, soloPost._id));
+			cy.then(() => likePostViaApi(soloAuthorSession, soloPost._id));
 
 			cy.request({ method: 'GET', url: `${serverUrl}/users?userIds=${soloAuthorId}` }).then((response) => {
 				const likes = response.body[0].posts[0].likes;

@@ -1,14 +1,14 @@
 import { buildTestUser, TEST_USERNAME_PREFIX } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, followUserViaApi } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession, followUserViaApi } from '../../support/api';
 
 describe('followers and following popup', () => {
 	const owner = buildTestUser();
 	const firstFollower = buildTestUser();
 	const secondFollower = buildTestUser();
 
-	let ownerToken;
-	let firstFollowerToken;
-	let secondFollowerToken;
+	let ownerSession;
+	let firstFollowerSession;
+	let secondFollowerSession;
 	let ownerId;
 	let firstFollowerId;
 	let ownerPath;
@@ -28,26 +28,26 @@ describe('followers and following popup', () => {
 		createUserViaApi(firstFollower);
 		createUserViaApi(secondFollower);
 
-		loginViaApi(owner).then((token) => {
-			ownerToken = token;
-			ownerId = userIdFromToken(token);
+		loginViaApi(owner).then((session) => {
+			ownerSession = session;
+			ownerId = userIdFromSession(session);
 			ownerPath = `/user/${ownerId}`;
 		});
 
-		loginViaApi(firstFollower).then((token) => {
-			firstFollowerToken = token;
-			firstFollowerId = userIdFromToken(token);
+		loginViaApi(firstFollower).then((session) => {
+			firstFollowerSession = session;
+			firstFollowerId = userIdFromSession(session);
 			firstFollowerPath = `/user/${firstFollowerId}`;
 		});
 
-		loginViaApi(secondFollower).then((token) => {
-			secondFollowerToken = token;
-			secondFollowerPath = `/user/${userIdFromToken(token)}`;
+		loginViaApi(secondFollower).then((session) => {
+			secondFollowerSession = session;
+			secondFollowerPath = `/user/${userIdFromSession(session)}`;
 		});
 
-		cy.then(() => followUserViaApi(firstFollowerToken, ownerId));
-		cy.then(() => followUserViaApi(secondFollowerToken, ownerId));
-		cy.then(() => followUserViaApi(ownerToken, firstFollowerId));
+		cy.then(() => followUserViaApi(firstFollowerSession, ownerId));
+		cy.then(() => followUserViaApi(secondFollowerSession, ownerId));
+		cy.then(() => followUserViaApi(ownerSession, firstFollowerId));
 	});
 
 	after(() => {
@@ -137,7 +137,7 @@ describe('followers and following popup', () => {
 
 	it('lists the logged-in user first', () => {
 		cy.viewport(1440, 900);
-		visitAsUser(ownerPath, secondFollowerToken);
+		visitAsUser(ownerPath, secondFollowerSession);
 
 		statButton('followers').click();
 

@@ -3,7 +3,7 @@ import {
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	followUserViaApi,
 	uploadStoryViaApi,
 	getStoryTrayViaApi,
@@ -16,9 +16,9 @@ describe('watching stories', () => {
 	const unfollowedPoster = buildTestUser();
 
 	let viewer;
-	let viewerToken;
-	let posterAToken;
-	let posterBToken;
+	let viewerSession;
+	let posterASession;
+	let posterBSession;
 	let posterAStories;
 	let posterBStories;
 
@@ -53,29 +53,29 @@ describe('watching stories', () => {
 		createUserViaApi(posterB);
 		createUserViaApi(unfollowedPoster);
 
-		loginViaApi(posterA).then((token) => {
-			posterAToken = token;
+		loginViaApi(posterA).then((session) => {
+			posterASession = session;
 		});
-		loginViaApi(posterB).then((token) => {
-			posterBToken = token;
-		});
-
-		let unfollowedToken;
-
-		loginViaApi(unfollowedPoster).then((token) => {
-			unfollowedToken = token;
+		loginViaApi(posterB).then((session) => {
+			posterBSession = session;
 		});
 
-		cy.then(() => uploadStoryViaApi(posterAToken)).then((story) => {
+		let unfollowedSession;
+
+		loginViaApi(unfollowedPoster).then((session) => {
+			unfollowedSession = session;
+		});
+
+		cy.then(() => uploadStoryViaApi(posterASession)).then((story) => {
 			posterAStories = [story];
 		});
-		cy.then(() => uploadStoryViaApi(posterAToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(posterASession)).then((story) => {
 			posterAStories.push(story);
 		});
-		cy.then(() => uploadStoryViaApi(posterBToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(posterBSession)).then((story) => {
 			posterBStories = [story];
 		});
-		cy.then(() => uploadStoryViaApi(unfollowedToken));
+		cy.then(() => uploadStoryViaApi(unfollowedSession));
 	});
 
 	beforeEach(() => {
@@ -83,12 +83,12 @@ describe('watching stories', () => {
 
 		createUserViaApi(viewer);
 
-		loginViaApi(viewer).then((token) => {
-			viewerToken = token;
+		loginViaApi(viewer).then((session) => {
+			viewerSession = session;
 		});
 
-		cy.then(() => followUserViaApi(viewerToken, userIdFromToken(posterAToken)));
-		cy.then(() => followUserViaApi(viewerToken, userIdFromToken(posterBToken)));
+		cy.then(() => followUserViaApi(viewerSession, userIdFromSession(posterASession)));
+		cy.then(() => followUserViaApi(viewerSession, userIdFromSession(posterBSession)));
 	});
 
 	afterEach(() => {
@@ -103,7 +103,7 @@ describe('watching stories', () => {
 
 	describe('the tray', () => {
 		it('lists your circle first, then followed users newest story first, and leaves out people you do not follow', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			trayLabels().should('have.length', 3);
 			trayLabels().eq(0).should('have.text', 'Your story');
@@ -113,7 +113,7 @@ describe('watching stories', () => {
 		});
 
 		it('rings unwatched users in red and keeps your own circle grey', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			ring(posterA.username).should('have.class', 'story-circle-ring-unwatched');
 			ring(posterB.username).should('have.class', 'story-circle-ring-unwatched');
@@ -121,9 +121,9 @@ describe('watching stories', () => {
 		});
 
 		it('moves a user whose stories you have all watched after the unwatched ones, with a grey ring', () => {
-			cy.then(() => recordStoryViewViaApi(viewerToken, posterBStories[0]._id));
+			cy.then(() => recordStoryViewViaApi(viewerSession, posterBStories[0]._id));
 
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			trayLabels().eq(1).should('have.text', posterA.username);
 			trayLabels().eq(2).should('have.text', posterB.username);
@@ -132,18 +132,18 @@ describe('watching stories', () => {
 		});
 
 		it('keeps a user red while any one of their stories is unwatched', () => {
-			cy.then(() => recordStoryViewViaApi(viewerToken, posterAStories[0]._id));
+			cy.then(() => recordStoryViewViaApi(viewerSession, posterAStories[0]._id));
 
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			ring(posterA.username).should('have.class', 'story-circle-ring-unwatched');
 		});
 
 		it('turns the ring grey once everything the user posted is watched', () => {
-			cy.then(() => recordStoryViewViaApi(viewerToken, posterAStories[0]._id));
-			cy.then(() => recordStoryViewViaApi(viewerToken, posterAStories[1]._id));
+			cy.then(() => recordStoryViewViaApi(viewerSession, posterAStories[0]._id));
+			cy.then(() => recordStoryViewViaApi(viewerSession, posterAStories[1]._id));
 
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			ring(posterA.username).should('not.have.class', 'story-circle-ring-unwatched');
 		});
@@ -151,8 +151,8 @@ describe('watching stories', () => {
 
 	describe('the viewer', () => {
 		it('opens on the first story a user has not watched yet', () => {
-			cy.then(() => recordStoryViewViaApi(viewerToken, posterAStories[0]._id));
-			visitAsUser('/user-feed', viewerToken);
+			cy.then(() => recordStoryViewViaApi(viewerSession, posterAStories[0]._id));
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterA.username);
 
@@ -162,9 +162,9 @@ describe('watching stories', () => {
 		});
 
 		it('opens on the first story when the user has none unwatched', () => {
-			cy.then(() => recordStoryViewViaApi(viewerToken, posterAStories[0]._id));
-			cy.then(() => recordStoryViewViaApi(viewerToken, posterAStories[1]._id));
-			visitAsUser('/user-feed', viewerToken);
+			cy.then(() => recordStoryViewViaApi(viewerSession, posterAStories[0]._id));
+			cy.then(() => recordStoryViewViaApi(viewerSession, posterAStories[1]._id));
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterA.username);
 
@@ -173,7 +173,7 @@ describe('watching stories', () => {
 		});
 
 		it('moves through a user, on to the next user in the tray, and closes after the last', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterB.username);
 			username().should('have.text', posterB.username);
@@ -192,7 +192,7 @@ describe('watching stories', () => {
 		});
 
 		it('goes back to the previous user last story from a first story, and does nothing on the very first story', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterB.username);
 			tapPrevious();
@@ -207,8 +207,8 @@ describe('watching stories', () => {
 		});
 
 		it('goes back to the previous story of the same user', () => {
-			cy.then(() => recordStoryViewViaApi(viewerToken, posterAStories[0]._id));
-			visitAsUser('/user-feed', viewerToken);
+			cy.then(() => recordStoryViewViaApi(viewerSession, posterAStories[0]._id));
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterA.username);
 			cy.get('.story-viewer-segment-fill-complete').should('have.length', 1);
@@ -220,7 +220,7 @@ describe('watching stories', () => {
 		});
 
 		it('pauses while held and carries on, on the same story, when released', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 			openCircle(posterB.username);
 			waitForPhotoLoad();
 
@@ -234,7 +234,7 @@ describe('watching stories', () => {
 		});
 
 		it('advances by itself 5 seconds after the photo has loaded', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 			openCircle(posterB.username);
 			waitForPhotoLoad();
 
@@ -242,7 +242,7 @@ describe('watching stories', () => {
 		});
 
 		it('shows the time next to the poster as minutes for a fresh story', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterB.username);
 
@@ -252,7 +252,7 @@ describe('watching stories', () => {
 		});
 
 		it('has no Seen by and no delete on someone else story, and no reply input', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterB.username);
 
@@ -262,7 +262,7 @@ describe('watching stories', () => {
 		});
 
 		it('closes from the close button and leaves the feed usable', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 			openCircle(posterB.username);
 
 			cy.get('.story-viewer-header button[aria-label="Close"]').click();
@@ -274,7 +274,7 @@ describe('watching stories', () => {
 
 	describe('watching all the way through', () => {
 		it('greys both rings and records every view once the photos have loaded', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterB.username);
 			waitForPhotoLoad();
@@ -288,13 +288,13 @@ describe('watching stories', () => {
 			ring(posterA.username).should('not.have.class', 'story-circle-ring-unwatched');
 			ring(posterB.username).should('not.have.class', 'story-circle-ring-unwatched');
 
-			cy.then(() => getStoryTrayViaApi(viewerToken)).then((tray) => {
+			cy.then(() => getStoryTrayViaApi(viewerSession)).then((tray) => {
 				expect(tray.filter((entry) => !entry.isOwn).every((entry) => entry.isWatched)).to.equal(true);
 			});
 		});
 
 		it('counts a story as watched even when tapped past before 5 seconds', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 
 			openCircle(posterB.username);
 			waitForPhotoLoad();
@@ -307,7 +307,7 @@ describe('watching stories', () => {
 	describe('layout', () => {
 		it('shows the side arrows on desktop and moves with them', () => {
 			cy.viewport(1440, 900);
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 			openCircle(posterB.username);
 
 			cy.get('.story-viewer-arrow-previous').should('not.exist');
@@ -324,7 +324,7 @@ describe('watching stories', () => {
 		].forEach(([name, width, height]) => {
 			it(`shows no side arrows on ${name}`, () => {
 				cy.viewport(width, height);
-				visitAsUser('/user-feed', viewerToken);
+				visitAsUser('/user-feed', viewerSession);
 				openCircle(posterB.username);
 
 				cy.get('.story-viewer-arrow-next').should('not.be.visible');
@@ -339,7 +339,7 @@ describe('watching stories', () => {
 		].forEach(([name, width, height]) => {
 			it(`keeps the tray and the viewer controls on screen on ${name} without horizontal scrolling`, () => {
 				cy.viewport(width, height);
-				visitAsUser('/user-feed', viewerToken);
+				visitAsUser('/user-feed', viewerSession);
 
 				cy.get('.stories-tray').should('be.visible');
 				cy.document().then((doc) => {
@@ -371,7 +371,7 @@ describe('watching stories', () => {
 
 	describe('when the stories cannot be loaded', () => {
 		it('closes the viewer and shows the error toast', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 			cy.get('.stories-tray .story-circle-label').should('have.length', 3);
 			cy.intercept('GET', '**/stories/user/*', { statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }).as(
 				'userStories',
@@ -385,7 +385,7 @@ describe('watching stories', () => {
 		});
 
 		it('ends the session and goes to /log-in when the token is no longer valid', () => {
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 			cy.get('.stories-tray .story-circle-label').should('have.length', 3);
 			cy.intercept('GET', '**/stories/user/*', { statusCode: 401, body: { code: 'UNAUTHENTICATED', message: 'Invalid or expired token' } }).as(
 				'userStories',
@@ -415,7 +415,7 @@ describe('watching stories', () => {
 					res.send(body);
 				});
 			}).as('userStories');
-			visitAsUser('/user-feed', viewerToken);
+			visitAsUser('/user-feed', viewerSession);
 			cy.get('.stories-tray .story-circle-label').should('have.length', 3);
 
 			circle(posterB.username).find('button.story-circle-button').click();
@@ -426,7 +426,7 @@ describe('watching stories', () => {
 			ring(posterB.username).should('have.class', 'story-circle-ring-unwatched');
 			ring(posterA.username).should('have.class', 'story-circle-ring-unwatched');
 
-			cy.then(() => getStoryTrayViaApi(viewerToken)).then((tray) => {
+			cy.then(() => getStoryTrayViaApi(viewerSession)).then((tray) => {
 				expect(tray.filter((entry) => !entry.isOwn).every((entry) => entry.isWatched === false)).to.equal(true);
 			});
 		});

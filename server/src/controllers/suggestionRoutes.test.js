@@ -10,6 +10,7 @@ jest.mock('../services', () => ({
 }));
 
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const JWT = require('jsonwebtoken');
 
 const { suggestionService } = require('../services');
@@ -17,6 +18,7 @@ const suggestionController = require('./suggestionController');
 const errorHandler = require('../middlewares/errorHandler');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
+const constants = require('../config/constants');
 
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const JWT_SECRET = 'suggestion-routes-test-secret';
@@ -33,7 +35,8 @@ describe('suggestion routes', () => {
 	let originalJwtSecret;
 	let consoleErrorSpy;
 
-	const authHeaders = () => ({ 'X-Authorization': JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET) });
+	const sessionCookie = (token) => ({ Cookie: `${constants.AUTH_COOKIE_NAME}=${token}` });
+	const authHeaders = () => sessionCookie(JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET));
 
 	beforeAll(async () => {
 		originalJwtSecret = process.env.JWT_SECRET;
@@ -41,6 +44,7 @@ describe('suggestion routes', () => {
 
 		const app = express();
 
+		app.use(cookieParser());
 		app.use(express.json());
 		app.use('/suggestions', suggestionController);
 		app.use(errorHandler);
@@ -89,7 +93,7 @@ describe('suggestion routes', () => {
 		])('answers 401 to %s %s with a token signed with the wrong secret', async (method, path) => {
 			const response = await fetch(`${baseUrl}${path}`, {
 				method,
-				headers: { 'X-Authorization': JWT.sign({ userId: USER_ID }, 'another-secret') },
+				headers: sessionCookie(JWT.sign({ userId: USER_ID }, 'another-secret')),
 			});
 
 			expect(response.status).toBe(401);

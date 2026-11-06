@@ -1,5 +1,13 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, uploadPostViaApi, addCommentViaApi, deletePostViaApi } from '../../support/api';
+import {
+	createUserViaApi,
+	loginViaApi,
+	visitAsUser,
+	userIdFromSession,
+	uploadPostViaApi,
+	addCommentViaApi,
+	deletePostViaApi,
+} from '../../support/api';
 
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 const START_Y = 300;
@@ -49,7 +57,7 @@ const getSheetHeight = (sheetSelector) => cy.get(sheetSelector).then(($sheet) =>
 describe('bottom sheets: swipe to close', () => {
 	const owner = buildTestUser();
 
-	let ownerToken;
+	let ownerSession;
 	let ownerId;
 	let post;
 
@@ -69,20 +77,20 @@ describe('bottom sheets: swipe to close', () => {
 	before(() => {
 		createUserViaApi(owner);
 
-		loginViaApi(owner).then((token) => {
-			ownerToken = token;
-			ownerId = userIdFromToken(token);
+		loginViaApi(owner).then((session) => {
+			ownerSession = session;
+			ownerId = userIdFromSession(session);
 		});
 
-		cy.then(() => uploadPostViaApi(ownerToken, POST_CAPTION)).then((uploaded) => {
+		cy.then(() => uploadPostViaApi(ownerSession, POST_CAPTION)).then((uploaded) => {
 			post = uploaded;
 		});
 
-		cy.then(() => addCommentViaApi(ownerToken, post._id, COMMENT_TEXT));
+		cy.then(() => addCommentViaApi(ownerSession, post._id, COMMENT_TEXT));
 	});
 
 	after(() => {
-		cy.then(() => deletePostViaApi(ownerToken, post._id, false));
+		cy.then(() => deletePostViaApi(ownerSession, post._id, false));
 		cy.task('deleteTestUser', owner.email);
 	});
 
@@ -93,7 +101,7 @@ describe('bottom sheets: swipe to close', () => {
 
 		describe('the comments sheet', () => {
 			beforeEach(() => {
-				visitAsUser(postsPath(), ownerToken);
+				visitAsUser(postsPath(), ownerSession);
 				openComments();
 			});
 
@@ -173,7 +181,7 @@ describe('bottom sheets: swipe to close', () => {
 
 		describe('the account menu sheet', () => {
 			beforeEach(() => {
-				visitAsUser(`/user/${ownerId}`, ownerToken);
+				visitAsUser(`/user/${ownerId}`, ownerSession);
 				openAccountMenu();
 			});
 
@@ -223,7 +231,7 @@ describe('bottom sheets: swipe to close', () => {
 	describe('on a desktop screen', () => {
 		beforeEach(() => {
 			cy.viewport(1440, 900);
-			visitAsUser(postsPath(), ownerToken);
+			visitAsUser(postsPath(), ownerSession);
 			openComments();
 		});
 

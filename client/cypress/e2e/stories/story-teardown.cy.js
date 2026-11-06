@@ -2,7 +2,7 @@ import { buildTestUser } from '../../support/testUser';
 import {
 	createUserViaApi,
 	loginViaApi,
-	userIdFromToken,
+	userIdFromSession,
 	uploadStoryViaApi,
 	getUserStoriesViaApi,
 	recordStoryViewViaApi,
@@ -13,18 +13,18 @@ describe('story teardown', () => {
 	const author = buildTestUser();
 	const watcher = buildTestUser();
 
-	let authorToken;
-	let watcherToken;
+	let authorSession;
+	let watcherSession;
 
 	beforeEach(() => {
 		createUserViaApi(author);
 		createUserViaApi(watcher);
 
-		loginViaApi(author).then((token) => {
-			authorToken = token;
+		loginViaApi(author).then((session) => {
+			authorSession = session;
 		});
-		loginViaApi(watcher).then((token) => {
-			watcherToken = token;
+		loginViaApi(watcher).then((session) => {
+			watcherSession = session;
 		});
 	});
 
@@ -36,7 +36,7 @@ describe('story teardown', () => {
 	it('removes the story images of a test user from Cloudinary together with the account', () => {
 		let publicId;
 
-		cy.then(() => uploadStoryViaApi(authorToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(authorSession)).then((story) => {
 			publicId = publicIdFromImageUrl(story.imageUrl);
 		});
 		cy.then(() => cy.task('cloudinaryAssetExists', publicId)).should('eq', true);
@@ -49,10 +49,10 @@ describe('story teardown', () => {
 	it('removes the stories and view records of a test user from the database', () => {
 		let storyId;
 
-		cy.then(() => uploadStoryViaApi(authorToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(authorSession)).then((story) => {
 			storyId = story._id;
 		});
-		cy.then(() => recordStoryViewViaApi(watcherToken, storyId));
+		cy.then(() => recordStoryViewViaApi(watcherSession, storyId));
 
 		cy.task('deleteTestUser', author.email).then((removed) => {
 			expect(removed.users).to.equal(1);
@@ -64,10 +64,10 @@ describe('story teardown', () => {
 	it('removes the views a test user left on other stories along with the account', () => {
 		let storyId;
 
-		cy.then(() => uploadStoryViaApi(authorToken)).then((story) => {
+		cy.then(() => uploadStoryViaApi(authorSession)).then((story) => {
 			storyId = story._id;
 		});
-		cy.then(() => recordStoryViewViaApi(watcherToken, storyId));
+		cy.then(() => recordStoryViewViaApi(watcherSession, storyId));
 
 		cy.task('deleteTestUser', watcher.email).then((removed) => {
 			expect(removed.users).to.equal(1);
@@ -75,7 +75,7 @@ describe('story teardown', () => {
 			expect(removed.stories).to.equal(0);
 		});
 
-		cy.then(() => getUserStoriesViaApi(authorToken, userIdFromToken(authorToken)))
+		cy.then(() => getUserStoriesViaApi(authorSession, userIdFromSession(authorSession)))
 			.its('stories')
 			.should('have.length', 1);
 	});

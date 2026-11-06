@@ -1,11 +1,11 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession } from '../../support/api';
 
 describe('profile view', () => {
 	const user = buildTestUser();
 	const otherUser = buildTestUser();
 
-	let jwtToken;
+	let session;
 	let ownProfilePath;
 	let otherProfilePath;
 
@@ -13,12 +13,12 @@ describe('profile view', () => {
 		createUserViaApi(user);
 
 		createUserViaApi(otherUser).then((response) => {
-			otherProfilePath = `/user/${userIdFromToken(response.body)}`;
+			otherProfilePath = `/user/${response.body._id}`;
 		});
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			ownProfilePath = `/user/${userIdFromToken(token)}`;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			ownProfilePath = `/user/${userIdFromSession(loggedInSession)}`;
 		});
 	});
 
@@ -28,7 +28,7 @@ describe('profile view', () => {
 	});
 
 	it('shows Edit Profile and the add-post tile on your own profile', () => {
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser(ownProfilePath, session);
 
 		cy.contains('.profile-header .username', user.username).should('be.visible');
 		cy.contains('.profile-action button', 'Edit Profile').should('be.visible');
@@ -36,7 +36,7 @@ describe('profile view', () => {
 	});
 
 	it('shows Follow and no add-post tile on another user profile', () => {
-		visitAsUser(otherProfilePath, jwtToken);
+		visitAsUser(otherProfilePath, session);
 
 		cy.contains('.profile-header .username', otherUser.username).should('be.visible');
 		cy.contains('.profile-action button', 'Follow').should('be.visible');
@@ -45,7 +45,7 @@ describe('profile view', () => {
 
 	it('shows the desktop header and hides the tab bar above the mobile breakpoint', () => {
 		cy.viewport(1440, 900);
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser(ownProfilePath, session);
 
 		cy.get('.header-wrapper').should('be.visible');
 		cy.get('.mobile-top-bar').should('not.be.visible');
@@ -54,7 +54,7 @@ describe('profile view', () => {
 
 	it('shows the mobile top bar and tab bar at 390', () => {
 		cy.viewport(390, 844);
-		visitAsUser(ownProfilePath, jwtToken);
+		visitAsUser(ownProfilePath, session);
 
 		cy.get('.mobile-top-bar').should('be.visible');
 		cy.get('.tab-bar').should('be.visible');

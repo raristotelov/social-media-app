@@ -1,20 +1,20 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession } from '../../support/api';
 
 const NEW_PASSWORD = 'CypressNewPassword2';
 
 describe('change password', () => {
 	const user = buildTestUser();
 
-	let jwtToken;
+	let session;
 	let profilePath;
 
 	before(() => {
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			profilePath = `/user/${userIdFromToken(token)}`;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			profilePath = `/user/${userIdFromSession(loggedInSession)}`;
 		});
 	});
 
@@ -24,7 +24,7 @@ describe('change password', () => {
 
 	const openChangePasswordOnDesktop = () => {
 		cy.viewport(1440, 900);
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		cy.get('.logged-user-avatar').click();
 		cy.contains('.account-menu-row', 'Change password').click();
@@ -42,12 +42,12 @@ describe('change password', () => {
 
 	it('lists Change password between Dark mode and Log out in the account menu', () => {
 		cy.viewport(1440, 900);
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		cy.get('.logged-user-avatar').click();
 
 		cy.get('.account-menu .account-menu-row').then((rows) => {
-			expect([...rows].map((row) => row.textContent)).to.deep.equal(['Profile', 'Dark mode', 'Change password', 'Log out']);
+			expect([...rows].map((row) => row.textContent)).to.deep.equal(['Profile', 'Notifications', 'Dark mode', 'Change password', 'Log out']);
 		});
 	});
 
@@ -111,7 +111,7 @@ describe('change password', () => {
 
 	it('opens the same form from the bottom sheet on mobile', () => {
 		cy.viewport(390, 844);
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		cy.get('.mobile-top-bar-action[aria-label="Account menu"]').click();
 		cy.contains('.account-menu-sheet .account-menu-row', 'Change password').click();

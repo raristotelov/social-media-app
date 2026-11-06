@@ -9,12 +9,14 @@ const useStoryTray = () => {
 	const [isLoaded, setIsLoaded] = useState(false);
 	const [reloadCount, setReloadCount] = useState(0);
 
-	const { jwtToken, endSession } = useContext(LoggedInUserContext);
+	const { loggedInUser, endSession } = useContext(LoggedInUserContext);
+
+	const loggedInUserId = loggedInUser?._id;
 
 	useEffect(() => {
 		let isCurrentRequest = true;
 
-		getStoryTray({ jwtToken })
+		getStoryTray()
 			.then((result) => {
 				if (isCurrentRequest) {
 					setEntries(result);
@@ -30,7 +32,7 @@ const useStoryTray = () => {
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [jwtToken, endSession, reloadCount]);
+	}, [loggedInUserId, endSession, reloadCount]);
 
 	const reload = useCallback(() => {
 		setReloadCount((count) => count + 1);

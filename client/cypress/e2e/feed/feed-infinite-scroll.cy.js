@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, followUserViaApi, loginViaApi, uploadPostViaApi, userIdFromToken, visitAsUser } from '../../support/api';
+import { createUserViaApi, followUserViaApi, loginViaApi, uploadPostViaApi, userIdFromSession, visitAsUser } from '../../support/api';
 
 const FEED_PATH = '/user-feed';
 const FIRST_PAGE_SIZE = 30;
@@ -35,25 +35,25 @@ describe('feed infinite scroll', () => {
 	const viewer = buildTestUser();
 	const author = buildTestUser();
 
-	let viewerToken;
-	let authorToken;
+	let viewerSession;
+	let authorSession;
 
 	before(() => {
 		createUserViaApi(viewer);
 		createUserViaApi(author);
 
-		loginViaApi(viewer).then((token) => {
-			viewerToken = token;
+		loginViaApi(viewer).then((session) => {
+			viewerSession = session;
 		});
 
-		loginViaApi(author).then((token) => {
-			authorToken = token;
+		loginViaApi(author).then((session) => {
+			authorSession = session;
 		});
 
-		cy.then(() => followUserViaApi(viewerToken, userIdFromToken(authorToken)));
+		cy.then(() => followUserViaApi(viewerSession, userIdFromSession(authorSession)));
 
 		Cypress._.times(POST_COUNT, (index) => {
-			cy.then(() => uploadPostViaApi(authorToken, `scroll post ${index + 1}`));
+			cy.then(() => uploadPostViaApi(authorSession, `scroll post ${index + 1}`));
 		});
 	});
 
@@ -70,7 +70,7 @@ describe('feed infinite scroll', () => {
 	});
 
 	it('shows the first 30 posts and asks for no more until the reader scrolls', () => {
-		visitAsUser(FEED_PATH, viewerToken);
+		visitAsUser(FEED_PATH, viewerSession);
 
 		cy.get('.user-post').should('have.length', FIRST_PAGE_SIZE);
 		cy.get('.user-post').first().invoke('text').should('match', captionPattern(POST_COUNT));
@@ -79,7 +79,7 @@ describe('feed infinite scroll', () => {
 	});
 
 	it('asks for the first page without a cursor and is told there is more', () => {
-		visitAsUser(FEED_PATH, viewerToken);
+		visitAsUser(FEED_PATH, viewerSession);
 
 		cy.wait('@feed').then(({ request, response }) => {
 			expect(request.url).to.not.include('cursor=');
@@ -90,7 +90,7 @@ describe('feed infinite scroll', () => {
 	});
 
 	it('loads the rest when the reader scrolls to the bottom: newest first, no duplicate, no gap', () => {
-		visitAsUser(FEED_PATH, viewerToken);
+		visitAsUser(FEED_PATH, viewerSession);
 
 		cy.get('.user-post').should('have.length', FIRST_PAGE_SIZE);
 		cy.scrollTo('bottom');
@@ -109,7 +109,7 @@ describe('feed infinite scroll', () => {
 	});
 
 	it('asks for nothing after the last page, however much the reader scrolls', () => {
-		visitAsUser(FEED_PATH, viewerToken);
+		visitAsUser(FEED_PATH, viewerSession);
 
 		cy.get('.user-post').should('have.length', FIRST_PAGE_SIZE);
 		cy.scrollTo('bottom');
@@ -126,7 +126,7 @@ describe('feed infinite scroll', () => {
 			{ statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } },
 		).as('failedMore');
 
-		visitAsUser(FEED_PATH, viewerToken);
+		visitAsUser(FEED_PATH, viewerSession);
 
 		cy.get('.user-post').should('have.length', FIRST_PAGE_SIZE);
 		cy.scrollTo('bottom');
@@ -144,7 +144,7 @@ describe('feed infinite scroll', () => {
 
 	it('loads more on scroll at 390 too, with the suggestions carousel staying after the 5th post', () => {
 		cy.viewport(390, 844);
-		visitAsUser(FEED_PATH, viewerToken);
+		visitAsUser(FEED_PATH, viewerSession);
 
 		cy.get('.user-post').should('have.length', FIRST_PAGE_SIZE);
 		cy.get('.suggestions-carousel').should('have.length', 1);
@@ -159,11 +159,11 @@ describe('feed infinite scroll', () => {
 	});
 
 	it('does not repeat or lose a post when a new one arrives between two pages', () => {
-		visitAsUser(FEED_PATH, viewerToken);
+		visitAsUser(FEED_PATH, viewerSession);
 
 		cy.get('.user-post').should('have.length', FIRST_PAGE_SIZE);
 
-		cy.then(() => uploadPostViaApi(authorToken, 'scroll arrival'));
+		cy.then(() => uploadPostViaApi(authorSession, 'scroll arrival'));
 
 		cy.scrollTo('bottom');
 

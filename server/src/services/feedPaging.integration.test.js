@@ -94,7 +94,7 @@ describe('the paged feed against a real database', () => {
 
 	const request = (path, as) =>
 		fetch(`${baseUrl}${path}`, {
-			headers: as ? { 'X-Authorization': JWT.sign({ userId: String(as._id), username: as.username }, JWT_SECRET) } : {},
+			headers: as ? { Cookie: `${constants.AUTH_COOKIE_NAME}=${JWT.sign({ userId: String(as._id), username: as.username }, JWT_SECRET)}` } : {},
 		});
 
 	beforeAll(async () => {

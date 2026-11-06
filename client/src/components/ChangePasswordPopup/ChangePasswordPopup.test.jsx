@@ -13,7 +13,7 @@ jest.mock('../../services/userService');
 
 const renderPopup = ({ onClose = jest.fn(), endSession = jest.fn() } = {}) => {
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', endSession }}>
+		<LoggedInUserContext.Provider value={{ endSession }}>
 			<ToastProvider>
 				<ChangePasswordPopup onClose={onClose} />
 			</ToastProvider>
@@ -48,7 +48,7 @@ describe('ChangePasswordPopup', () => {
 		fillAndSave();
 
 		await waitFor(() => expect(changePassword).toHaveBeenCalledTimes(1));
-		expect(changePassword).toHaveBeenCalledWith({ jwtToken: 'token123', currentPassword: 'oldPassword1', newPassword: 'newPassword1' });
+		expect(changePassword).toHaveBeenCalledWith({ currentPassword: 'oldPassword1', newPassword: 'newPassword1' });
 	});
 
 	it('closes and shows the "Password changed" success toast on success', async () => {

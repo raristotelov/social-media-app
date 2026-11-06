@@ -23,7 +23,7 @@ const savedStory = { _id: 'story1' };
 
 const renderCreatePopup = ({ initialMode, onPostAdded = jest.fn(), onStoryAdded = jest.fn(), onClose = jest.fn(), endSession = jest.fn() } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', endSession }}>
+		<LoggedInUserContext.Provider value={{ endSession }}>
 			<CreatePopup initialMode={initialMode} onClose={onClose} onPostAdded={onPostAdded} onStoryAdded={onStoryAdded} />
 		</LoggedInUserContext.Provider>,
 	);
@@ -150,7 +150,7 @@ describe('CreatePopup', () => {
 
 			await waitFor(() => expect(onPostAdded).toHaveBeenCalledWith(savedPost));
 			expect(resizeImage).toHaveBeenCalledWith(chosenFile);
-			expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Sunset' }, 'token123');
+			expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Sunset' });
 		});
 
 		it('closes the popup after the post is saved', async () => {
@@ -182,14 +182,14 @@ describe('CreatePopup', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onPostAdded).toHaveBeenCalled());
-			expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Sunset' }, 'token123');
+			expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Sunset' });
 		});
 
 		it('does not need an onPostAdded handler', async () => {
 			const onClose = jest.fn();
 
 			render(
-				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', endSession: jest.fn() }}>
+				<LoggedInUserContext.Provider value={{ endSession: jest.fn() }}>
 					<CreatePopup initialMode='post' onClose={onClose} />
 				</LoggedInUserContext.Provider>,
 			);
@@ -244,7 +244,7 @@ describe('CreatePopup', () => {
 
 			await waitFor(() => expect(onStoryAdded).toHaveBeenCalledWith(savedStory));
 			expect(resizeImage).toHaveBeenCalledWith(chosenFile);
-			expect(addStory).toHaveBeenCalledWith({ image: resizedFile }, 'token123');
+			expect(addStory).toHaveBeenCalledWith({ image: resizedFile });
 		});
 
 		it('closes the popup after the story is saved', async () => {
@@ -275,7 +275,7 @@ describe('CreatePopup', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onStoryAdded).toHaveBeenCalled());
-			expect(addStory).toHaveBeenCalledWith({ image: resizedFile }, 'token123');
+			expect(addStory).toHaveBeenCalledWith({ image: resizedFile });
 			expect(addUserPost).not.toHaveBeenCalled();
 		});
 

@@ -33,8 +33,8 @@ const NOTICE_DISMISSED_KEY = 'demo-notice-dismissed';
 const demoVisitor = { _id: 'visitor1', username: 'john_demo_2', accountType: 'demo' };
 const regularUser = { _id: 'user1', username: 'johndoe', accountType: 'user' };
 
-const buildUi = ({ jwtToken, loggedInUser, setJwtToken, showToast }) => (
-	<LoggedInUserContext.Provider value={{ jwtToken, loggedInUser, setJwtToken }}>
+const buildUi = ({ loggedInUser, setLoggedInUser, showToast }) => (
+	<LoggedInUserContext.Provider value={{ loggedInUser, setLoggedInUser }}>
 		<ToastContext.Provider value={{ showToast }}>
 			<MemoryRouter>
 				<DemoStrip />
@@ -43,14 +43,14 @@ const buildUi = ({ jwtToken, loggedInUser, setJwtToken, showToast }) => (
 	</LoggedInUserContext.Provider>
 );
 
-const renderStrip = ({ jwtToken = null, loggedInUser, setJwtToken = jest.fn(), showToast = jest.fn() } = {}) => {
-	const context = { jwtToken, loggedInUser, setJwtToken, showToast };
+const renderStrip = ({ loggedInUser = null, setLoggedInUser = jest.fn(), showToast = jest.fn() } = {}) => {
+	const context = { loggedInUser, setLoggedInUser, showToast };
 	const result = render(buildUi(context));
 
-	return { ...result, context, setJwtToken, showToast };
+	return { ...result, context, setLoggedInUser, showToast };
 };
 
-const renderDemoVisitorStrip = (overrides = {}) => renderStrip({ jwtToken: 'demoToken', loggedInUser: demoVisitor, ...overrides });
+const renderDemoVisitorStrip = (overrides = {}) => renderStrip({ loggedInUser: demoVisitor, ...overrides });
 
 describe('DemoStrip', () => {
 	beforeEach(() => {
@@ -95,12 +95,6 @@ describe('DemoStrip', () => {
 			renderStrip();
 
 			expect(screen.queryByText(NOTICE_LEAD)).not.toBeInTheDocument();
-		});
-
-		it('should show the strip when a logged-in user object is present but there is no token', () => {
-			renderStrip({ jwtToken: null, loggedInUser: demoVisitor });
-
-			expect(screen.getByText(GUEST_COPY)).toBeInTheDocument();
 		});
 
 		describe('closing the strip', () => {
@@ -159,7 +153,7 @@ describe('DemoStrip', () => {
 
 		describe('trying the demo', () => {
 			it('should request a demo account', async () => {
-				demoLogin.mockResolvedValue('demoJwt');
+				demoLogin.mockResolvedValue(demoVisitor);
 
 				renderStrip();
 
@@ -168,18 +162,31 @@ describe('DemoStrip', () => {
 				await waitFor(() => expect(demoLogin).toHaveBeenCalledTimes(1));
 			});
 
-			it('should log in with the token the server returns', async () => {
-				demoLogin.mockResolvedValue('demoJwt');
+			it('should log in with the user the server returns', async () => {
+				demoLogin.mockResolvedValue(demoVisitor);
 
-				const { setJwtToken } = renderStrip();
+				const { setLoggedInUser } = renderStrip();
 
 				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
 
-				await waitFor(() => expect(setJwtToken).toHaveBeenCalledWith('demoJwt'));
+				await waitFor(() => expect(setLoggedInUser).toHaveBeenCalledWith(demoVisitor));
+			});
+
+			it('should keep no token in local storage or session storage', async () => {
+				demoLogin.mockResolvedValue(demoVisitor);
+
+				renderStrip();
+
+				userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
+
+				await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+
+				expect(Object.keys(localStorage).filter((key) => /jwt|token/i.test(key))).toEqual([]);
+				expect(Object.keys(sessionStorage).filter((key) => /jwt|token/i.test(key))).toEqual([]);
 			});
 
 			it('should go to the feed, replacing the guest page in the history', async () => {
-				demoLogin.mockResolvedValue('demoJwt');
+				demoLogin.mockResolvedValue(demoVisitor);
 
 				renderStrip();
 
@@ -189,7 +196,7 @@ describe('DemoStrip', () => {
 			});
 
 			it('should not ask for any form input or credentials', async () => {
-				demoLogin.mockResolvedValue('demoJwt');
+				demoLogin.mockResolvedValue(demoVisitor);
 
 				renderStrip();
 
@@ -216,7 +223,7 @@ describe('DemoStrip', () => {
 				expect(busyButton).toBeDisabled();
 				expect(screen.queryByRole('button', { name: 'Try the demo' })).not.toBeInTheDocument();
 
-				resolveRequest('demoJwt');
+				resolveRequest(demoVisitor);
 
 				await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
 			});
@@ -237,7 +244,7 @@ describe('DemoStrip', () => {
 
 				expect(demoLogin).toHaveBeenCalledTimes(1);
 
-				resolveRequest('demoJwt');
+				resolveRequest(demoVisitor);
 
 				await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
 			});
@@ -299,13 +306,13 @@ describe('DemoStrip', () => {
 				it('should not log in or navigate', async () => {
 					demoLogin.mockRejectedValue({ status: 500, code: 'INTERNAL_ERROR' });
 
-					const { setJwtToken, showToast } = renderStrip();
+					const { setLoggedInUser, showToast } = renderStrip();
 
 					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
 
 					await waitFor(() => expect(showToast).toHaveBeenCalled());
 
-					expect(setJwtToken).not.toHaveBeenCalled();
+					expect(setLoggedInUser).not.toHaveBeenCalled();
 					expect(mockNavigate).not.toHaveBeenCalled();
 				});
 
@@ -334,9 +341,9 @@ describe('DemoStrip', () => {
 				});
 
 				it('should allow a second attempt that succeeds', async () => {
-					demoLogin.mockRejectedValueOnce({ status: 500, code: 'INTERNAL_ERROR' }).mockResolvedValueOnce('demoJwt');
+					demoLogin.mockRejectedValueOnce({ status: 500, code: 'INTERNAL_ERROR' }).mockResolvedValueOnce(demoVisitor);
 
-					const { setJwtToken, showToast } = renderStrip();
+					const { setLoggedInUser, showToast } = renderStrip();
 
 					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
 
@@ -344,7 +351,7 @@ describe('DemoStrip', () => {
 
 					userEvent.click(screen.getByRole('button', { name: 'Try the demo' }));
 
-					await waitFor(() => expect(setJwtToken).toHaveBeenCalledWith('demoJwt'));
+					await waitFor(() => expect(setLoggedInUser).toHaveBeenCalledWith(demoVisitor));
 				});
 			});
 		});
@@ -441,38 +448,33 @@ describe('DemoStrip', () => {
 			expect(screen.getByText(GUEST_COPY)).toBeInTheDocument();
 		});
 
-		it('should show the notice once the profile of the visitor has loaded after the token', () => {
-			const { rerender, context } = renderStrip({ jwtToken: 'demoToken', loggedInUser: undefined });
+		it('should swap the guest invitation for the notice once the visitor is logged in', () => {
+			const { rerender, context } = renderStrip({ loggedInUser: null });
 
-			expect(screen.queryByText(NOTICE_LEAD)).not.toBeInTheDocument();
+			expect(screen.getByText(GUEST_COPY)).toBeInTheDocument();
 
 			rerender(buildUi({ ...context, loggedInUser: demoVisitor }));
 
 			expect(screen.getByText(NOTICE_LEAD)).toBeInTheDocument();
+			expect(screen.queryByText(GUEST_COPY)).not.toBeInTheDocument();
 		});
 	});
 
 	describe('for a logged-in regular user', () => {
 		it('should render nothing', () => {
-			const { container } = renderStrip({ jwtToken: 'token123', loggedInUser: regularUser });
+			const { container } = renderStrip({ loggedInUser: regularUser });
 
 			expect(container).toBeEmptyDOMElement();
 		});
 
 		it('should render nothing for an account of the persona type', () => {
-			const { container } = renderStrip({ jwtToken: 'token123', loggedInUser: { ...regularUser, accountType: 'persona' } });
-
-			expect(container).toBeEmptyDOMElement();
-		});
-
-		it('should render nothing while the profile has not loaded yet', () => {
-			const { container } = renderStrip({ jwtToken: 'token123', loggedInUser: undefined });
+			const { container } = renderStrip({ loggedInUser: { ...regularUser, accountType: 'persona' } });
 
 			expect(container).toBeEmptyDOMElement();
 		});
 
 		it('should render nothing for a user whose profile has no account type', () => {
-			const { container } = renderStrip({ jwtToken: 'token123', loggedInUser: { _id: 'user1', username: 'johndoe' } });
+			const { container } = renderStrip({ loggedInUser: { _id: 'user1', username: 'johndoe' } });
 
 			expect(container).toBeEmptyDOMElement();
 		});

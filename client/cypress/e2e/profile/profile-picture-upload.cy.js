@@ -1,11 +1,11 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, getProfileViaApi } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession, getProfileViaApi } from '../../support/api';
 
 const FIXTURE_IMAGE = 'cypress/fixtures/test-image.png';
 
 describe('profile picture upload', () => {
 	let user;
-	let jwtToken;
+	let session;
 	let userId;
 	let profilePath;
 
@@ -23,9 +23,9 @@ describe('profile picture upload', () => {
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 			profilePath = `/user/${userId}`;
 		});
 
@@ -37,7 +37,7 @@ describe('profile picture upload', () => {
 	});
 
 	it('uploads a picture through the server and shows it on the profile', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
@@ -60,7 +60,7 @@ describe('profile picture upload', () => {
 	});
 
 	it('keeps the picture after a refresh', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openEditProfile();
 
 		fileInput().selectFile(FIXTURE_IMAGE, { force: true });

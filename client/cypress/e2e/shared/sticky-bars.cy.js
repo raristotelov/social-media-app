@@ -1,5 +1,5 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser } from '../../support/api';
+import { createUserViaApi, loginViaApi, setSessionCookie, visitAsUser } from '../../support/api';
 
 const STRIP = '.demo-strip';
 const GRID_PATH = '/popular-posts';
@@ -70,6 +70,19 @@ const visitWithSessionFlags = (path, flags) =>
 	});
 
 const stubAsDemoVisitor = () => {
+	cy.intercept({ method: 'GET', pathname: '/users/me' }, (request) => {
+		delete request.headers['if-none-match'];
+		delete request.headers['if-modified-since'];
+
+		request.continue((response) => {
+			if (response.body && !Array.isArray(response.body)) {
+				response.body = { ...response.body, accountType: 'demo' };
+				delete response.headers.etag;
+				response.headers['cache-control'] = 'no-store';
+			}
+		});
+	});
+
 	cy.intercept({ method: 'GET', pathname: '/users', query: { userIds: '*' } }, (request) => {
 		delete request.headers['if-none-match'];
 		delete request.headers['if-modified-since'];
@@ -127,13 +140,13 @@ const checkTheBarSitsAtTheTopWithoutAStrip = (bar, content) => {
 describe('the strip and the sticky bars', () => {
 	const user = buildTestUser();
 
-	let userToken;
+	let session;
 
 	before(() => {
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			userToken = token;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
 		});
 	});
 
@@ -194,7 +207,7 @@ describe('the strip and the sticky bars', () => {
 
 			describe('for a signed-in user who is not a demo visitor', () => {
 				it('is at the top from the start and stays there while scrolling', () => {
-					visitAsUser(GRID_PATH, userToken);
+					visitAsUser(GRID_PATH, session);
 
 					cy.get('.popular-posts-grid').should('be.visible');
 					checkTheBarSitsAtTheTopWithoutAStrip(header, '.popular-posts-wrapper');
@@ -207,7 +220,7 @@ describe('the strip and the sticky bars', () => {
 				});
 
 				it('sits right under the demo account notice, then stays at the top once the notice scrolls away', () => {
-					visitAsUser(GRID_PATH, userToken);
+					visitAsUser(GRID_PATH, session);
 
 					cy.contains(STRIP, /demo account/i).should('exist');
 					cy.get('.popular-posts-grid').should('be.visible');
@@ -215,7 +228,7 @@ describe('the strip and the sticky bars', () => {
 				});
 
 				it('moves to the top at once when the notice is closed', () => {
-					visitAsUser(GRID_PATH, userToken);
+					visitAsUser(GRID_PATH, session);
 					cy.contains(STRIP, /demo account/i).should('exist');
 
 					cy.get('.demo-strip-close').click();
@@ -225,7 +238,7 @@ describe('the strip and the sticky bars', () => {
 				});
 
 				it('stays at the top after the notice was closed and the page reloads', () => {
-					visitAsUser(GRID_PATH, userToken);
+					visitAsUser(GRID_PATH, session);
 					cy.get('.demo-strip-close').click();
 					cy.reload();
 
@@ -234,9 +247,9 @@ describe('the strip and the sticky bars', () => {
 				});
 
 				it('is at the top from the start in a tab where the notice was closed earlier', () => {
+					setSessionCookie(session.value);
 					cy.visit(GRID_PATH, {
 						onBeforeLoad: (win) => {
-							win.localStorage.setItem('jwt-token', JSON.stringify(userToken));
 							win.sessionStorage.setItem(NOTICE_DISMISSED_KEY, 'true');
 						},
 					});
@@ -273,7 +286,7 @@ describe('the strip and the sticky bars', () => {
 			});
 
 			it('is at the top from the start for a signed-in user', () => {
-				visitAsUser(POSTS_PATH, userToken);
+				visitAsUser(POSTS_PATH, session);
 
 				cy.get('.posts-bar').should('be.visible');
 				cy.get('.profile-posts-list .user-post').should('have.length.greaterThan', 0);

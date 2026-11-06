@@ -65,7 +65,7 @@ const otherUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderProfileRoutes = ({ entries = ['/user/user2/posts#post2'], initialIndex, user = otherUser, endSession = jest.fn() } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, updateLoggedInUser: jest.fn(), endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: jest.fn(), endSession }}>
 			<ToastProvider>
 				<NotFoundProvider>
 					<MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
@@ -166,7 +166,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			expect(getUsersProfileData).toHaveBeenCalledTimes(1);
-			expect(getUsersProfileData).toHaveBeenCalledWith({ userIds: ['user2'], jwtToken: 'token123' });
+			expect(getUsersProfileData).toHaveBeenCalledWith({ userIds: ['user2'] });
 		});
 
 		it('opens at the post named by the hash', async () => {
@@ -454,9 +454,7 @@ describe('ProfilePostsView', () => {
 			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
 			userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-			await waitFor(() =>
-				expect(updateUserPostCaption).toHaveBeenCalledWith({ userPostId: 'post2', caption: 'Edited caption', jwtToken: 'token123' }),
-			);
+			await waitFor(() => expect(updateUserPostCaption).toHaveBeenCalledWith({ userPostId: 'post2', caption: 'Edited caption' }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Picture' })).not.toBeInTheDocument());
 			expect(document.getElementById('post2').querySelector('.post-caption')).toHaveTextContent('Edited caption');
 		});
@@ -503,7 +501,7 @@ describe('ProfilePostsView', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(getRenderedPostIds()).toEqual(['post3', 'post1']));
-			expect(deleteUserPost).toHaveBeenCalledWith({ userPostId: 'post2', jwtToken: 'token123' });
+			expect(deleteUserPost).toHaveBeenCalledWith({ userPostId: 'post2' });
 		});
 
 		it('shows the deleted post gone from the grid as well', async () => {
@@ -605,11 +603,11 @@ describe('ProfilePostsView', () => {
 	});
 
 	describe('as a guest', () => {
-		it('loads and shows the posts without a token', async () => {
+		it('loads and shows the posts with the same request as a logged-in user', async () => {
 			renderProfileRoutes({ user: null });
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
-			expect(getUsersProfileData).toHaveBeenCalledWith({ userIds: ['user2'], jwtToken: null });
+			expect(getUsersProfileData).toHaveBeenCalledWith({ userIds: ['user2'] });
 		});
 
 		it('shows the like control and the comment box on every post', async () => {

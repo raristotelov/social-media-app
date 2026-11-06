@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
 import useSessionGuard from '../../hooks/useSessionGuard';
 import { deleteStory, getUserStories, markStoryViewed } from '../../services/storyService';
@@ -41,7 +40,6 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 	const viewedStoryIdsRef = useRef(new Set());
 	const startTargetRef = useRef(STORY_START_TARGETS.FIRST_UNWATCHED);
 
-	const { jwtToken } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 	const { endSessionIfUnauthenticated } = useSessionGuard();
 
@@ -118,7 +116,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 
 		let isCurrentRequest = true;
 
-		getUserStories({ userId, jwtToken })
+		getUserStories({ userId })
 			.then((result) => {
 				if (!isCurrentRequest) {
 					return;
@@ -148,7 +146,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [userId, isUserLoaded, jwtToken, endSessionIfUnauthenticated, showToast, onClose]);
+	}, [userId, isUserLoaded, endSessionIfUnauthenticated, showToast, onClose]);
 
 	useEffect(() => {
 		if (userStories && storyIndex >= userStories.length) {
@@ -165,7 +163,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 
 		viewedStoryIdsRef.current.add(currentStoryId);
 
-		markStoryViewed({ storyId: currentStoryId, jwtToken }).catch(endSessionIfUnauthenticated);
+		markStoryViewed({ storyId: currentStoryId }).catch(endSessionIfUnauthenticated);
 	};
 
 	useEffect(() => {
@@ -220,7 +218,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		setIsDeleting(true);
 
 		try {
-			await deleteStory({ storyId: currentStoryId, jwtToken });
+			await deleteStory({ storyId: currentStoryId });
 
 			setLoadedStories((state) => ({
 				...state,

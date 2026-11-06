@@ -52,7 +52,7 @@ const renderPopup = ({
 	endSession = jest.fn(),
 } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={[entry]}>
 					<CommentsPopup userPostId='post1' onClose={onClose} onCommentsLoaded={onCommentsLoaded} />
@@ -107,7 +107,7 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			expect(getComments).toHaveBeenCalledWith({ userPostId: 'post1', jwtToken: 'token123' });
+			expect(getComments).toHaveBeenCalledWith({ userPostId: 'post1' });
 		});
 
 		it('shows a spinner while the comments load', async () => {
@@ -237,7 +237,7 @@ describe('CommentsPopup', () => {
 			userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
 			userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
-			await waitFor(() => expect(addComment).toHaveBeenCalledWith({ userPostId: 'post1', text: 'Nice shot', jwtToken: 'token123' }));
+			await waitFor(() => expect(addComment).toHaveBeenCalledWith({ userPostId: 'post1', text: 'Nice shot' }));
 		});
 
 		it('reloads the comments and shows the new one', async () => {
@@ -441,7 +441,7 @@ describe('CommentsPopup', () => {
 			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
 
 			expect(await screen.findByText('3 likes')).toBeInTheDocument();
-			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1', jwtToken: 'token123' });
+			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1' });
 		});
 
 		describe('when the like is saved but the reload fails', () => {
@@ -519,7 +519,7 @@ describe('CommentsPopup', () => {
 
 				await waitFor(() => expect(getReplyLikeLabels()).toEqual(['1 like']));
 				expect(getTopLevelLikeLabels()).toEqual(['0 likes']);
-				expect(likeComment).toHaveBeenCalledWith({ commentId: 'r1', jwtToken: 'token123' });
+				expect(likeComment).toHaveBeenCalledWith({ commentId: 'r1' });
 			});
 
 			it('reports the locally updated list to the post card', async () => {
@@ -709,13 +709,13 @@ describe('CommentsPopup', () => {
 	});
 
 	describe('as a guest', () => {
-		it('lets the guest read every comment, requesting them without a token', async () => {
+		it('lets the guest read every comment, with the same request as a member', async () => {
 			getComments.mockResolvedValue(topComments);
 			renderPopup({ user: null });
 
 			expect(await screen.findByText('Most liked comment')).toBeInTheDocument();
 			expect(screen.getByText('Newest comment')).toBeInTheDocument();
-			expect(getComments).toHaveBeenCalledWith({ userPostId: 'post1', jwtToken: null });
+			expect(getComments).toHaveBeenCalledWith({ userPostId: 'post1' });
 		});
 
 		it('sends the guest to /log-in with the same URL, hash included, when the comment box is clicked', async () => {
@@ -909,7 +909,6 @@ describe('CommentsPopup', () => {
 					text: '@alice Thanks',
 					parentCommentId: 'c1',
 					mentionedUserId: 'user3',
-					jwtToken: 'token123',
 				});
 			});
 
@@ -997,7 +996,6 @@ describe('CommentsPopup', () => {
 					text: '@bob Agreed',
 					parentCommentId: 'c1',
 					mentionedUserId: 'user4',
-					jwtToken: 'token123',
 				}),
 			);
 		});
@@ -1064,7 +1062,7 @@ describe('CommentsPopup', () => {
 			await openLikes();
 
 			expect(getCommentLikes).toHaveBeenCalledTimes(1);
-			expect(getCommentLikes).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'c1', jwtToken: 'token123' }));
+			expect(getCommentLikes).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'c1' }));
 		});
 
 		it('shows a comment with no likes as plain text, so only comments with likes open a list', async () => {

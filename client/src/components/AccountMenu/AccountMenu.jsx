@@ -12,7 +12,7 @@ import BottomSheetHandle from '../BottomSheetHandle/BottomSheetHandle';
 import './AccountMenu.css';
 
 const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, onNotificationsClick, className = '', isBottomSheet = false }) => {
-	const { loggedInUser, jwtToken, updateLoggedInUser } = useContext(LoggedInUserContext);
+	const { loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
 	const { unreadCount } = useContext(NotificationsContext);
 	const menuRef = useRef(null);
 	const bottomSheetDragProps = useBottomSheetDrag(onClose);
@@ -52,7 +52,6 @@ const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, on
 	const toggleTheme = async () => {
 		const updatedUser = await updateUserProfileData({
 			userId: loggedInUser._id,
-			jwtToken,
 			updatedProfileData: { theme: isDark ? 'light' : 'dark' },
 		});
 

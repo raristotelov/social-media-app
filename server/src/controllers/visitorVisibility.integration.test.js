@@ -9,6 +9,7 @@ const StoryViewModel = require('../models/storyViewModel');
 const UserModel = require('../models/userModel');
 const UserPostModel = require('../models/userPostModel');
 const { ERROR_CODES } = require('../config/errorCodes');
+const constants = require('../config/constants');
 
 jest.mock('../demo/userReactions', () => ({
 	reactToSignUp: jest.fn(),
@@ -38,7 +39,7 @@ describe('visitor visibility against a real database', () => {
 		fetch(`${baseUrl}${path}`, {
 			method,
 			headers: {
-				...(as ? { 'X-Authorization': JWT.sign({ userId: String(as._id), username: as.username }, JWT_SECRET) } : {}),
+				...(as ? { Cookie: `${constants.AUTH_COOKIE_NAME}=${JWT.sign({ userId: String(as._id), username: as.username }, JWT_SECRET)}` } : {}),
 				...(body ? { 'Content-Type': 'application/json' } : {}),
 			},
 			body: body ? JSON.stringify(body) : undefined,

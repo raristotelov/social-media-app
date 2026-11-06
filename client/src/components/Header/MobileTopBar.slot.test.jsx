@@ -15,7 +15,7 @@ const loggedInUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderTopBar = (path, user = loggedInUser) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user }}>
 			<NotFoundContext.Provider value={{ isNotFound: false, setIsNotFound: jest.fn() }}>
 				<ToastContext.Provider value={{ showToast: jest.fn() }}>
 					<MemoryRouter initialEntries={[path]}>

@@ -1,9 +1,11 @@
 import { buildTestUser } from '../../support/testUser';
 import {
 	serverUrl,
+	authHeaders,
+	cookieHeader,
 	createUserViaApi,
 	loginViaApi,
-	userIdFromToken,
+	userIdFromSession,
 	uploadPostViaApi,
 	uploadProfilePictureViaApi,
 	getProfileViaApi,
@@ -20,9 +22,9 @@ describe('profile access', () => {
 	const attacker = buildTestUser();
 	const target = buildTestUser();
 
-	let ownerToken;
-	let attackerToken;
-	let targetToken;
+	let ownerSession;
+	let attackerSession;
+	let targetSession;
 	let ownerId;
 	let attackerId;
 	let targetId;
@@ -32,22 +34,22 @@ describe('profile access', () => {
 		createUserViaApi(attacker);
 		createUserViaApi(target);
 
-		loginViaApi(owner).then((token) => {
-			ownerToken = token;
-			ownerId = userIdFromToken(token);
+		loginViaApi(owner).then((session) => {
+			ownerSession = session;
+			ownerId = userIdFromSession(session);
 		});
 
-		loginViaApi(attacker).then((token) => {
-			attackerToken = token;
-			attackerId = userIdFromToken(token);
+		loginViaApi(attacker).then((session) => {
+			attackerSession = session;
+			attackerId = userIdFromSession(session);
 		});
 
-		loginViaApi(target).then((token) => {
-			targetToken = token;
-			targetId = userIdFromToken(token);
+		loginViaApi(target).then((session) => {
+			targetSession = session;
+			targetId = userIdFromSession(session);
 		});
 
-		cy.then(() => uploadPostViaApi(targetToken, 'A post by the target'));
+		cy.then(() => uploadPostViaApi(targetSession, 'A post by the target'));
 	});
 
 	after(() => {
@@ -63,7 +65,7 @@ describe('profile access', () => {
 		};
 
 		it("rejects updating another user's profile and leaves it unchanged", () => {
-			cy.then(() => updateProfileViaApi(attackerToken, ownerId, { bio: 'Hijacked' }, false)).then(expectProfileForbidden);
+			cy.then(() => updateProfileViaApi(attackerSession, ownerId, { bio: 'Hijacked' }, false)).then(expectProfileForbidden);
 
 			cy.then(() => getProfileViaApi(ownerId)).then((profile) => {
 				expect(profile.bio).not.to.eq('Hijacked');
@@ -71,7 +73,7 @@ describe('profile access', () => {
 		});
 
 		it('still lets the owner update their own profile', () => {
-			cy.then(() => updateProfileViaApi(ownerToken, ownerId, { bio: 'Written by me' }))
+			cy.then(() => updateProfileViaApi(ownerSession, ownerId, { bio: 'Written by me' }))
 				.its('status')
 				.should('eq', 200);
 
@@ -82,7 +84,7 @@ describe('profile access', () => {
 
 		it('rejects following on behalf of another user and changes no followers', () => {
 			cy.then(() => getProfileViaApi(targetId)).then((before) => {
-				cy.then(() => followUserViaApi(attackerToken, targetId, { actingUserId: ownerId, failOnStatusCode: false })).then(
+				cy.then(() => followUserViaApi(attackerSession, targetId, { actingUserId: ownerId, failOnStatusCode: false })).then(
 					expectProfileForbidden,
 				);
 
@@ -93,9 +95,9 @@ describe('profile access', () => {
 		});
 
 		it('rejects unfollowing on behalf of another user and keeps the follow', () => {
-			cy.then(() => followUserViaApi(ownerToken, targetId));
+			cy.then(() => followUserViaApi(ownerSession, targetId));
 
-			cy.then(() => unfollowUserViaApi(attackerToken, targetId, { actingUserId: ownerId, failOnStatusCode: false })).then(
+			cy.then(() => unfollowUserViaApi(attackerSession, targetId, { actingUserId: ownerId, failOnStatusCode: false })).then(
 				expectProfileForbidden,
 			);
 
@@ -105,7 +107,7 @@ describe('profile access', () => {
 		});
 
 		it('still lets a user follow and unfollow as themselves', () => {
-			cy.then(() => followUserViaApi(attackerToken, targetId))
+			cy.then(() => followUserViaApi(attackerSession, targetId))
 				.its('status')
 				.should('eq', 200);
 
@@ -113,7 +115,7 @@ describe('profile access', () => {
 				expect(profile.followers).to.include(attackerId);
 			});
 
-			cy.then(() => unfollowUserViaApi(attackerToken, targetId))
+			cy.then(() => unfollowUserViaApi(attackerSession, targetId))
 				.its('status')
 				.should('eq', 200);
 
@@ -122,10 +124,11 @@ describe('profile access', () => {
 			});
 		});
 
-		it('answers 401 rather than 403 when there is no token', () => {
+		it('answers 401 rather than 403 when there is no session cookie', () => {
 			cy.request({
 				method: 'PATCH',
 				url: `${serverUrl}/users/update/${ownerId}`,
+				headers: cookieHeader(''),
 				body: { bio: 'Hijacked' },
 				failOnStatusCode: false,
 			})
@@ -135,7 +138,7 @@ describe('profile access', () => {
 	});
 
 	describe('email privacy', () => {
-		const requestProfiles = (userIds, headers = {}) =>
+		const requestProfiles = (userIds, headers = cookieHeader('')) =>
 			cy.request({ method: 'GET', url: `${serverUrl}/users?userIds=${userIds.join(',')}`, headers });
 
 		it('leaves the email out of the response for a guest', () => {
@@ -146,26 +149,26 @@ describe('profile access', () => {
 		});
 
 		it('leaves the email out of the response for another logged-in user', () => {
-			cy.then(() => getProfileViaApi(ownerId, attackerToken)).then((profile) => {
+			cy.then(() => getProfileViaApi(ownerId, attackerSession)).then((profile) => {
 				expect(profile).not.to.have.property('email');
 			});
 		});
 
-		it('leaves the email out of the response when the token is invalid', () => {
-			cy.then(() => requestProfiles([ownerId], { 'X-Authorization': 'not.a.valid.token' })).then((response) => {
+		it('leaves the email out of the response when the session cookie is invalid', () => {
+			cy.then(() => requestProfiles([ownerId], cookieHeader('not.a.valid.token'))).then((response) => {
 				expect(response.status).to.eq(200);
 				expect(response.body[0]).not.to.have.property('email');
 			});
 		});
 
 		it('returns the email to the account owner', () => {
-			cy.then(() => getProfileViaApi(ownerId, ownerToken))
+			cy.then(() => getProfileViaApi(ownerId, ownerSession))
 				.its('email')
 				.should('eq', owner.email);
 		});
 
 		it("returns the email only on the requester's own profile when several profiles are requested", () => {
-			cy.then(() => requestProfiles([ownerId, attackerId], { 'X-Authorization': ownerToken })).then((response) => {
+			cy.then(() => requestProfiles([ownerId, attackerId], authHeaders(ownerSession))).then((response) => {
 				const ownerProfile = response.body.find((profile) => profile._id === ownerId);
 				const attackerProfile = response.body.find((profile) => profile._id === attackerId);
 
@@ -175,9 +178,9 @@ describe('profile access', () => {
 		});
 
 		it('exposes neither the email nor the password hash of followed users in the followed posts', () => {
-			cy.then(() => followUserViaApi(ownerToken, targetId));
+			cy.then(() => followUserViaApi(ownerSession, targetId));
 
-			cy.then(() => getFollowedUsersPostsViaApi(ownerToken)).then((followedPosts) => {
+			cy.then(() => getFollowedUsersPostsViaApi(ownerSession)).then((followedPosts) => {
 				expect(followedPosts).to.have.length.greaterThan(0);
 
 				followedPosts.forEach((post) => {
@@ -191,10 +194,10 @@ describe('profile access', () => {
 
 	describe('followed users posts', () => {
 		it("lists a followed user's posts but not their profile picture", () => {
-			cy.then(() => uploadProfilePictureViaApi(targetToken)).then((picture) => {
-				cy.then(() => followUserViaApi(ownerToken, targetId));
+			cy.then(() => uploadProfilePictureViaApi(targetSession)).then((picture) => {
+				cy.then(() => followUserViaApi(ownerSession, targetId));
 
-				cy.then(() => getFollowedUsersPostsViaApi(ownerToken)).then((followedPosts) => {
+				cy.then(() => getFollowedUsersPostsViaApi(ownerSession)).then((followedPosts) => {
 					const imageUrls = followedPosts.map((post) => post.imageUrl);
 
 					expect(followedPosts).to.have.length(1);
@@ -216,8 +219,8 @@ describe('profile access', () => {
 		};
 
 		beforeEach(() => {
-			cy.then(() => followUserViaApi(attackerToken, targetId));
-			cy.then(() => followUserViaApi(ownerToken, targetId));
+			cy.then(() => followUserViaApi(attackerSession, targetId));
+			cy.then(() => followUserViaApi(ownerSession, targetId));
 		});
 
 		it('returns slim rows with no email to a guest', () => {
@@ -237,18 +240,18 @@ describe('profile access', () => {
 		});
 
 		it('puts the logged-in requester first', () => {
-			cy.then(() => getFollowersViaApi(targetId, attackerToken)).then((rows) => {
+			cy.then(() => getFollowersViaApi(targetId, attackerSession)).then((rows) => {
 				expect(rows[0]._id).to.eq(attackerId);
 				expectSlimRows(rows);
 			});
 
-			cy.then(() => getFollowersViaApi(targetId, ownerToken)).then((rows) => {
+			cy.then(() => getFollowersViaApi(targetId, ownerSession)).then((rows) => {
 				expect(rows[0]._id).to.eq(ownerId);
 			});
 		});
 
 		it('lists the users a profile follows in the following endpoint', () => {
-			cy.then(() => getFollowingViaApi(ownerId, ownerToken)).then((rows) => {
+			cy.then(() => getFollowingViaApi(ownerId, ownerSession)).then((rows) => {
 				expect(rows.map((row) => row._id)).to.include(targetId);
 				expectSlimRows(rows);
 			});

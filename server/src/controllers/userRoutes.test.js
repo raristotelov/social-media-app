@@ -14,6 +14,7 @@ jest.mock('../services', () => ({
 }));
 
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const JWT = require('jsonwebtoken');
 
 const { userService } = require('../services');
@@ -21,6 +22,7 @@ const userController = require('./userController');
 const errorHandler = require('../middlewares/errorHandler');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
+const constants = require('../config/constants');
 
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const OTHER_USER_ID = '64b7f0a1c2d3e4f5a6b7c8d2';
@@ -32,7 +34,8 @@ describe('user routes', () => {
 	let originalJwtSecret;
 	let consoleErrorSpy;
 
-	const authHeaders = (userId = USER_ID) => ({ 'X-Authorization': JWT.sign({ userId, username: 'realuser' }, JWT_SECRET) });
+	const sessionCookie = (token) => ({ Cookie: `${constants.AUTH_COOKIE_NAME}=${token}` });
+	const authHeaders = (userId = USER_ID) => sessionCookie(JWT.sign({ userId, username: 'realuser' }, JWT_SECRET));
 
 	const expectProfileForbidden = async (response) => {
 		expect(response.status).toBe(403);
@@ -45,6 +48,7 @@ describe('user routes', () => {
 
 		const app = express();
 
+		app.use(cookieParser());
 		app.use(express.json());
 		app.use('/users', userController);
 		app.use(errorHandler);
@@ -95,7 +99,7 @@ describe('user routes', () => {
 		});
 
 		it('answers 401 for an invalid token and never calls the service', async () => {
-			const response = await patchPassword({ 'X-Authorization': 'not.a.valid.token' });
+			const response = await patchPassword(sessionCookie('not.a.valid.token'));
 
 			expect(response.status).toBe(401);
 			expect(userService.changePassword).not.toHaveBeenCalled();
@@ -217,7 +221,7 @@ describe('user routes', () => {
 		});
 
 		it('treats an invalid token as a guest instead of rejecting the request', async () => {
-			const response = await getUsers({ 'X-Authorization': 'not.a.valid.token' });
+			const response = await getUsers(sessionCookie('not.a.valid.token'));
 
 			expect(response.status).toBe(200);
 			expect(userService.getUsersProfileDataByUserIds).toHaveBeenCalledWith({ userIds: [USER_ID], requesterId: undefined });
@@ -255,7 +259,7 @@ describe('user routes', () => {
 		});
 
 		it('treats an invalid token as a guest instead of rejecting the request', async () => {
-			const response = await getList({ 'X-Authorization': 'not.a.valid.token' });
+			const response = await getList(sessionCookie('not.a.valid.token'));
 
 			expect(response.status).toBe(200);
 			expect(userService[serviceMethod]).toHaveBeenCalledWith({ userId: USER_ID, requesterId: undefined });

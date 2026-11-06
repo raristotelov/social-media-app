@@ -28,7 +28,9 @@ describe('notification endpoints against a real database', () => {
 	let alice;
 	let bob;
 
-	const authHeaders = (user) => ({ 'X-Authorization': JWT.sign({ userId: String(user._id), username: user.username }, JWT_SECRET) });
+	const authHeaders = (user) => ({
+		Cookie: `${constants.AUTH_COOKIE_NAME}=${JWT.sign({ userId: String(user._id), username: user.username }, JWT_SECRET)}`,
+	});
 
 	const get = (path, user) => fetch(`${baseUrl}${path}`, { headers: user ? authHeaders(user) : {} });
 

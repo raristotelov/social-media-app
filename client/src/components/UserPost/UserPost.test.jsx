@@ -68,7 +68,7 @@ const renderPost = ({
 	showActions,
 } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={[entry]}>
 					<UserPost
@@ -279,7 +279,7 @@ describe('UserPost', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Like post' }));
 
 			await waitFor(() => expect(onPostChange).toHaveBeenCalledWith('post1', { likes: ['user1'] }));
-			expect(likeUserPost).toHaveBeenCalledWith({ userPostToLikeId: 'post1', jwtToken: 'token123' });
+			expect(likeUserPost).toHaveBeenCalledWith({ userPostToLikeId: 'post1' });
 			expect(unlikeUserPost).not.toHaveBeenCalled();
 		});
 
@@ -290,7 +290,7 @@ describe('UserPost', () => {
 			userEvent.click(screen.getByRole('button', { name: 'Unlike post' }));
 
 			await waitFor(() => expect(onPostChange).toHaveBeenCalledWith('post1', { likes: [] }));
-			expect(unlikeUserPost).toHaveBeenCalledWith({ userPostToUnlikeId: 'post1', jwtToken: 'token123' });
+			expect(unlikeUserPost).toHaveBeenCalledWith({ userPostToUnlikeId: 'post1' });
 			expect(likeUserPost).not.toHaveBeenCalled();
 		});
 
@@ -406,7 +406,7 @@ describe('UserPost', () => {
 
 			typeAndPost('Nice shot');
 
-			await waitFor(() => expect(addComment).toHaveBeenCalledWith({ userPostId: 'post1', text: 'Nice shot', jwtToken: 'token123' }));
+			await waitFor(() => expect(addComment).toHaveBeenCalledWith({ userPostId: 'post1', text: 'Nice shot' }));
 		});
 
 		it('raises the comment count by one and adds the comment to the preview', async () => {
@@ -501,7 +501,7 @@ describe('UserPost', () => {
 
 			expect(screen.getByRole('heading', { name: 'Comments' })).toBeInTheDocument();
 			expect(await screen.findByText('Hello there')).toBeInTheDocument();
-			expect(getComments).toHaveBeenCalledWith({ userPostId: 'post1', jwtToken: 'token123' });
+			expect(getComments).toHaveBeenCalledWith({ userPostId: 'post1' });
 		});
 
 		it('closes when its Close button is clicked', async () => {
@@ -582,7 +582,7 @@ describe('UserPost', () => {
 			expect(await screen.findByText('newestliker')).toBeInTheDocument();
 			expect(screen.getByText('olderliker')).toBeInTheDocument();
 			expect(getUserPostLikes).toHaveBeenCalledTimes(1);
-			expect(getUserPostLikes).toHaveBeenCalledWith(expect.objectContaining({ userPostId: 'post1', jwtToken: 'token123' }));
+			expect(getUserPostLikes).toHaveBeenCalledWith(expect.objectContaining({ userPostId: 'post1' }));
 		});
 
 		it('does not toggle the like when the label is clicked', async () => {

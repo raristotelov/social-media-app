@@ -33,6 +33,11 @@ const signAuthToken = ({ _id, username }) =>
 		expiresIn: constants.JWT_EXPIRY,
 	});
 
+const startUserSession = async (user) => ({
+	user: await getCurrentUser(String(user._id)),
+	jwt: signAuthToken(user),
+});
+
 const getNeccessaryUserData = (user, hiddenVisitorIds = []) => {
 	const userObject = {};
 
@@ -87,7 +92,7 @@ const signUp = async ({ email, username, password }) => {
 
 		reactToSignUp(user._id);
 
-		return signAuthToken(user);
+		return await startUserSession(user);
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -107,7 +112,7 @@ const demoLogin = async () => {
 	try {
 		const visitor = await createDemoVisitor();
 
-		return signAuthToken(visitor);
+		return await startUserSession(visitor);
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -135,7 +140,7 @@ const login = async ({ email, password }) => {
 			throw new AppError('Wrong email or password', 401, { code: ERROR_CODES.WRONG_CREDENTIALS });
 		}
 
-		return signAuthToken(dbUser);
+		return await startUserSession(dbUser);
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
@@ -260,6 +265,20 @@ const getUsersProfileDataByUserIds = async ({ userIds: requestedUserIds, request
 		}
 
 		throw new AppError('Could not load users profile data', 500, { cause: error });
+	}
+};
+
+const getCurrentUser = async (userId) => {
+	try {
+		const [currentUser] = await getUsersProfileDataByUserIds({ userIds: [userId], requesterId: userId });
+
+		return currentUser;
+	} catch (error) {
+		if (error instanceof AppError && error.code === ERROR_CODES.USER_NOT_FOUND) {
+			throw new AppError('Unauthorized', 401, { code: ERROR_CODES.UNAUTHENTICATED, cause: error });
+		}
+
+		throw error;
 	}
 };
 
@@ -475,6 +494,7 @@ module.exports = {
 	login,
 	demoLogin,
 	changePassword,
+	getCurrentUser,
 	getUsersProfileDataByUserIds,
 	getUsersProfileDataBySearchWord,
 	getFollowers,

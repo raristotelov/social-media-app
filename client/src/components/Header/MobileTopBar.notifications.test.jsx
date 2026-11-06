@@ -17,7 +17,7 @@ const loggedInUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderTopBarAt = (path, { unreadCount = 0, user = loggedInUser } = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user, endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession: jest.fn() }}>
 			<NotFoundContext.Provider value={{ isNotFound: false, setIsNotFound: jest.fn() }}>
 				<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: jest.fn() }}>
 					<MemoryRouter initialEntries={[path]}>

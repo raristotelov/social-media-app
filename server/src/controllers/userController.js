@@ -8,23 +8,65 @@ const verifyProfileOwner = require('../middlewares/verifyProfileOwner');
 const demoLoginRateLimit = require('../middlewares/demoLoginRateLimit');
 const uploadImage = require('../middlewares/uploadImage');
 const constants = require('../config/constants');
+const { ERROR_CODES } = require('../config/errorCodes');
+const { setAuthCookie, clearAuthCookie } = require('../utils/authCookie');
+
+const startSession = (res, { user, jwt }) => {
+	setAuthCookie(res, jwt);
+
+	return user;
+};
+
+const refreshSession = (res, { user, jwt }) => {
+	setAuthCookie(res, jwt);
+
+	return { user };
+};
 
 router.post('/sign-up', async (req, res) => {
-	const userData = await userService.signUp(req.body);
+	const session = await userService.signUp(req.body);
 
-	return res.json(userData);
+	return res.json(startSession(res, session));
 });
 
 router.post('/login', async (req, res) => {
-	const userData = await userService.login(req.body);
+	const session = await userService.login(req.body);
 
-	return res.json(userData);
+	return res.json(startSession(res, session));
 });
 
 router.post('/demo-login', demoLoginRateLimit, async (req, res) => {
-	const jwt = await userService.demoLogin();
+	const session = await userService.demoLogin();
 
-	return res.json(jwt);
+	return res.json(startSession(res, session));
+});
+
+router.post('/logout', (req, res) => {
+	clearAuthCookie(res);
+
+	return res.sendStatus(204);
+});
+
+const answerGuestWithNull = (req, res, next) => {
+	if (req.cookies?.[constants.AUTH_COOKIE_NAME]) {
+		return next();
+	}
+
+	return res.json(null);
+};
+
+router.get('/me', answerGuestWithNull, verifyJwtToken, async (req, res) => {
+	try {
+		const user = await userService.getCurrentUser(res.userId);
+
+		return res.json(user);
+	} catch (error) {
+		if (error.code === ERROR_CODES.UNAUTHENTICATED) {
+			clearAuthCookie(res);
+		}
+
+		throw error;
+	}
 });
 
 router.patch('/password', verifyJwtToken, async (req, res) => {
@@ -67,7 +109,7 @@ router.patch('/update/:userId', verifyJwtToken, verifyProfileOwner, uploadImage(
 
 	const userAccountData = await userService.updateUserProfileData(userId, req.body, req.file);
 
-	return res.json(userAccountData);
+	return res.json(refreshSession(res, userAccountData));
 });
 
 router.post('/:userId/follow/:userIdToFollow', verifyJwtToken, verifyProfileOwner, async (req, res) => {
@@ -76,7 +118,7 @@ router.post('/:userId/follow/:userIdToFollow', verifyJwtToken, verifyProfileOwne
 
 	const userAccountData = await userService.followUser(userId, userIdToFollow);
 
-	return res.json(userAccountData);
+	return res.json(refreshSession(res, userAccountData));
 });
 
 router.post('/:userId/unfollow/:userIdToUnfollow', verifyJwtToken, verifyProfileOwner, async (req, res) => {
@@ -85,7 +127,7 @@ router.post('/:userId/unfollow/:userIdToUnfollow', verifyJwtToken, verifyProfile
 
 	const userAccountData = await userService.unfollowUser(userId, userIdToUnfollow);
 
-	return res.json(userAccountData);
+	return res.json(refreshSession(res, userAccountData));
 });
 
 module.exports = router;

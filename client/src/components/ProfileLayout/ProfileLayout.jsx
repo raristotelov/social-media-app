@@ -30,7 +30,7 @@ const ProfileLayout = () => {
 	const [reloadCount, setReloadCount] = useState(0);
 	const [profileRequestCount, setProfileRequestCount] = useState(0);
 
-	const { jwtToken, loggedInUser, endSession } = useContext(LoggedInUserContext);
+	const { loggedInUser, endSession } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 	const { runWithSessionGuard } = useSessionGuard();
 
@@ -48,7 +48,7 @@ const ProfileLayout = () => {
 		setIsLoadingProfile(true);
 		setProfileRequestCount((count) => count + 1);
 
-		getUsersProfileData({ userIds: [userId], jwtToken })
+		getUsersProfileData({ userIds: [userId] })
 			.then((result) => {
 				if (!isCurrentRequest) {
 					return;
@@ -91,7 +91,7 @@ const ProfileLayout = () => {
 		return () => {
 			isCurrentRequest = false;
 		};
-	}, [userId, jwtToken, isLoggedInUserProfile, loggedInUser, reloadCount, endSession]);
+	}, [userId, isLoggedInUserProfile, loggedInUser, reloadCount, endSession]);
 
 	const retryProfileLoad = () => {
 		setReloadCount((count) => count + 1);
@@ -103,7 +103,7 @@ const ProfileLayout = () => {
 
 	const editPostHandler = (caption) =>
 		runWithSessionGuard(async () => {
-			const updatedPost = await updateUserPostCaption({ userPostId: postToEdit._id, caption, jwtToken });
+			const updatedPost = await updateUserPostCaption({ userPostId: postToEdit._id, caption });
 
 			setUserPosts((state) => state.map((post) => (isSamePost(post, updatedPost._id) ? { ...post, caption: updatedPost.caption } : post)));
 
@@ -120,7 +120,7 @@ const ProfileLayout = () => {
 		setIsDeletingPost(true);
 
 		try {
-			await deleteUserPost({ userPostId: deletedPostId, jwtToken });
+			await deleteUserPost({ userPostId: deletedPostId });
 
 			setUserPosts((state) => state.filter((post) => !isSamePost(post, deletedPostId)));
 			setUserData((state) => ({ ...state, posts: state.posts.filter((post) => !isSamePost(post, deletedPostId)) }));

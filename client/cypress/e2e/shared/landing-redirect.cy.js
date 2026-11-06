@@ -4,13 +4,13 @@ import { createUserViaApi, loginViaApi, visitAsUser } from '../../support/api';
 describe('landing redirect from /', () => {
 	const user = buildTestUser();
 
-	let userToken;
+	let session;
 
 	before(() => {
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			userToken = token;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
 		});
 	});
 
@@ -26,7 +26,7 @@ describe('landing redirect from /', () => {
 	});
 
 	it('keeps sending a logged-in user to the feed', () => {
-		visitAsUser('/', userToken);
+		visitAsUser('/', session);
 
 		cy.location('pathname').should('eq', '/user-feed');
 	});

@@ -3,15 +3,15 @@ import { createUserViaApi, loginViaApi, uploadPostViaApi, uploadProfilePictureVi
 
 describe('cloudinary teardown', () => {
 	let user;
-	let jwtToken;
+	let session;
 
 	beforeEach(() => {
 		user = buildTestUser();
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
 		});
 	});
 
@@ -23,11 +23,11 @@ describe('cloudinary teardown', () => {
 		let postImageIdentifier;
 		let pictureImageIdentifier;
 
-		cy.then(() => uploadPostViaApi(jwtToken, 'Teardown check')).then((post) => {
+		cy.then(() => uploadPostViaApi(session, 'Teardown check')).then((post) => {
 			postImageIdentifier = post.imageIdentifier;
 		});
 
-		cy.then(() => uploadProfilePictureViaApi(jwtToken)).then((picture) => {
+		cy.then(() => uploadProfilePictureViaApi(session)).then((picture) => {
 			pictureImageIdentifier = picture.imageIdentifier;
 		});
 

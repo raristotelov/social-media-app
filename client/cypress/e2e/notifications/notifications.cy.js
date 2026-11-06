@@ -3,7 +3,7 @@ import {
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	uploadPostViaApi,
 	deletePostViaApi,
 	followUserViaApi,
@@ -32,13 +32,13 @@ describe('notifications', () => {
 	const postCaption = 'a post that gets notifications';
 	const commentText = 'great post';
 
-	let ownerToken;
-	let actorToken;
+	let ownerSession;
+	let actorSession;
 	let ownerId;
 	let actorId;
 	let post;
 
-	const visitFeedAsOwner = () => visitAsUser('/user-feed', ownerToken);
+	const visitFeedAsOwner = () => visitAsUser('/user-feed', ownerSession);
 
 	const visitFeedAsOwnerOnceTheCountLoaded = () => {
 		cy.intercept({ method: 'GET', pathname: '/notifications/unread-count' }).as('unreadCount');
@@ -59,27 +59,27 @@ describe('notifications', () => {
 		createUserViaApi(owner);
 		createUserViaApi(actor);
 
-		loginViaApi(owner).then((token) => {
-			ownerToken = token;
-			ownerId = userIdFromToken(token);
+		loginViaApi(owner).then((session) => {
+			ownerSession = session;
+			ownerId = userIdFromSession(session);
 		});
 
-		loginViaApi(actor).then((token) => {
-			actorToken = token;
-			actorId = userIdFromToken(token);
+		loginViaApi(actor).then((session) => {
+			actorSession = session;
+			actorId = userIdFromSession(session);
 		});
 
-		cy.then(() => uploadPostViaApi(ownerToken, postCaption)).then((uploadedPost) => {
+		cy.then(() => uploadPostViaApi(ownerSession, postCaption)).then((uploadedPost) => {
 			post = uploadedPost;
 		});
 
-		cy.then(() => followUserViaApi(actorToken, ownerId));
-		cy.then(() => likePostViaApi(actorToken, post._id));
-		cy.then(() => addCommentViaApi(actorToken, post._id, commentText));
+		cy.then(() => followUserViaApi(actorSession, ownerId));
+		cy.then(() => likePostViaApi(actorSession, post._id));
+		cy.then(() => addCommentViaApi(actorSession, post._id, commentText));
 	});
 
 	after(() => {
-		cy.then(() => deletePostViaApi(ownerToken, post._id, false));
+		cy.then(() => deletePostViaApi(ownerSession, post._id, false));
 		cy.task('deleteTestUser', owner.email);
 		cy.task('deleteTestUser', actor.email);
 	});
@@ -190,7 +190,7 @@ describe('notifications', () => {
 		});
 
 		it('shows the empty state to an account nobody has interacted with', () => {
-			visitAsUser('/user-feed', actorToken);
+			visitAsUser('/user-feed', actorSession);
 			openAccountMenuOnDesktop();
 			accountMenuNotificationsRow().click();
 
@@ -200,8 +200,8 @@ describe('notifications', () => {
 		});
 
 		it('removes the follow and the like notifications when they are undone, and keeps the comment', () => {
-			cy.then(() => unfollowUserViaApi(actorToken, ownerId));
-			cy.then(() => unlikePostViaApi(actorToken, post._id));
+			cy.then(() => unfollowUserViaApi(actorSession, ownerId));
+			cy.then(() => unlikePostViaApi(actorSession, post._id));
 
 			openNotificationsAsOwner();
 
@@ -212,14 +212,14 @@ describe('notifications', () => {
 		});
 
 		it('raises the dot for a new notification and drops it when that action is undone before it was read', () => {
-			cy.then(() => followUserViaApi(actorToken, ownerId));
+			cy.then(() => followUserViaApi(actorSession, ownerId));
 
 			visitFeedAsOwner();
 			cy.get('.logged-user-avatar .unread-dot').should('be.visible');
 			openAccountMenuOnDesktop();
 			accountMenuNotificationsRow().find('.account-menu-badge').should('have.text', '1');
 
-			cy.then(() => unfollowUserViaApi(actorToken, ownerId));
+			cy.then(() => unfollowUserViaApi(actorSession, ownerId));
 
 			visitFeedAsOwnerOnceTheCountLoaded();
 			cy.get('.logged-user-avatar').should('be.visible');
@@ -227,8 +227,8 @@ describe('notifications', () => {
 		});
 
 		it('keeps one notification per person when the action is repeated', () => {
-			cy.then(() => likePostViaApi(actorToken, post._id));
-			cy.then(() => likePostViaApi(actorToken, post._id));
+			cy.then(() => likePostViaApi(actorSession, post._id));
+			cy.then(() => likePostViaApi(actorSession, post._id));
 
 			openNotificationsAsOwner();
 
@@ -236,7 +236,7 @@ describe('notifications', () => {
 		});
 
 		it('does not notify the owner of their own like', () => {
-			cy.then(() => likePostViaApi(ownerToken, post._id));
+			cy.then(() => likePostViaApi(ownerSession, post._id));
 
 			openNotificationsAsOwner();
 
@@ -278,8 +278,8 @@ describe('notifications on mobile', () => {
 	const owner = buildTestUser();
 	const follower = buildTestUser();
 
-	let ownerToken;
-	let followerToken;
+	let ownerSession;
+	let followerSession;
 	let ownerId;
 	let followerId;
 
@@ -289,17 +289,17 @@ describe('notifications on mobile', () => {
 		createUserViaApi(owner);
 		createUserViaApi(follower);
 
-		loginViaApi(owner).then((token) => {
-			ownerToken = token;
-			ownerId = userIdFromToken(token);
+		loginViaApi(owner).then((session) => {
+			ownerSession = session;
+			ownerId = userIdFromSession(session);
 		});
 
-		loginViaApi(follower).then((token) => {
-			followerToken = token;
-			followerId = userIdFromToken(token);
+		loginViaApi(follower).then((session) => {
+			followerSession = session;
+			followerId = userIdFromSession(session);
 		});
 
-		cy.then(() => followUserViaApi(followerToken, ownerId));
+		cy.then(() => followUserViaApi(followerSession, ownerId));
 	});
 
 	after(() => {
@@ -312,28 +312,28 @@ describe('notifications on mobile', () => {
 	});
 
 	it('shows the dot on the profile photo in the tab bar, and none on the feed top bar', () => {
-		visitAsUser('/user-feed', ownerToken);
+		visitAsUser('/user-feed', ownerSession);
 
 		cy.get('.tab-bar .tab-bar-unread-dot').should('be.visible');
 		cy.get('.mobile-top-bar .unread-dot').should('not.exist');
 	});
 
 	it('shows the dot on the burger on your own profile as well as on the tab bar', () => {
-		visitAsUser(`/user/${ownerId}`, ownerToken);
+		visitAsUser(`/user/${ownerId}`, ownerSession);
 
 		cy.get('.mobile-top-bar-action[aria-label="Account menu"] .unread-dot').invoke('outerWidth').should('be.greaterThan', 0);
 		cy.get('.tab-bar .tab-bar-unread-dot').should('be.visible');
 	});
 
 	it("shows no burger and so no burger dot on someone else's profile, but keeps the tab bar dot", () => {
-		visitAsUser(`/user/${followerId}`, ownerToken);
+		visitAsUser(`/user/${followerId}`, ownerSession);
 
 		cy.get('.mobile-top-bar-action[aria-label="Account menu"]').should('not.exist');
 		cy.get('.tab-bar .tab-bar-unread-dot').should('be.visible');
 	});
 
 	it('opens a full-screen list from the account menu sheet, then clears both dots', () => {
-		visitAsUser(`/user/${ownerId}`, ownerToken);
+		visitAsUser(`/user/${ownerId}`, ownerSession);
 
 		openAccountMenuOnMobile();
 		accountMenuNotificationsRow().find('.account-menu-badge').should('have.text', '1');
@@ -354,7 +354,7 @@ describe('notifications on mobile', () => {
 	});
 
 	it('opens the profile of the follower and closes the full-screen list when the row is clicked', () => {
-		visitAsUser(`/user/${ownerId}`, ownerToken);
+		visitAsUser(`/user/${ownerId}`, ownerSession);
 
 		openAccountMenuOnMobile();
 		accountMenuNotificationsRow().click();

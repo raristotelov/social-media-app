@@ -54,7 +54,7 @@ let storiesByUser;
 
 const renderViewer = ({ queue = buildQueue(), startIndex = 1, onClose = jest.fn(), endSession = jest.fn() } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: { _id: 'me' }, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: { _id: 'me' }, endSession }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<StoryViewer queue={queue} startIndex={startIndex} onClose={onClose} />
@@ -105,7 +105,7 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 1 });
 
 			expect(getUserStories).toHaveBeenCalledTimes(1);
-			expect(getUserStories).toHaveBeenCalledWith({ userId: 'alice', jwtToken: 'token123' });
+			expect(getUserStories).toHaveBeenCalledWith({ userId: 'alice' });
 		});
 
 		it('shows a spinner and no photo while the stories load', () => {
@@ -310,7 +310,7 @@ describe('StoryViewer', () => {
 			finishSegment();
 
 			expect(await screen.findByAltText('Story by bob')).toBeInTheDocument();
-			expect(getUserStories).toHaveBeenCalledWith({ userId: 'bob', jwtToken: 'token123' });
+			expect(getUserStories).toHaveBeenCalledWith({ userId: 'bob' });
 		});
 
 		it('starts the next user on their first unwatched story, not their first story', async () => {
@@ -688,7 +688,7 @@ describe('StoryViewer', () => {
 			loadPhoto();
 
 			expect(markStoryViewed).toHaveBeenCalledTimes(1);
-			expect(markStoryViewed).toHaveBeenCalledWith({ storyId: 'a3', jwtToken: 'token123' });
+			expect(markStoryViewed).toHaveBeenCalledWith({ storyId: 'a3' });
 		});
 	});
 
@@ -705,7 +705,7 @@ describe('StoryViewer', () => {
 			loadPhoto();
 
 			expect(markStoryViewed).toHaveBeenCalledTimes(1);
-			expect(markStoryViewed).toHaveBeenCalledWith({ storyId: 'a2', jwtToken: 'token123' });
+			expect(markStoryViewed).toHaveBeenCalledWith({ storyId: 'a2' });
 		});
 
 		it('records a story that was tapped past before 5 seconds, as long as its photo had loaded', async () => {
@@ -714,7 +714,7 @@ describe('StoryViewer', () => {
 			loadPhoto();
 			tapNext();
 
-			expect(markStoryViewed).toHaveBeenCalledWith({ storyId: 'a2', jwtToken: 'token123' });
+			expect(markStoryViewed).toHaveBeenCalledWith({ storyId: 'a2' });
 		});
 
 		it('does not record a story that was tapped past before its photo loaded', async () => {
@@ -917,7 +917,7 @@ describe('StoryViewer', () => {
 
 			expect(await screen.findByRole('heading', { name: 'Viewers' })).toBeInTheDocument();
 			expect(await screen.findByText('viewer1')).toBeInTheDocument();
-			expect(getStoryViewers).toHaveBeenCalledWith(expect.objectContaining({ storyId: 'm1', jwtToken: 'token123' }));
+			expect(getStoryViewers).toHaveBeenCalledWith(expect.objectContaining({ storyId: 'm1' }));
 		});
 
 		it('lists the viewers by photo and username only', async () => {
@@ -1043,7 +1043,7 @@ describe('StoryViewer', () => {
 			openDeleteConfirm();
 			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-			await waitFor(() => expect(deleteStory).toHaveBeenCalledWith({ storyId: 'm1', jwtToken: 'token123' }));
+			await waitFor(() => expect(deleteStory).toHaveBeenCalledWith({ storyId: 'm1' }));
 			expect(deleteStory).toHaveBeenCalledTimes(1);
 		});
 

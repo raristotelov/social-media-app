@@ -5,6 +5,7 @@ jest.mock('../services', () => ({
 }));
 
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const JWT = require('jsonwebtoken');
 
 const { userService, userPostService } = require('../services');
@@ -42,7 +43,8 @@ describe('upload routes', () => {
 	let originalJwtSecret;
 	let consoleErrorSpy;
 
-	const authHeaders = () => ({ 'X-Authorization': JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET) });
+	const sessionCookie = (token) => ({ Cookie: `${constants.AUTH_COOKIE_NAME}=${token}` });
+	const authHeaders = () => sessionCookie(JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET));
 
 	beforeAll(async () => {
 		originalJwtSecret = process.env.JWT_SECRET;
@@ -50,6 +52,7 @@ describe('upload routes', () => {
 
 		const app = express();
 
+		app.use(cookieParser());
 		app.use(express.json());
 		app.use('/users', userController);
 		app.use('/user-posts', userPostController);
@@ -118,7 +121,7 @@ describe('upload routes', () => {
 		it('answers 401 for an invalid token and never calls the service', async () => {
 			const response = await fetch(url(), {
 				method: 'POST',
-				headers: { 'X-Authorization': 'not.a.valid.token' },
+				headers: sessionCookie('not.a.valid.token'),
 				body: buildFormData({ fieldName: constants.POST_IMAGE_FIELD }),
 			});
 

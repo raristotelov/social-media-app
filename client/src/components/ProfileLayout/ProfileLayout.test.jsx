@@ -25,7 +25,7 @@ const FlagProbe = () => {
 
 const renderLayoutAt = (path) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: null, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: null, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 			<ToastProvider>
 				<NotFoundProvider>
 					<MemoryRouter initialEntries={[path]}>

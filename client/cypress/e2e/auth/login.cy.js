@@ -74,20 +74,4 @@ describe('login', () => {
 			cy.contains('Profile').should('exist');
 		});
 	});
-
-	it('discards a malformed stored token and falls back to a clean guest state', () => {
-		cy.visit('/', {
-			onBeforeLoad: (win) => {
-				win.localStorage.setItem('jwt-token', JSON.stringify('not-a-real-jwt'));
-			},
-		});
-
-		cy.location('pathname').should('eq', '/log-in');
-
-		// cy.its()/cy.invoke() retry until the subject is non-null, so they cannot be
-		// used to assert that a value IS null.
-		cy.window().then((win) => {
-			expect(win.localStorage.getItem('jwt-token')).to.equal(null);
-		});
-	});
 });

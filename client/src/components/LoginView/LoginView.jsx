@@ -9,16 +9,16 @@ import LoginForm from '../LoginForm/LoginForm';
 import './LoginView.css';
 
 const LoginView = () => {
-	const { setJwtToken } = useContext(LoggedInUserContext);
+	const { setLoggedInUser } = useContext(LoggedInUserContext);
 	const navigate = useNavigate();
 	const location = useLocation();
 
 	const redirectPath = location.state?.from || '/user-feed';
 
 	const loginHandler = async (loginCredentials) => {
-		const loggedInUserJwt = await login(loginCredentials);
+		const loggedInUser = await login(loginCredentials);
 
-		setJwtToken(loggedInUserJwt);
+		setLoggedInUser(loggedInUser);
 		navigate(redirectPath, { replace: true });
 	};
 

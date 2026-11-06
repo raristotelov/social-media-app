@@ -18,7 +18,7 @@ import './DemoStrip.css';
 const isDemoVisitor = (user) => user?.accountType === DEMO_ACCOUNT_TYPE;
 
 const DemoStrip = () => {
-	const { jwtToken, loggedInUser, setJwtToken } = useContext(LoggedInUserContext);
+	const { loggedInUser, setLoggedInUser } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 
 	const navigate = useNavigate();
@@ -28,16 +28,16 @@ const DemoStrip = () => {
 	const [isNoticeDismissed, dismissNotice] = useSessionFlag(DEMO_NOTICE_DISMISSED_KEY);
 	const [isStarting, setIsStarting] = useState(false);
 
-	const isGuest = !jwtToken;
+	const isGuest = !loggedInUser;
 	const isVisible = isGuest ? !isGuestStripDismissed : isDemoVisitor(loggedInUser) && !isNoticeDismissed;
 
 	const startDemo = async () => {
 		setIsStarting(true);
 
 		try {
-			const demoJwt = await demoLogin();
+			const demoUser = await demoLogin();
 
-			setJwtToken(demoJwt);
+			setLoggedInUser(demoUser);
 			navigate(DEMO_LANDING_PATH, { replace: true });
 		} catch (error) {
 			showToast(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.START_DEMO));

@@ -3,7 +3,7 @@ import {
 	createUserViaApi,
 	loginViaApi,
 	visitAsUser,
-	userIdFromToken,
+	userIdFromSession,
 	uploadPostViaApi,
 	addCommentViaApi,
 	followUserViaApi,
@@ -43,10 +43,10 @@ describe('popular posts', () => {
 	const member = buildTestUser();
 	const commenter = buildTestUser();
 
-	let strangerAuthorToken;
-	let followedAuthorToken;
-	let memberToken;
-	let commenterToken;
+	let strangerAuthorSession;
+	let followedAuthorSession;
+	let memberSession;
+	let commenterSession;
 	let strangerAuthorId;
 	let memberId;
 	let strangerPost;
@@ -56,7 +56,7 @@ describe('popular posts', () => {
 
 	const boostPost = (post) => {
 		Cypress._.times(BOOST_COMMENT_COUNT, (index) => {
-			cy.then(() => addCommentViaApi(commenterToken, post._id, `boost ${index}`));
+			cy.then(() => addCommentViaApi(commenterSession, post._id, `boost ${index}`));
 		});
 	};
 
@@ -66,49 +66,49 @@ describe('popular posts', () => {
 		createUserViaApi(member);
 		createUserViaApi(commenter);
 
-		loginViaApi(strangerAuthor).then((token) => {
-			strangerAuthorToken = token;
-			strangerAuthorId = userIdFromToken(token);
+		loginViaApi(strangerAuthor).then((session) => {
+			strangerAuthorSession = session;
+			strangerAuthorId = userIdFromSession(session);
 		});
 
-		loginViaApi(followedAuthor).then((token) => {
-			followedAuthorToken = token;
+		loginViaApi(followedAuthor).then((session) => {
+			followedAuthorSession = session;
 		});
 
-		loginViaApi(member).then((token) => {
-			memberToken = token;
-			memberId = userIdFromToken(token);
+		loginViaApi(member).then((session) => {
+			memberSession = session;
+			memberId = userIdFromSession(session);
 		});
 
-		loginViaApi(commenter).then((token) => {
-			commenterToken = token;
+		loginViaApi(commenter).then((session) => {
+			commenterSession = session;
 		});
 
-		cy.then(() => uploadPostViaApi(strangerAuthorToken, 'popular stranger post')).then((post) => {
+		cy.then(() => uploadPostViaApi(strangerAuthorSession, 'popular stranger post')).then((post) => {
 			strangerPost = post;
 		});
 
-		cy.then(() => uploadPostViaApi(followedAuthorToken, 'popular followed post')).then((post) => {
+		cy.then(() => uploadPostViaApi(followedAuthorSession, 'popular followed post')).then((post) => {
 			followedPost = post;
 		});
 
-		cy.then(() => uploadPostViaApi(memberToken, 'popular member post')).then((post) => {
+		cy.then(() => uploadPostViaApi(memberSession, 'popular member post')).then((post) => {
 			memberPost = post;
 		});
 
-		cy.then(() => uploadPostViaApi(strangerAuthorToken, 'popular deleted post')).then((post) => {
+		cy.then(() => uploadPostViaApi(strangerAuthorSession, 'popular deleted post')).then((post) => {
 			deletedPostId = post._id;
 		});
 
-		cy.then(() => deletePostViaApi(strangerAuthorToken, deletedPostId));
+		cy.then(() => deletePostViaApi(strangerAuthorSession, deletedPostId));
 
 		cy.then(() => boostPost(strangerPost));
 		cy.then(() => boostPost(followedPost));
 		cy.then(() => boostPost(memberPost));
 
-		cy.then(() => addCommentViaApi(commenterToken, strangerPost._id, 'a readable comment'));
+		cy.then(() => addCommentViaApi(commenterSession, strangerPost._id, 'a readable comment'));
 
-		cy.then(() => followUserViaApi(memberToken, userIdFromToken(followedAuthorToken)));
+		cy.then(() => followUserViaApi(memberSession, userIdFromSession(followedAuthorSession)));
 	});
 
 	after(() => {
@@ -214,7 +214,7 @@ describe('popular posts', () => {
 
 	describe('as a member', () => {
 		it('shows the member header and no Log in or Sign up', () => {
-			visitAsUser(GRID_PATH, memberToken);
+			visitAsUser(GRID_PATH, memberSession);
 
 			cy.contains('.logged-user-avatar', member.username).should('be.visible');
 			cy.get('.header-wrapper').within(() => {
@@ -224,7 +224,7 @@ describe('popular posts', () => {
 		});
 
 		it('leaves out their own posts and the posts of the people they follow', () => {
-			visitAsUser(GRID_PATH, memberToken);
+			visitAsUser(GRID_PATH, memberSession);
 
 			tileFor(strangerPost._id).should('exist');
 			tileFor(followedPost._id).should('not.exist');
@@ -232,7 +232,7 @@ describe('popular posts', () => {
 		});
 
 		it('leaves the same posts out of the posts view', () => {
-			visitAsUser(`${POSTS_PATH}#${strangerPost._id}`, memberToken);
+			visitAsUser(`${POSTS_PATH}#${strangerPost._id}`, memberSession);
 
 			cy.get(`[id="${strangerPost._id}"]`).should('exist');
 			cy.get(`[id="${followedPost._id}"]`).should('not.exist');
@@ -240,7 +240,7 @@ describe('popular posts', () => {
 		});
 
 		it('keeps the full interactive post, liking it without leaving the page', () => {
-			visitAsUser(`${POSTS_PATH}#${strangerPost._id}`, memberToken);
+			visitAsUser(`${POSTS_PATH}#${strangerPost._id}`, memberSession);
 
 			cy.get(`[id="${strangerPost._id}"] .user-post-like-button`).click();
 
@@ -278,7 +278,7 @@ describe('popular posts', () => {
 		});
 
 		it('shows a shared post even when a member follows its author or owns it', () => {
-			visitAsUser(`${POSTS_PATH}#${memberPost._id}`, memberToken);
+			visitAsUser(`${POSTS_PATH}#${memberPost._id}`, memberSession);
 
 			cy.get('.user-post').first().should('have.attr', 'id', memberPost._id);
 		});
@@ -316,7 +316,7 @@ describe('popular posts', () => {
 		});
 
 		it('opens the grid for a member too', () => {
-			visitAsUser(`${POSTS_PATH}#${deletedPostId}`, memberToken);
+			visitAsUser(`${POSTS_PATH}#${deletedPostId}`, memberSession);
 
 			cy.contains('.toast', 'This post no longer exists').should('be.visible');
 			cy.location('pathname').should('eq', GRID_PATH);
@@ -393,16 +393,16 @@ describe('popular posts', () => {
 		before(() => {
 			createUserViaApi(scroller);
 
-			let scrollerToken;
+			let scrollerSession;
 
-			loginViaApi(scroller).then((token) => {
-				scrollerToken = token;
+			loginViaApi(scroller).then((session) => {
+				scrollerSession = session;
 			});
 
 			scrollerPosts = [];
 
 			Cypress._.times(SCROLL_BATCH_POST_COUNT, (index) => {
-				cy.then(() => uploadPostViaApi(scrollerToken, `scroll ${index}`)).then((post) => scrollerPosts.push(post));
+				cy.then(() => uploadPostViaApi(scrollerSession, `scroll ${index}`)).then((post) => scrollerPosts.push(post));
 			});
 		});
 

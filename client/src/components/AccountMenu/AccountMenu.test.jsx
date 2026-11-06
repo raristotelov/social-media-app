@@ -15,7 +15,7 @@ const loggedInUser = { _id: 'user1', username: 'johndoe', theme: 'light' };
 
 const renderAccountMenu = (isOpen, props = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn() }}>
 			<MemoryRouter>
 				<AccountMenu isOpen={isOpen} onClose={jest.fn()} logoutHandler={jest.fn()} {...props} />
 			</MemoryRouter>
@@ -89,7 +89,6 @@ describe('AccountMenu', () => {
 		await waitFor(() =>
 			expect(updateUserProfileData).toHaveBeenCalledWith({
 				userId: 'user1',
-				jwtToken: 'token123',
 				updatedProfileData: { theme: 'dark' },
 			}),
 		);

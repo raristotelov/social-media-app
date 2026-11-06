@@ -11,7 +11,7 @@ const member = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderTabBar = ({ unreadCount = 0, user = member, path = '/user-feed' } = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user }}>
 			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: jest.fn() }}>
 				<MemoryRouter initialEntries={[path]}>
 					<TabBar />

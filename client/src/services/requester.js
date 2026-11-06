@@ -50,8 +50,8 @@ const readJsonBody = async (response) => {
 	}
 };
 
-const request = async (method, token, url, data) => {
-	const options = {};
+const request = async (method, url, data) => {
+	const options = { credentials: 'include' };
 
 	if (method !== 'GET') {
 		options.method = method;
@@ -65,13 +65,6 @@ const request = async (method, token, url, data) => {
 
 			options.body = JSON.stringify(data);
 		}
-	}
-
-	if (token) {
-		options.headers = {
-			...options.headers,
-			'X-Authorization': token,
-		};
 	}
 
 	let response;
@@ -95,12 +88,12 @@ const request = async (method, token, url, data) => {
 	return result;
 };
 
-export const requestFactory = (token) => {
+export const requestFactory = () => {
 	return {
-		get: request.bind(null, 'GET', token),
-		post: request.bind(null, 'POST', token),
-		put: request.bind(null, 'PUT', token),
-		patch: request.bind(null, 'PATCH', token),
-		delete: request.bind(null, 'DELETE', token),
+		get: request.bind(null, 'GET'),
+		post: request.bind(null, 'POST'),
+		put: request.bind(null, 'PUT'),
+		patch: request.bind(null, 'PATCH'),
+		delete: request.bind(null, 'DELETE'),
 	};
 };

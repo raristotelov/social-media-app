@@ -48,7 +48,7 @@ const TrayHost = () => {
 
 const renderTray = ({ endSession = jest.fn() } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<TrayHost />
@@ -62,7 +62,7 @@ const renderTray = ({ endSession = jest.fn() } = {}) => {
 
 const renderTrayWithProps = ({ entries = [], isLoaded = true, reload = jest.fn() } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, endSession: jest.fn() }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<StoriesTray entries={entries} isLoaded={isLoaded} reload={reload} />
@@ -158,7 +158,7 @@ describe('StoriesTray', () => {
 
 			await screen.findByText('Your story');
 
-			expect(getStoryTray).toHaveBeenCalledWith({ jwtToken: 'token123' });
+			expect(getStoryTray).toHaveBeenCalledWith();
 		});
 
 		it('stays empty, with no error, when the tray fails to load', async () => {
@@ -282,7 +282,7 @@ describe('StoriesTray', () => {
 			userEvent.click(await screen.findByRole('button', { name: 'View your story' }));
 
 			expect(await screen.findByRole('dialog', { name: 'Story viewer' })).toBeInTheDocument();
-			expect(getUserStories).toHaveBeenCalledWith({ userId: 'me', jwtToken: 'token123' });
+			expect(getUserStories).toHaveBeenCalledWith({ userId: 'me' });
 		});
 
 		it('opens Create on the Story tab, not the viewer, when the plus is tapped', async () => {
@@ -311,7 +311,7 @@ describe('StoriesTray', () => {
 			userEvent.click(await screen.findByRole('button', { name: "View bob's story" }));
 
 			expect(await screen.findByLabelText('Story viewer')).toBeInTheDocument();
-			await waitFor(() => expect(getUserStories).toHaveBeenCalledWith({ userId: 'bob', jwtToken: 'token123' }));
+			await waitFor(() => expect(getUserStories).toHaveBeenCalledWith({ userId: 'bob' }));
 			expect(getUserStories).not.toHaveBeenCalledWith(expect.objectContaining({ userId: 'alice' }));
 		});
 
@@ -384,7 +384,7 @@ describe('StoriesTray', () => {
 
 			expect(await screen.findByRole('button', { name: 'View your story' })).toBeInTheDocument();
 			expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-			expect(addStory).toHaveBeenCalledWith({ image: resized }, 'token123');
+			expect(addStory).toHaveBeenCalledWith({ image: resized });
 		});
 	});
 

@@ -1,23 +1,23 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, setThemeViaApi } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession, setThemeViaApi } from '../../support/api';
 
 describe('dark mode', () => {
 	const user = buildTestUser();
 
-	let jwtToken;
+	let session;
 	let profilePath;
 
 	before(() => {
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			profilePath = `/user/${userIdFromToken(token)}`;
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			profilePath = `/user/${userIdFromSession(loggedInSession)}`;
 		});
 	});
 
 	beforeEach(() => {
-		setThemeViaApi(jwtToken, 'light');
+		setThemeViaApi(session, 'light');
 	});
 
 	after(() => {
@@ -26,7 +26,7 @@ describe('dark mode', () => {
 
 	const openDesktopAccountMenu = () => {
 		cy.viewport(1440, 900);
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		cy.get('.logged-user-avatar').click();
 	};
 
@@ -65,7 +65,7 @@ describe('dark mode', () => {
 
 	it('switches from the bottom sheet on mobile', () => {
 		cy.viewport(390, 844);
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 
 		cy.get('.mobile-top-bar-action[aria-label="Account menu"]').click();
 		cy.get('.account-menu-sheet').should('be.visible');

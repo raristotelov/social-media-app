@@ -48,7 +48,7 @@ const renderPopup = () => {
 	const clearUnreadCount = jest.fn();
 
 	const ui = (
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser: { _id: 'user1', username: 'johndoe' }, endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: { _id: 'user1', username: 'johndoe' }, endSession }}>
 			<NotificationsContext.Provider value={{ unreadCount: 2, clearUnreadCount }}>
 				<MemoryRouter>
 					<NotificationsPopup onClose={onClose} />
@@ -103,7 +103,7 @@ describe('NotificationsPopup', () => {
 
 			await screen.findByText('user-n1');
 
-			expect(getNotifications).toHaveBeenCalledWith({ jwtToken: 'token123' });
+			expect(getNotifications).toHaveBeenCalledWith();
 		});
 
 		it('lists the rows in the order the server sent them, newest first', async () => {
@@ -145,7 +145,7 @@ describe('NotificationsPopup', () => {
 			await screen.findByText('user-n1');
 
 			await waitFor(() => expect(clearUnreadCount).toHaveBeenCalledTimes(1));
-			expect(markAllNotificationsRead).toHaveBeenCalledWith({ jwtToken: 'token123', cutoff: new Date(NOW).toISOString() });
+			expect(markAllNotificationsRead).toHaveBeenCalledWith({ cutoff: new Date(NOW).toISOString() });
 			expect(markAllNotificationsRead).toHaveBeenCalledTimes(1);
 		});
 
@@ -259,7 +259,7 @@ describe('NotificationsPopup', () => {
 			await screen.findByText('No notifications yet');
 
 			await waitFor(() => expect(markAllNotificationsRead).toHaveBeenCalledTimes(1));
-			expect(markAllNotificationsRead).toHaveBeenCalledWith({ jwtToken: 'token123', cutoff: new Date(NOW).toISOString() });
+			expect(markAllNotificationsRead).toHaveBeenCalledWith({ cutoff: new Date(NOW).toISOString() });
 		});
 
 		it('clears the unread dot even though there is nothing to show', async () => {
@@ -349,7 +349,7 @@ describe('NotificationsPopup', () => {
 
 			await screen.findByText('user-n1');
 
-			expect(getNotifications).toHaveBeenNthCalledWith(2, { jwtToken: 'token123', cursor: 'cursor-1' });
+			expect(getNotifications).toHaveBeenNthCalledWith(2, { cursor: 'cursor-1' });
 			expect([...container.querySelectorAll('.notification-row-username')].map((name) => name.textContent)).toEqual([
 				'user-n3',
 				'user-n2',
@@ -423,7 +423,7 @@ describe('NotificationsPopup', () => {
 			userEvent.click(await within(await screen.findByRole('alert')).findByRole('button', { name: 'Try again' }));
 
 			expect(await screen.findByText('user-n1')).toBeInTheDocument();
-			expect(getNotifications).toHaveBeenNthCalledWith(3, { jwtToken: 'token123', cursor: 'cursor-1' });
+			expect(getNotifications).toHaveBeenNthCalledWith(3, { cursor: 'cursor-1' });
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 		});
 
@@ -447,7 +447,7 @@ describe('NotificationsPopup', () => {
 
 			await screen.findByText('user-n1');
 
-			expect(markAllNotificationsRead).toHaveBeenCalledWith({ jwtToken: 'token123', cutoff: firstFetchedAt });
+			expect(markAllNotificationsRead).toHaveBeenCalledWith({ cutoff: firstFetchedAt });
 			expect(markAllNotificationsRead).not.toHaveBeenCalledWith(expect.objectContaining({ cutoff: laterFetchedAt }));
 		});
 

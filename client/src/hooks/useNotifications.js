@@ -15,17 +15,12 @@ const useNotifications = () => {
 	const [hasLoadMoreFailed, setHasLoadMoreFailed] = useState(false);
 	const [reloadCount, setReloadCount] = useState(0);
 
-	const { jwtToken, endSession } = useContext(LoggedInUserContext);
+	const { endSession } = useContext(LoggedInUserContext);
 	const { clearUnreadCount } = useContext(NotificationsContext);
 
-	const jwtTokenRef = useRef(jwtToken);
 	const nextCursorRef = useRef(null);
 	const isLoadingMoreRef = useRef(false);
 	const loadGenerationRef = useRef(0);
-
-	useEffect(() => {
-		jwtTokenRef.current = jwtToken;
-	}, [jwtToken]);
 
 	useEffect(() => {
 		let isCurrentRequest = true;
@@ -36,7 +31,7 @@ const useNotifications = () => {
 		setHasLoadFailed(false);
 
 		const markAllRead = (cutoff) =>
-			markAllNotificationsRead({ jwtToken: jwtTokenRef.current, cutoff })
+			markAllNotificationsRead({ cutoff })
 				.then(clearUnreadCount)
 				.catch((error) => {
 					if (isUnauthenticatedError(error)) {
@@ -44,7 +39,7 @@ const useNotifications = () => {
 					}
 				});
 
-		getNotifications({ jwtToken: jwtTokenRef.current })
+		getNotifications()
 			.then((result) => {
 				if (!isCurrentRequest) {
 					return;
@@ -100,7 +95,7 @@ const useNotifications = () => {
 		setHasLoadMoreFailed(false);
 
 		try {
-			const result = await getNotifications({ jwtToken: jwtTokenRef.current, cursor: nextCursorRef.current });
+			const result = await getNotifications({ cursor: nextCursorRef.current });
 
 			if (loadGeneration !== loadGenerationRef.current) {
 				return;

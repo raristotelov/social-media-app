@@ -13,15 +13,15 @@ describe('storyService', () => {
 			requestFactory.mockReturnValue({ post });
 		});
 
-		it('posts to the stories endpoint with the token', async () => {
-			await addStory({ image }, 'token123');
+		it('posts to the stories endpoint', async () => {
+			await addStory({ image });
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/stories$/), expect.any(FormData));
 		});
 
 		it('sends the picture under the "image" field and nothing else, as multipart form data', async () => {
-			await addStory({ image }, 'token123');
+			await addStory({ image });
 
 			const formData = post.mock.calls[0][1];
 
@@ -31,71 +31,71 @@ describe('storyService', () => {
 		});
 
 		it('resolves with the saved story', async () => {
-			await expect(addStory({ image }, 'token123')).resolves.toEqual({ _id: 'story1' });
+			await expect(addStory({ image })).resolves.toEqual({ _id: 'story1' });
 		});
 	});
 
 	describe('getStoryTray', () => {
-		it('gets the tray endpoint with the token', async () => {
+		it('gets the tray endpoint', async () => {
 			const get = jest.fn().mockResolvedValue([{ isOwn: true }]);
 
 			requestFactory.mockReturnValue({ get });
 
-			await expect(getStoryTray({ jwtToken: 'token123' })).resolves.toEqual([{ isOwn: true }]);
+			await expect(getStoryTray()).resolves.toEqual([{ isOwn: true }]);
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/stories\/tray$/));
 		});
 	});
 
 	describe('getUserStories', () => {
-		it("gets that user's stories endpoint with the token", async () => {
+		it("gets that user's stories endpoint", async () => {
 			const get = jest.fn().mockResolvedValue({ user: {}, stories: [] });
 
 			requestFactory.mockReturnValue({ get });
 
-			await expect(getUserStories({ userId: 'user7', jwtToken: 'token123' })).resolves.toEqual({ user: {}, stories: [] });
+			await expect(getUserStories({ userId: 'user7' })).resolves.toEqual({ user: {}, stories: [] });
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/stories\/user\/user7$/));
 		});
 	});
 
 	describe('markStoryViewed', () => {
-		it('posts to the view endpoint of that story with the token and no body', async () => {
+		it('posts to the view endpoint of that story with no body', async () => {
 			const post = jest.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ post });
 
-			await markStoryViewed({ storyId: 'story1', jwtToken: 'token123' });
+			await markStoryViewed({ storyId: 'story1' });
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(post).toHaveBeenCalledWith(expect.stringMatching(/\/stories\/story1\/view$/));
 		});
 	});
 
 	describe('getStoryViewers', () => {
-		it('gets the viewers endpoint of that story with the token', async () => {
+		it('gets the viewers endpoint of that story', async () => {
 			const get = jest.fn().mockResolvedValue([{ _id: 'viewer1' }]);
 
 			requestFactory.mockReturnValue({ get });
 
-			await expect(getStoryViewers({ storyId: 'story1', jwtToken: 'token123' })).resolves.toEqual([{ _id: 'viewer1' }]);
+			await expect(getStoryViewers({ storyId: 'story1' })).resolves.toEqual([{ _id: 'viewer1' }]);
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/stories\/story1\/viewers$/));
 		});
 	});
 
 	describe('deleteStory', () => {
-		it('sends a DELETE to that story with the token', async () => {
+		it('sends a DELETE to that story', async () => {
 			const del = jest.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ delete: del });
 
-			await deleteStory({ storyId: 'story1', jwtToken: 'token123' });
+			await deleteStory({ storyId: 'story1' });
 
-			expect(requestFactory).toHaveBeenCalledWith('token123');
+			expect(requestFactory).toHaveBeenCalledWith();
 			expect(del).toHaveBeenCalledWith(expect.stringMatching(/\/stories\/story1$/));
 		});
 	});

@@ -17,7 +17,7 @@ const renderAccountMenu = ({ unreadCount = 0, ...props } = {}) => {
 	const onNotificationsClick = jest.fn();
 
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn() }}>
 			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: jest.fn() }}>
 				<MemoryRouter>
 					<AccountMenu

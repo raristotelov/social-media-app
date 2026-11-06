@@ -16,7 +16,7 @@ const loggedInUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderTopBarAt = (path, user = loggedInUser, isNotFound = false) =>
 	render(
-		<LoggedInUserContext.Provider value={{ jwtToken: user ? 'token123' : null, loggedInUser: user }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user }}>
 			<NotFoundContext.Provider value={{ isNotFound, setIsNotFound: jest.fn() }}>
 				<MemoryRouter initialEntries={[path]}>
 					<MobileTopBar logoutHandler={jest.fn()} />
@@ -132,7 +132,7 @@ describe('MobileTopBar', () => {
 	describe('Change password', () => {
 		const renderOwnProfileTopBar = () =>
 			render(
-				<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser }}>
 					<NotFoundContext.Provider value={{ isNotFound: false, setIsNotFound: jest.fn() }}>
 						<ToastContext.Provider value={{ showToast: jest.fn(), dismissToast: jest.fn() }}>
 							<MemoryRouter initialEntries={['/user/user1']}>

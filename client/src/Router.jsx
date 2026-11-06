@@ -17,18 +17,18 @@ import NotFoundView from './components/NotFoundView/NotFoundView';
 import './index.css';
 
 const Router = () => {
-	const { jwtToken } = useContext(LoggedInUserContext);
+	const { loggedInUser } = useContext(LoggedInUserContext);
 
 	return (
 		<div className='routes-wrapper'>
 			<Routes>
-				<Route path='/' element={jwtToken ? <Navigate to='/user-feed' replace /> : <Navigate to='/popular-posts' replace />} />
+				<Route path='/' element={loggedInUser ? <Navigate to='/user-feed' replace /> : <Navigate to='/popular-posts' replace />} />
 
 				<Route path='/sign-up' element={<SignUpView />} />
 
 				<Route path='/log-in' element={<LoginView />} />
 
-				<Route path='/user-feed' element={jwtToken ? <FeedView /> : <Navigate to='/log-in' replace state={{ from: '/user-feed' }} />} />
+				<Route path='/user-feed' element={loggedInUser ? <FeedView /> : <Navigate to='/log-in' replace state={{ from: '/user-feed' }} />} />
 
 				<Route path='/popular-posts' element={<PopularPostsLayout />}>
 					<Route index element={<PopularPostsView />} />

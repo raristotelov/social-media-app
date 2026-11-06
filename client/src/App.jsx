@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { jwtDecode } from 'jwt-decode';
+import { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import useLocalStorage from './hooks/useLocalStorage';
 import LoggedInUserContext from './contexts/LoggedInUserContext';
-import { getUsersProfileData } from './services/userService';
-import { ERROR_CODES } from './constants/errorCodes';
+import ToastContext from './contexts/ToastContext';
+import { getCurrentUser, logout } from './services/userService';
 import { APP_NAME } from './constants/app';
-import { getErrorCode } from './utils/errors';
+import { ACTION_FALLBACK_MESSAGES } from './constants/errorMessages';
+import { getErrorMessage } from './utils/errors';
 
 import DemoStrip from './components/DemoStrip/DemoStrip';
 import MainHeader from './components/Header/MainHeader';
@@ -22,24 +22,11 @@ import './App.css';
 
 const getOperatingSystemTheme = () => (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 
-const readUserIdFromToken = (token) => {
-	try {
-		const { userId, exp } = jwtDecode(token);
-
-		if (typeof exp !== 'number' || exp * 1000 <= Date.now()) {
-			return null;
-		}
-
-		return userId || null;
-	} catch {
-		return null;
-	}
-};
-
 function App() {
-	const [jwtToken, setJwtToken] = useLocalStorage('jwt-token', null);
+	const { showToast } = useContext(ToastContext);
+
 	const [loggedInUser, setLoggedInUser] = useState(null);
-	const [isRestoringSession, setIsRestoringSession] = useState(Boolean(jwtToken));
+	const [isRestoringSession, setIsRestoringSession] = useState(true);
 	const [storedTheme, setStoredTheme] = useLocalStorage('theme', null);
 
 	const navigate = useNavigate();
@@ -50,9 +37,9 @@ function App() {
 	}, [navigate]);
 
 	const endSession = useCallback(() => {
-		setJwtToken(null);
+		setLoggedInUser(null);
 		navigateRef.current('/log-in');
-	}, [setJwtToken]);
+	}, []);
 
 	useEffect(() => {
 		document.title = APP_NAME;
@@ -82,61 +69,49 @@ function App() {
 	}, [loggedInUser, storedTheme]);
 
 	useEffect(() => {
-		if (!jwtToken) {
-			setLoggedInUser(null);
-			setIsRestoringSession(false);
+		let isCancelled = false;
 
-			return;
-		}
-
-		if (loggedInUser) {
-			return;
-		}
-
-		const userId = readUserIdFromToken(jwtToken);
-
-		if (!userId) {
-			endSession();
-
-			return;
-		}
-
-		setIsRestoringSession(true);
-
-		getUsersProfileData({ userIds: [userId], jwtToken })
-			.then((result) => {
-				if (result[0]) {
-					setLoggedInUser(result[0]);
-				} else {
-					endSession();
+		getCurrentUser()
+			.then((currentUser) => {
+				if (!isCancelled) {
+					setLoggedInUser(currentUser);
 				}
 			})
-			.catch((error) => {
-				const errorCode = getErrorCode(error);
-
-				if (errorCode === ERROR_CODES.UNAUTHENTICATED || errorCode === ERROR_CODES.USER_NOT_FOUND) {
-					endSession();
+			.catch(() => {
+				if (!isCancelled) {
+					setLoggedInUser(null);
 				}
 			})
 			.finally(() => {
-				setIsRestoringSession(false);
+				if (!isCancelled) {
+					setIsRestoringSession(false);
+				}
 			});
-	}, [jwtToken, loggedInUser, endSession]);
+
+		return () => {
+			isCancelled = true;
+		};
+	}, []);
 
 	const updateLoggedInUser = (updatedUser) => {
 		setLoggedInUser(updatedUser.user);
-		setJwtToken(updatedUser.jwt);
 	};
 
-	const logoutHandler = (e) => {
+	const logoutHandler = async (e) => {
 		e.preventDefault();
+
+		try {
+			await logout();
+		} catch (error) {
+			showToast(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.LOG_OUT));
+
+			return;
+		}
 
 		endSession();
 	};
 
 	const loggedInUserContextValues = {
-		jwtToken,
-		setJwtToken,
 		loggedInUser,
 		updateLoggedInUser,
 		setLoggedInUser,

@@ -30,7 +30,7 @@ const renderSidebar = ({ result = { suggestions, reserve: [], isCarouselDismisse
 	getSuggestions.mockResolvedValue(result);
 
 	return render(
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<SuggestionsSidebar />
@@ -43,7 +43,7 @@ const renderSidebar = ({ result = { suggestions, reserve: [], isCarouselDismisse
 describe('SuggestionsSidebar', () => {
 	beforeEach(() => {
 		jest.resetAllMocks();
-		followUser.mockResolvedValue({ user: loggedInUser, jwt: 'new.jwt' });
+		followUser.mockResolvedValue({ user: loggedInUser });
 	});
 
 	it('requests the sidebar placement', async () => {
@@ -51,7 +51,7 @@ describe('SuggestionsSidebar', () => {
 
 		await screen.findByRole('complementary');
 
-		expect(getSuggestions).toHaveBeenCalledWith({ placement: 'sidebar', jwtToken: 'token123' });
+		expect(getSuggestions).toHaveBeenCalledWith({ placement: 'sidebar' });
 	});
 
 	it('shows the "Suggested for you" heading', async () => {
@@ -89,7 +89,7 @@ describe('SuggestionsSidebar', () => {
 		getSuggestions.mockReturnValue(new Promise(() => {}));
 
 		render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<SuggestionsSidebar />
@@ -106,7 +106,7 @@ describe('SuggestionsSidebar', () => {
 		getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
 		render(
-			<LoggedInUserContext.Provider value={{ jwtToken: 'token123', loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<SuggestionsSidebar />

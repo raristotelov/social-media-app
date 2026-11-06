@@ -1,12 +1,12 @@
 import { buildTestUser } from '../../support/testUser';
-import { createUserViaApi, loginViaApi, visitAsUser, userIdFromToken, getProfileViaApi, deletePostViaApi } from '../../support/api';
+import { createUserViaApi, loginViaApi, visitAsUser, userIdFromSession, getProfileViaApi, deletePostViaApi } from '../../support/api';
 
 const FIXTURE_IMAGE = 'cypress/fixtures/test-image.png';
 const MAX_LONG_EDGE = 2048;
 
 describe('post upload', () => {
 	let user;
-	let jwtToken;
+	let session;
 	let userId;
 	let profilePath;
 
@@ -44,9 +44,9 @@ describe('post upload', () => {
 
 		createUserViaApi(user);
 
-		loginViaApi(user).then((token) => {
-			jwtToken = token;
-			userId = userIdFromToken(token);
+		loginViaApi(user).then((loggedInSession) => {
+			session = loggedInSession;
+			userId = userIdFromSession(loggedInSession);
 			profilePath = `/user/${userId}`;
 		});
 
@@ -55,14 +55,14 @@ describe('post upload', () => {
 
 	afterEach(() => {
 		cy.then(() => getProfileViaApi(userId)).then((profile) => {
-			profile.posts.forEach((post) => deletePostViaApi(jwtToken, post._id));
+			profile.posts.forEach((post) => deletePostViaApi(session, post._id));
 		});
 
 		cy.task('deleteTestUser', user.email);
 	});
 
 	it('uploads a photo through the server and shows it as a new post', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openUploadPopup();
 
 		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
@@ -86,7 +86,7 @@ describe('post upload', () => {
 	});
 
 	it('keeps the post after a refresh', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openUploadPopup();
 
 		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
@@ -100,7 +100,7 @@ describe('post upload', () => {
 	});
 
 	it('uploads an image wider than 2048px at 2048px on its long edge', () => {
-		visitAsUser(profilePath, jwtToken);
+		visitAsUser(profilePath, session);
 		openUploadPopup();
 
 		buildSolidPng(3000, 1000).then((contents) => {

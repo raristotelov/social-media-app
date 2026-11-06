@@ -11,6 +11,7 @@ jest.mock('../services', () => ({
 }));
 
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const JWT = require('jsonwebtoken');
 
 const { commentService } = require('../services');
@@ -18,6 +19,7 @@ const commentController = require('./commentController');
 const errorHandler = require('../middlewares/errorHandler');
 const AppError = require('../utils/AppError');
 const { ERROR_CODES } = require('../config/errorCodes');
+const constants = require('../config/constants');
 
 const USER_ID = '64b7f0a1c2d3e4f5a6b7c8d1';
 const POST_ID = '64b7f0a1c2d3e4f5a6b7c8e1';
@@ -31,7 +33,8 @@ describe('comment routes', () => {
 	let originalJwtSecret;
 	let consoleErrorSpy;
 
-	const authHeaders = () => ({ 'X-Authorization': JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET) });
+	const sessionCookie = (token) => ({ Cookie: `${constants.AUTH_COOKIE_NAME}=${token}` });
+	const authHeaders = () => sessionCookie(JWT.sign({ userId: USER_ID, username: 'realuser' }, JWT_SECRET));
 
 	const postJson = (path, body, headers = {}) =>
 		fetch(`${baseUrl}${path}`, {
@@ -46,6 +49,7 @@ describe('comment routes', () => {
 
 		const app = express();
 
+		app.use(cookieParser());
 		app.use(express.json());
 		app.use('/comments', commentController);
 		app.use(errorHandler);
@@ -96,7 +100,7 @@ describe('comment routes', () => {
 		});
 
 		it('answers 200 for a guest who sends an expired or invalid token', async () => {
-			const response = await fetch(`${baseUrl}/comments/post/${POST_ID}`, { headers: { 'X-Authorization': 'not-a-token' } });
+			const response = await fetch(`${baseUrl}/comments/post/${POST_ID}`, { headers: sessionCookie('not-a-token') });
 
 			expect(response.status).toBe(200);
 		});
@@ -135,7 +139,7 @@ describe('comment routes', () => {
 		});
 
 		it('answers 200 for a guest who sends an expired or invalid token', async () => {
-			const response = await fetch(`${baseUrl}/comments/${COMMENT_ID}/likes`, { headers: { 'X-Authorization': 'not-a-token' } });
+			const response = await fetch(`${baseUrl}/comments/${COMMENT_ID}/likes`, { headers: sessionCookie('not-a-token') });
 
 			expect(response.status).toBe(200);
 		});
@@ -177,7 +181,7 @@ describe('comment routes', () => {
 		});
 
 		it('answers 401 for an invalid token', async () => {
-			const response = await postJson('/comments', { userPostId: POST_ID, text: 'Hi' }, { 'X-Authorization': 'not-a-token' });
+			const response = await postJson('/comments', { userPostId: POST_ID, text: 'Hi' }, sessionCookie('not-a-token'));
 
 			expect(response.status).toBe(401);
 			expect(commentService.addComment).not.toHaveBeenCalled();

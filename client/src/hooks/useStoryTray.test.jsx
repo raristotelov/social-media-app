@@ -23,7 +23,7 @@ const buildDeferred = () => {
 const renderStoryTray = () => {
 	const endSession = jest.fn();
 	const wrapper = ({ children }) => (
-		<LoggedInUserContext.Provider value={{ jwtToken: 'token123', endSession }}>{children}</LoggedInUserContext.Provider>
+		<LoggedInUserContext.Provider value={{ loggedInUser: { _id: 'me' }, endSession }}>{children}</LoggedInUserContext.Provider>
 	);
 	const rendered = renderHook(() => useStoryTray(), { wrapper });
 
@@ -44,7 +44,7 @@ describe('useStoryTray', () => {
 		expect(result.current.isLoaded).toBe(false);
 	});
 
-	it('requests the tray with the token', async () => {
+	it('requests the tray once, without passing a token', async () => {
 		getStoryTray.mockResolvedValue(trayEntries);
 
 		const { result } = renderStoryTray();
@@ -52,7 +52,43 @@ describe('useStoryTray', () => {
 		await waitFor(() => expect(result.current.isLoaded).toBe(true));
 
 		expect(getStoryTray).toHaveBeenCalledTimes(1);
-		expect(getStoryTray).toHaveBeenCalledWith({ jwtToken: 'token123' });
+		expect(getStoryTray).toHaveBeenCalledWith();
+	});
+
+	it('loads the tray again when a different user logs in', async () => {
+		getStoryTray.mockResolvedValue(trayEntries);
+
+		const endSession = jest.fn();
+		let loggedInUser = { _id: 'me' };
+		const wrapper = ({ children }) => (
+			<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>{children}</LoggedInUserContext.Provider>
+		);
+		const { result, rerender } = renderHook(() => useStoryTray(), { wrapper });
+
+		await waitFor(() => expect(result.current.isLoaded).toBe(true));
+
+		loggedInUser = { _id: 'someone-else' };
+		rerender();
+
+		await waitFor(() => expect(getStoryTray).toHaveBeenCalledTimes(2));
+	});
+
+	it('does not load the tray again when the same user object is refreshed', async () => {
+		getStoryTray.mockResolvedValue(trayEntries);
+
+		const endSession = jest.fn();
+		let loggedInUser = { _id: 'me', bio: 'a' };
+		const wrapper = ({ children }) => (
+			<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>{children}</LoggedInUserContext.Provider>
+		);
+		const { result, rerender } = renderHook(() => useStoryTray(), { wrapper });
+
+		await waitFor(() => expect(result.current.isLoaded).toBe(true));
+
+		loggedInUser = { _id: 'me', bio: 'b' };
+		rerender();
+
+		expect(getStoryTray).toHaveBeenCalledTimes(1);
 	});
 
 	it('exposes the entries once loaded', async () => {
@@ -82,7 +118,7 @@ describe('useStoryTray', () => {
 		expect(endSession).not.toHaveBeenCalled();
 	});
 
-	it('ends the session when the token is no longer valid', async () => {
+	it('ends the session when the session is no longer valid', async () => {
 		getStoryTray.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 
 		const { endSession } = renderStoryTray();

@@ -34,7 +34,7 @@ const Comment = ({ comment, userPostId, onReload, onCloseComments, isReply = fal
 	const [isLikesPopupOpen, setIsLikesPopupOpen] = useState(false);
 	const isUpdatingLikeRef = useRef(false);
 
-	const { jwtToken, loggedInUser, endSession } = useContext(LoggedInUserContext);
+	const { loggedInUser, endSession } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 	const redirectToLogin = useLoginRedirect();
 
@@ -65,9 +65,9 @@ const Comment = ({ comment, userPostId, onReload, onCloseComments, isReply = fal
 
 		try {
 			if (hasLikedComment) {
-				await unlikeComment({ commentId: comment._id, jwtToken });
+				await unlikeComment({ commentId: comment._id });
 			} else {
-				await likeComment({ commentId: comment._id, jwtToken });
+				await likeComment({ commentId: comment._id });
 			}
 
 			await onReload(undefined, { commentId: comment._id, userId: loggedInUser._id, isLiked: !hasLikedComment });
@@ -98,7 +98,6 @@ const Comment = ({ comment, userPostId, onReload, onCloseComments, isReply = fal
 			text,
 			parentCommentId: isReply ? parentCommentId : comment._id,
 			mentionedUserId: author._id && text.trim().startsWith(replyMention) ? author._id : null,
-			jwtToken,
 		});
 
 		setIsReplying(false);
