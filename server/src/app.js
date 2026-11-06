@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 
 const routes = require('./router.js');
@@ -15,9 +14,9 @@ app.set('trust proxy', constants.PROXY_HOPS);
 
 app.use(cors({ origin: config.clientOrigin, credentials: true }));
 app.use(cookieParser());
-app.post('/user-posts/popular', bodyParser.json({ limit: POPULAR_BODY_LIMIT_BYTES }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.post('/user-posts/popular', express.json({ limit: POPULAR_BODY_LIMIT_BYTES }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 app.use(routes);
 

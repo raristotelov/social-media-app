@@ -15,7 +15,7 @@ Overview of the technologies used across the social media app. Versions reflect 
 
 ## Backend (`server/`)
 
-- **Runtime:** Node.js.
+- **Runtime:** Node.js `^22.22.2 || ^24.15.0 || >=26.0.0` (`engines` in `server/package.json`).
 - **Framework:** Express 5.
 - **Auth:** `jsonwebtoken` (JWT signing/verification), `bcrypt` (password hashing).
 - **Config/middleware:** `cors` (explicit `CLIENT_ORIGIN`, `credentials: true`), `cookie-parser`, `dotenv`.
@@ -23,7 +23,7 @@ Overview of the technologies used across the social media app. Versions reflect 
 
 ## Database
 
-- **MongoDB** via **Mongoose** 8 (ODM). Runs locally (`mongodb-community`) or via MongoDB Atlas; connection string in `MONGODB_URI`.
+- **MongoDB** via **Mongoose** 9 (ODM). Runs locally (`mongodb-community`) or via MongoDB Atlas; connection string in `MONGODB_URI`.
 
 ## Migrations
 
@@ -53,7 +53,7 @@ Overview of the technologies used across the social media app. Versions reflect 
 ## Tooling
 
 - **Client:** Prettier, ESLint 9 (flat config), Vitest 5 with jsdom, Testing Library, Cypress for end-to-end.
-- **Server:** Prettier, ESLint, Jest, `nodemon` for dev reload.
+- **Server:** Prettier, ESLint, Jest (run with `--experimental-vm-modules`, because the MongoDB driver loads `os` through a dynamic `import()`), `node --watch` for dev reload.
 
 ### Commands
 

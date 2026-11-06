@@ -1245,8 +1245,12 @@ describe('userService', () => {
 			const result = await action(USER_ID, TARGET_ID);
 
 			expect(UserModel.countDocuments).toHaveBeenCalledWith({ _id: { $in: [USER_ID, TARGET_ID] } });
-			expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: USER_ID }, { [operator]: { [ownList]: TARGET_ID } }, { new: true });
-			expect(UserModel.updateOne).toHaveBeenCalledWith({ _id: TARGET_ID }, { [operator]: { [otherList]: USER_ID } }, { new: true });
+			expect(UserModel.findOneAndUpdate).toHaveBeenCalledWith(
+				{ _id: USER_ID },
+				{ [operator]: { [ownList]: TARGET_ID } },
+				{ returnDocument: 'after' },
+			);
+			expect(UserModel.updateOne).toHaveBeenCalledWith({ _id: TARGET_ID }, { [operator]: { [otherList]: USER_ID } });
 			expect(result).toEqual({ user: { _id: USER_ID, username: 'realuser' }, jwt: 'signed.jwt.token' });
 		});
 

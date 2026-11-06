@@ -391,7 +391,7 @@ const updateUserProfileData = async (userId, updatedProfileData, profilePictureF
 			}
 
 			user = await UserModel.findOneAndUpdate({ _id: userId }, userUpdate, {
-				new: true,
+				returnDocument: 'after',
 				runValidators: true,
 				context: 'query',
 			});
@@ -445,9 +445,13 @@ const followUser = async (userId, userIdToFollow) => {
 
 		assertUserNotHidden(userIdToFollow, hiddenVisitorIds);
 
-		const currentlyLoggedUser = await UserModel.findOneAndUpdate({ _id: userId }, { $addToSet: { following: userIdToFollow } }, { new: true });
+		const currentlyLoggedUser = await UserModel.findOneAndUpdate(
+			{ _id: userId },
+			{ $addToSet: { following: userIdToFollow } },
+			{ returnDocument: 'after' },
+		);
 
-		await UserModel.updateOne({ _id: userIdToFollow }, { $addToSet: { followers: userId } }, { new: true });
+		await UserModel.updateOne({ _id: userIdToFollow }, { $addToSet: { followers: userId } });
 
 		await notificationService.notifyFollow({ actorId: userId, recipientId: userIdToFollow });
 
@@ -471,9 +475,13 @@ const unfollowUser = async (userId, userIdToUnfollow) => {
 
 		assertUserNotHidden(userIdToUnfollow, hiddenVisitorIds);
 
-		const currentlyLoggedUser = await UserModel.findOneAndUpdate({ _id: userId }, { $pull: { following: userIdToUnfollow } }, { new: true });
+		const currentlyLoggedUser = await UserModel.findOneAndUpdate(
+			{ _id: userId },
+			{ $pull: { following: userIdToUnfollow } },
+			{ returnDocument: 'after' },
+		);
 
-		await UserModel.updateOne({ _id: userIdToUnfollow }, { $pull: { followers: userId } }, { new: true });
+		await UserModel.updateOne({ _id: userIdToUnfollow }, { $pull: { followers: userId } });
 
 		await notificationService.removeFollowNotification({ actorId: userId, recipientId: userIdToUnfollow });
 

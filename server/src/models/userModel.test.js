@@ -8,22 +8,20 @@ describe('UserModel', () => {
 		password: 'hashedPassword123',
 	};
 
-	it(`rejects a bio longer than ${constants.MAX_BIO_LENGTH} characters`, () => {
+	it(`rejects a bio longer than ${constants.MAX_BIO_LENGTH} characters`, async () => {
 		const bio = 'a'.repeat(constants.MAX_BIO_LENGTH + 1);
 		const user = new UserModel({ ...validUserData, bio });
 
-		const validationError = user.validateSync();
-
-		expect(validationError.errors.bio.message).toBe(`Bio must be at most ${constants.MAX_BIO_LENGTH} characters`);
+		await expect(user.validate()).rejects.toMatchObject({
+			errors: { bio: { message: `Bio must be at most ${constants.MAX_BIO_LENGTH} characters` } },
+		});
 	});
 
-	it(`accepts a bio of exactly ${constants.MAX_BIO_LENGTH} characters`, () => {
+	it(`accepts a bio of exactly ${constants.MAX_BIO_LENGTH} characters`, async () => {
 		const bio = 'a'.repeat(constants.MAX_BIO_LENGTH);
 		const user = new UserModel({ ...validUserData, bio });
 
-		const validationError = user.validateSync();
-
-		expect(validationError).toBeUndefined();
+		await expect(user.validate()).resolves.toBeUndefined();
 	});
 
 	describe('suggestionsCarouselDismissedUntil', () => {
@@ -33,22 +31,22 @@ describe('UserModel', () => {
 			expect(user.suggestionsCarouselDismissedUntil).toBeUndefined();
 		});
 
-		it('stores a date', () => {
+		it('stores a date', async () => {
 			const dismissedUntil = new Date('2026-11-01T10:00:00.000Z');
 			const user = new UserModel({ ...validUserData, suggestionsCarouselDismissedUntil: dismissedUntil });
 
 			expect(user.suggestionsCarouselDismissedUntil).toEqual(dismissedUntil);
-			expect(user.validateSync()).toBeUndefined();
+			await expect(user.validate()).resolves.toBeUndefined();
 		});
 
 		it('is a Date path on the schema', () => {
 			expect(UserModel.schema.path('suggestionsCarouselDismissedUntil').instance).toBe('Date');
 		});
 
-		it('rejects a value that is not a date', () => {
+		it('rejects a value that is not a date', async () => {
 			const user = new UserModel({ ...validUserData, suggestionsCarouselDismissedUntil: 'not a date' });
 
-			expect(user.validateSync().errors.suggestionsCarouselDismissedUntil).toBeDefined();
+			await expect(user.validate()).rejects.toMatchObject({ errors: { suggestionsCarouselDismissedUntil: expect.anything() } });
 		});
 	});
 
@@ -59,16 +57,16 @@ describe('UserModel', () => {
 			expect(user.accountType).toBe('user');
 		});
 
-		it.each(['user', 'persona', 'demo'])('accepts %s', (accountType) => {
+		it.each(['user', 'persona', 'demo'])('accepts %s', async (accountType) => {
 			const user = new UserModel({ ...validUserData, accountType });
 
-			expect(user.validateSync()).toBeUndefined();
+			await expect(user.validate()).resolves.toBeUndefined();
 		});
 
-		it('rejects any other value', () => {
+		it('rejects any other value', async () => {
 			const user = new UserModel({ ...validUserData, accountType: 'admin' });
 
-			expect(user.validateSync().errors.accountType).toBeDefined();
+			await expect(user.validate()).rejects.toMatchObject({ errors: { accountType: expect.anything() } });
 		});
 
 		it('is indexed, because every visibility rule looks accounts up by it', () => {

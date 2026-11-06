@@ -181,7 +181,7 @@ const updateUserPostLikes = async ({ userPostId, likesUpdate, viewerId }) => {
 
 	const hiddenVisitorIds = await getHiddenVisitorIds(viewerId);
 	const filter = hiddenVisitorIds.length ? { _id: userPostId, userId: { $nin: hiddenVisitorIds } } : { _id: userPostId };
-	const updatedUserPost = await UserPostModel.findOneAndUpdate(filter, likesUpdate, { new: true });
+	const updatedUserPost = await UserPostModel.findOneAndUpdate(filter, likesUpdate, { returnDocument: 'after' });
 
 	if (!updatedUserPost) {
 		throw createPostNotFoundError();

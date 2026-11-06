@@ -668,7 +668,7 @@ describe('commentService', () => {
 
 			const result = await action({ commentId: COMMENT_ID, userId: USER_ID });
 
-			expect(CommentModel.findByIdAndUpdate).toHaveBeenCalledWith(COMMENT_ID, expectedUpdate, { new: true });
+			expect(CommentModel.findByIdAndUpdate).toHaveBeenCalledWith(COMMENT_ID, expectedUpdate, { returnDocument: 'after' });
 			expect(result).toBe(updatedComment);
 		});
 
