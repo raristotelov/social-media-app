@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { deleteStory, getStoryViewers, getUserStories, markStoryViewed } from '../../services/storyService';
@@ -11,7 +10,7 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import StoryViewer from './StoryViewer';
 
-jest.mock('../../services/storyService');
+vi.mock('../../services/storyService');
 
 const LOAD_ERROR_TOAST = "Couldn't load stories. Try again.";
 const DELETE_ERROR_TOAST = "Couldn't delete your story. Try again.";
@@ -51,8 +50,9 @@ const buildDeferred = () => {
 };
 
 let storiesByUser;
+let user;
 
-const renderViewer = ({ queue = buildQueue(), startIndex = 1, onClose = jest.fn(), endSession = jest.fn() } = {}) => {
+const renderViewer = ({ queue = buildQueue(), startIndex = 1, onClose = vi.fn(), endSession = vi.fn() } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser: { _id: 'me' }, endSession }}>
 			<ToastProvider>
@@ -79,14 +79,15 @@ const getPhoto = () => screen.getByAltText(/^Story by/);
 const getPhotoName = () => getPhoto().getAttribute('src').split('/').pop().replace('.jpg', '');
 const loadPhoto = () => fireEvent.load(getPhoto());
 const finishSegment = () => fireEvent.animationEnd(document.querySelector('.story-viewer-segment-fill-active'));
-const tapNext = () => userEvent.click(document.querySelector('.story-viewer-zone-next'));
-const tapPrevious = () => userEvent.click(document.querySelector('.story-viewer-zone-previous'));
+const tapNext = () => user.click(document.querySelector('.story-viewer-zone-next'));
+const tapPrevious = () => user.click(document.querySelector('.story-viewer-zone-previous'));
 const getToastText = () => document.querySelector('.toast-region').textContent;
-const closeOverlay = () => userEvent.click(document.querySelector('.popup-close'));
+const closeOverlay = () => user.click(document.querySelector('.popup-close'));
 
 describe('StoryViewer', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		storiesByUser = buildStoriesByUser();
 		getUserStories.mockImplementation(({ userId }) => Promise.resolve({ user: { _id: userId }, stories: storiesByUser[userId] }));
 		markStoryViewed.mockResolvedValue({});
@@ -196,7 +197,7 @@ describe('StoryViewer', () => {
 			];
 
 			await openViewer({ startIndex: 1 });
-			tapNext();
+			await tapNext();
 
 			expect(document.querySelector('.story-viewer-age')).toHaveTextContent('2h');
 		});
@@ -220,7 +221,7 @@ describe('StoryViewer', () => {
 		it('fills the progress segment over 5 seconds', async () => {
 			await openViewer({ startIndex: 1 });
 
-			expect(document.querySelector('.story-viewer-segment-fill-active')).toHaveStyle({ animationDuration: '5000ms' });
+			expect(document.querySelector('.story-viewer-segment-fill-active')).toHaveStyle({ animationDuration: '5s' });
 		});
 
 		it('moves to the next story when the segment has filled', async () => {
@@ -246,7 +247,7 @@ describe('StoryViewer', () => {
 			loadPhoto();
 			expect(getViewer()).not.toHaveClass('story-viewer-paused');
 
-			tapPrevious();
+			await tapPrevious();
 
 			expect(getPhotoName()).toBe('a1');
 			expect(getViewer()).toHaveClass('story-viewer-paused');
@@ -263,7 +264,7 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 1 });
 			loadPhoto();
 
-			move();
+			await move();
 			loadPhoto();
 
 			await waitFor(() => expect(getViewer()).not.toHaveClass('story-viewer-paused'));
@@ -284,10 +285,10 @@ describe('StoryViewer', () => {
 		it('stays paused when returning to a story whose photo had loaded before, until it loads again', async () => {
 			await openViewer({ startIndex: 1 });
 			loadPhoto();
-			tapNext();
+			await tapNext();
 			loadPhoto();
 
-			tapPrevious();
+			await tapPrevious();
 
 			expect(getPhotoName()).toBe('a2');
 			expect(getViewer()).toHaveClass('story-viewer-paused');
@@ -355,7 +356,7 @@ describe('StoryViewer', () => {
 		it('goes forward when the right side is tapped', async () => {
 			await openViewer({ startIndex: 1 });
 
-			tapNext();
+			await tapNext();
 
 			expect(getPhotoName()).toBe('a3');
 		});
@@ -369,7 +370,7 @@ describe('StoryViewer', () => {
 			];
 
 			await openViewer({ startIndex: 1 });
-			tapNext();
+			await tapNext();
 
 			expect(getPhotoName()).toBe('a2');
 		});
@@ -377,7 +378,7 @@ describe('StoryViewer', () => {
 		it('goes back when the left side is tapped', async () => {
 			await openViewer({ startIndex: 1 });
 
-			tapPrevious();
+			await tapPrevious();
 
 			expect(getPhotoName()).toBe('a1');
 		});
@@ -386,17 +387,17 @@ describe('StoryViewer', () => {
 			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
 
 			await openViewer({ startIndex: 1 });
-			tapNext();
+			await tapNext();
 
 			expect(await screen.findByAltText('Story by bob')).toBeInTheDocument();
 		});
 
 		it("goes to the previous user's last story from a user's first story", async () => {
 			await openViewer({ startIndex: 2 });
-			tapPrevious();
+			await tapPrevious();
 			expect(getPhotoName()).toBe('b1');
 
-			tapPrevious();
+			await tapPrevious();
 
 			await waitFor(() => expect(screen.getByAltText('Story by alice')).toBeInTheDocument());
 			expect(getPhotoName()).toBe('a3');
@@ -406,11 +407,11 @@ describe('StoryViewer', () => {
 			storiesByUser.alice = [buildStory('a1', { isWatched: false }), buildStory('a2', { isWatched: false })];
 
 			await openViewer({ startIndex: 1 });
-			tapNext();
-			tapNext();
+			await tapNext();
+			await tapNext();
 			await screen.findByAltText('Story by bob');
-			tapPrevious();
-			tapPrevious();
+			await tapPrevious();
+			await tapPrevious();
 
 			await screen.findByAltText('Story by alice');
 			expect(getPhotoName()).toBe('a2');
@@ -419,7 +420,7 @@ describe('StoryViewer', () => {
 		it('does nothing on the very first story', async () => {
 			const { onClose } = await openViewer({ startIndex: 0 });
 
-			tapPrevious();
+			await tapPrevious();
 
 			expect(getPhotoName()).toBe('m1');
 			expect(onClose).not.toHaveBeenCalled();
@@ -428,17 +429,17 @@ describe('StoryViewer', () => {
 		it('closes after the last story when the right side is tapped', async () => {
 			const { onClose } = await openViewer({ startIndex: 2 });
 
-			tapNext();
+			await tapNext();
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not move a story that is still loading its user', () => {
+		it('does not move a story that is still loading its user', async () => {
 			getUserStories.mockReturnValue(new Promise(() => {}));
 			const { onClose } = renderViewer({ startIndex: 1 });
 
-			tapNext();
-			tapPrevious();
+			await tapNext();
+			await tapPrevious();
 
 			expect(onClose).not.toHaveBeenCalled();
 			expect(getUserStories).toHaveBeenCalledTimes(1);
@@ -469,7 +470,7 @@ describe('StoryViewer', () => {
 
 		beforeEach(() => {
 			currentTime = 1_000_000;
-			nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
+			nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
 		});
 
 		afterEach(() => {
@@ -574,7 +575,7 @@ describe('StoryViewer', () => {
 		it('has a next arrow that goes forward', async () => {
 			await openViewer({ startIndex: 1 });
 
-			userEvent.click(document.querySelector('.story-viewer-arrow-next'));
+			await user.click(document.querySelector('.story-viewer-arrow-next'));
 
 			expect(getPhotoName()).toBe('a3');
 		});
@@ -582,7 +583,7 @@ describe('StoryViewer', () => {
 		it('has a previous arrow that goes back', async () => {
 			await openViewer({ startIndex: 1 });
 
-			userEvent.click(document.querySelector('.story-viewer-arrow-previous'));
+			await user.click(document.querySelector('.story-viewer-arrow-previous'));
 
 			expect(getPhotoName()).toBe('a1');
 		});
@@ -604,7 +605,7 @@ describe('StoryViewer', () => {
 		it('always has a next arrow, which closes after the very last story', async () => {
 			const { onClose } = await openViewer({ startIndex: 2 });
 
-			userEvent.click(document.querySelector('.story-viewer-arrow-next'));
+			await user.click(document.querySelector('.story-viewer-arrow-next'));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -612,7 +613,7 @@ describe('StoryViewer', () => {
 		it('closes from the close button', async () => {
 			const { onClose } = await openViewer({ startIndex: 1 });
 
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -712,7 +713,7 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 1 });
 
 			loadPhoto();
-			tapNext();
+			await tapNext();
 
 			expect(markStoryViewed).toHaveBeenCalledWith({ storyId: 'a2' });
 		});
@@ -720,7 +721,7 @@ describe('StoryViewer', () => {
 		it('does not record a story that was tapped past before its photo loaded', async () => {
 			await openViewer({ startIndex: 1 });
 
-			tapNext();
+			await tapNext();
 
 			expect(markStoryViewed).not.toHaveBeenCalled();
 		});
@@ -738,9 +739,9 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 1 });
 
 			loadPhoto();
-			tapNext();
+			await tapNext();
 			loadPhoto();
-			tapPrevious();
+			await tapPrevious();
 			loadPhoto();
 
 			expect(markStoryViewed.mock.calls.filter(([{ storyId }]) => storyId === 'a2')).toHaveLength(1);
@@ -847,7 +848,7 @@ describe('StoryViewer', () => {
 
 			const { onClose } = await openViewer({ startIndex: 1 });
 
-			tapNext();
+			await tapNext();
 
 			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
 			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
@@ -870,7 +871,7 @@ describe('StoryViewer', () => {
 		it('is hidden while the story has no viewers, with the trash icon still there', async () => {
 			await openViewer({ startIndex: 0 });
 
-			tapNext();
+			await tapNext();
 
 			expect(screen.queryByRole('button', { name: /Seen by/ })).not.toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Delete story' })).toBeInTheDocument();
@@ -897,9 +898,9 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 0 });
 
 			expect(screen.getByRole('button', { name: 'Seen by 3' })).toBeInTheDocument();
-			tapNext();
+			await tapNext();
 			expect(screen.queryByRole('button', { name: /Seen by/ })).not.toBeInTheDocument();
-			tapPrevious();
+			await tapPrevious();
 			expect(screen.getByRole('button', { name: 'Seen by 3' })).toBeInTheDocument();
 		});
 
@@ -913,7 +914,7 @@ describe('StoryViewer', () => {
 			getStoryViewers.mockResolvedValue([{ _id: 'v1', username: 'viewer1' }]);
 			await openViewer({ startIndex: 0 });
 
-			userEvent.click(screen.getByRole('button', { name: 'Seen by 3' }));
+			await user.click(screen.getByRole('button', { name: 'Seen by 3' }));
 
 			expect(await screen.findByRole('heading', { name: 'Viewers' })).toBeInTheDocument();
 			expect(await screen.findByText('viewer1')).toBeInTheDocument();
@@ -924,7 +925,7 @@ describe('StoryViewer', () => {
 			getStoryViewers.mockResolvedValue([{ _id: 'v1', username: 'viewer1', followersCount: 9 }]);
 			await openViewer({ startIndex: 0 });
 
-			userEvent.click(screen.getByRole('button', { name: 'Seen by 3' }));
+			await user.click(screen.getByRole('button', { name: 'Seen by 3' }));
 
 			await screen.findByText('viewer1');
 			expect(document.querySelector('.search-result-followers')).not.toBeInTheDocument();
@@ -934,7 +935,7 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 0 });
 			loadPhoto();
 
-			userEvent.click(screen.getByRole('button', { name: 'Seen by 3' }));
+			await user.click(screen.getByRole('button', { name: 'Seen by 3' }));
 
 			expect(getViewer()).toHaveClass('story-viewer-paused');
 		});
@@ -944,9 +945,9 @@ describe('StoryViewer', () => {
 			loadPhoto();
 			const fillBefore = document.querySelector('.story-viewer-segment-fill-active');
 
-			userEvent.click(screen.getByRole('button', { name: 'Seen by 3' }));
+			await user.click(screen.getByRole('button', { name: 'Seen by 3' }));
 			await screen.findByRole('heading', { name: 'Viewers' });
-			closeOverlay();
+			await closeOverlay();
 
 			expect(screen.queryByRole('heading', { name: 'Viewers' })).not.toBeInTheDocument();
 			expect(getViewer()).not.toHaveClass('story-viewer-paused');
@@ -957,7 +958,7 @@ describe('StoryViewer', () => {
 		it('closes only the list, not the viewer, on Escape', async () => {
 			const { onClose } = await openViewer({ startIndex: 0 });
 
-			userEvent.click(screen.getByRole('button', { name: 'Seen by 3' }));
+			await user.click(screen.getByRole('button', { name: 'Seen by 3' }));
 			await screen.findByRole('heading', { name: 'Viewers' });
 			fireEvent.keyDown(document, { key: 'Escape' });
 
@@ -968,7 +969,7 @@ describe('StoryViewer', () => {
 		it('ignores the arrow keys while the list is open', async () => {
 			await openViewer({ startIndex: 0 });
 
-			userEvent.click(screen.getByRole('button', { name: 'Seen by 3' }));
+			await user.click(screen.getByRole('button', { name: 'Seen by 3' }));
 			await screen.findByRole('heading', { name: 'Viewers' });
 			fireEvent.keyDown(document, { key: 'ArrowRight' });
 
@@ -977,7 +978,7 @@ describe('StoryViewer', () => {
 	});
 
 	describe('your own stories: delete', () => {
-		const openDeleteConfirm = () => userEvent.click(screen.getByRole('button', { name: 'Delete story' }));
+		const openDeleteConfirm = () => user.click(screen.getByRole('button', { name: 'Delete story' }));
 
 		it("shows the trash icon on your own story but not on someone else's", async () => {
 			await openViewer({ startIndex: 1 });
@@ -988,7 +989,7 @@ describe('StoryViewer', () => {
 		it('opens the "Delete story" confirmation with Delete and Cancel', async () => {
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
+			await openDeleteConfirm();
 
 			expect(screen.getByRole('heading', { name: 'Delete story' })).toBeInTheDocument();
 			expect(screen.getByText('This story will be permanently deleted. This cannot be undone.')).toBeInTheDocument();
@@ -1000,7 +1001,7 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 0 });
 			loadPhoto();
 
-			openDeleteConfirm();
+			await openDeleteConfirm();
 
 			expect(getViewer()).toHaveClass('story-viewer-paused');
 		});
@@ -1008,7 +1009,7 @@ describe('StoryViewer', () => {
 		it('deletes nothing yet', async () => {
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
+			await openDeleteConfirm();
 
 			expect(deleteStory).not.toHaveBeenCalled();
 		});
@@ -1017,8 +1018,8 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 0 });
 			loadPhoto();
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(screen.queryByRole('heading', { name: 'Delete story' })).not.toBeInTheDocument();
 			expect(getViewer()).not.toHaveClass('story-viewer-paused');
@@ -1030,8 +1031,8 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 0 });
 			loadPhoto();
 
-			openDeleteConfirm();
-			closeOverlay();
+			await openDeleteConfirm();
+			await closeOverlay();
 
 			expect(screen.queryByRole('heading', { name: 'Delete story' })).not.toBeInTheDocument();
 			expect(getViewer()).not.toHaveClass('story-viewer-paused');
@@ -1040,8 +1041,8 @@ describe('StoryViewer', () => {
 		it('deletes the story that is showing, with the token', async () => {
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(deleteStory).toHaveBeenCalledWith({ storyId: 'm1' }));
 			expect(deleteStory).toHaveBeenCalledTimes(1);
@@ -1050,8 +1051,8 @@ describe('StoryViewer', () => {
 		it('closes the confirmation and moves on to your next story', async () => {
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Delete story' })).not.toBeInTheDocument());
 			expect(getPhotoName()).toBe('m2');
@@ -1063,8 +1064,8 @@ describe('StoryViewer', () => {
 
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			expect(await screen.findByAltText('Story by alice')).toBeInTheDocument();
 		});
@@ -1075,8 +1076,8 @@ describe('StoryViewer', () => {
 
 			const { onClose } = await openViewer({ queue, startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
 		});
@@ -1087,11 +1088,11 @@ describe('StoryViewer', () => {
 			deleteStory.mockReturnValue(request.promise);
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 			expect(deleteStory).toHaveBeenCalledTimes(1);
 
 			request.resolve({});
@@ -1103,8 +1104,8 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 0 });
 			loadPhoto();
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(getToastText()).toBe(DELETE_ERROR_TOAST));
 			expect(screen.queryByRole('heading', { name: 'Delete story' })).not.toBeInTheDocument();
@@ -1115,8 +1116,8 @@ describe('StoryViewer', () => {
 			deleteStory.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(getToastText()).toBe(DELETE_ERROR_TOAST));
 			expect(getPhotoName()).toBe('m1');
@@ -1127,8 +1128,8 @@ describe('StoryViewer', () => {
 			deleteStory.mockRejectedValue(new Error('network down'));
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(getToastText()).toBe(DELETE_ERROR_TOAST));
 		});
@@ -1137,8 +1138,8 @@ describe('StoryViewer', () => {
 			deleteStory.mockRejectedValue({ code: 'STORY_NOT_FOUND', status: 404 });
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(getToastText()).toBe(DELETE_ERROR_TOAST));
 		});
@@ -1147,8 +1148,8 @@ describe('StoryViewer', () => {
 			deleteStory.mockRejectedValue({ code: 'STORY_FORBIDDEN', status: 403 });
 			await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(getToastText()).toBe(DELETE_ERROR_TOAST));
 		});
@@ -1157,8 +1158,8 @@ describe('StoryViewer', () => {
 			deleteStory.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await openDeleteConfirm();
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(getToastText()).toBe('');
@@ -1168,7 +1169,7 @@ describe('StoryViewer', () => {
 		it('closes only the confirmation, not the viewer, on Escape', async () => {
 			const { onClose } = await openViewer({ startIndex: 0 });
 
-			openDeleteConfirm();
+			await openDeleteConfirm();
 			fireEvent.keyDown(document, { key: 'Escape' });
 
 			expect(screen.queryByRole('heading', { name: 'Delete story' })).not.toBeInTheDocument();
@@ -1180,10 +1181,10 @@ describe('StoryViewer', () => {
 		const getSheet = () => document.querySelector('.popup-container .popup-body');
 		const getHandle = () => document.querySelector('.popup-container .bottom-sheet-handle');
 		const openViewers = async () => {
-			userEvent.click(screen.getByRole('button', { name: 'Seen by 3' }));
+			await user.click(screen.getByRole('button', { name: 'Seen by 3' }));
 			await screen.findByRole('heading', { name: 'Viewers' });
 		};
-		const openDeleteConfirm = () => userEvent.click(screen.getByRole('button', { name: 'Delete story' }));
+		const openDeleteConfirm = () => user.click(screen.getByRole('button', { name: 'Delete story' }));
 
 		beforeEach(() => {
 			installBottomSheetEnvironment();
@@ -1267,7 +1268,7 @@ describe('StoryViewer', () => {
 			it('shows a drag handle', async () => {
 				await openViewer({ startIndex: 0 });
 
-				openDeleteConfirm();
+				await openDeleteConfirm();
 
 				expect(getSheet()).toContainElement(getHandle());
 			});
@@ -1276,7 +1277,7 @@ describe('StoryViewer', () => {
 				const { onClose } = await openViewer({ startIndex: 0 });
 
 				loadPhoto();
-				openDeleteConfirm();
+				await openDeleteConfirm();
 				dragDown(getHandle(), 120);
 				fireTransitionEnd(getSheet());
 
@@ -1289,7 +1290,7 @@ describe('StoryViewer', () => {
 
 			it('stays open after a short drag', async () => {
 				await openViewer({ startIndex: 0 });
-				openDeleteConfirm();
+				await openDeleteConfirm();
 
 				dragDown(getHandle(), 40);
 				fireTransitionEnd(getSheet());
@@ -1299,7 +1300,7 @@ describe('StoryViewer', () => {
 
 			it('does not close the confirmation when the drag starts on its message', async () => {
 				await openViewer({ startIndex: 0 });
-				openDeleteConfirm();
+				await openDeleteConfirm();
 
 				dragDown(screen.getByText('This story will be permanently deleted. This cannot be undone.'), 300);
 				fireTransitionEnd(getSheet());

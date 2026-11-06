@@ -1,16 +1,15 @@
-import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 
 import AddCommentForm from './AddCommentForm';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 
-jest.mock('react-router-dom', () => ({
-	...jest.requireActual('react-router-dom'),
+vi.mock('react-router', async () => ({
+	...(await vi.importActual('react-router')),
 	useNavigate: () => mockNavigate,
 }));
 
@@ -27,8 +26,8 @@ const buildDeferred = () => {
 	return deferred;
 };
 
-const renderForm = ({ user = loggedInUser, entry = '/user-feed', endSession = jest.fn(), ...props } = {}) => {
-	const onSubmit = props.onSubmit ?? jest.fn().mockResolvedValue(undefined);
+const renderForm = ({ user = loggedInUser, entry = '/user-feed', endSession = vi.fn(), ...props } = {}) => {
+	const onSubmit = props.onSubmit ?? vi.fn().mockResolvedValue(undefined);
 
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
@@ -47,7 +46,7 @@ const getPostButton = () => screen.getByRole('button', { name: 'Post' });
 
 describe('AddCommentForm', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 	});
 
 	describe('Post button state', () => {
@@ -57,27 +56,33 @@ describe('AddCommentForm', () => {
 			expect(getPostButton()).toBeDisabled();
 		});
 
-		it('is disabled while the box holds only spaces', () => {
+		it('is disabled while the box holds only spaces', async () => {
+			const user = userEvent.setup();
+
 			renderForm();
 
-			userEvent.type(getInput(), '    ');
+			await user.type(getInput(), '    ');
 
 			expect(getPostButton()).toBeDisabled();
 		});
 
-		it('is enabled once the box holds text', () => {
+		it('is enabled once the box holds text', async () => {
+			const user = userEvent.setup();
+
 			renderForm();
 
-			userEvent.type(getInput(), 'Nice shot');
+			await user.type(getInput(), 'Nice shot');
 
 			expect(getPostButton()).toBeEnabled();
 		});
 
-		it('is disabled again after the text is deleted', () => {
+		it('is disabled again after the text is deleted', async () => {
+			const user = userEvent.setup();
+
 			renderForm();
 
-			userEvent.type(getInput(), 'Nice shot');
-			userEvent.clear(getInput());
+			await user.type(getInput(), 'Nice shot');
+			await user.clear(getInput());
 
 			expect(getPostButton()).toBeDisabled();
 		});
@@ -92,27 +97,31 @@ describe('AddCommentForm', () => {
 
 	describe('submitting', () => {
 		it('calls onSubmit with the text when Post is clicked', async () => {
+			const user = userEvent.setup();
 			const { onSubmit } = renderForm();
 
-			userEvent.type(getInput(), 'Nice shot');
-			userEvent.click(getPostButton());
+			await user.type(getInput(), 'Nice shot');
+			await user.click(getPostButton());
 
 			await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('Nice shot'));
 		});
 
 		it('submits when Enter is pressed in the box', async () => {
+			const user = userEvent.setup();
 			const { onSubmit } = renderForm();
 
-			userEvent.type(getInput(), 'Nice shot{enter}');
+			await user.type(getInput(), 'Nice shot{Enter}');
 
 			await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('Nice shot'));
 		});
 
 		it('clears the box after a successful submit', async () => {
+			const user = userEvent.setup();
+
 			renderForm();
 
-			userEvent.type(getInput(), 'Nice shot');
-			userEvent.click(getPostButton());
+			await user.type(getInput(), 'Nice shot');
+			await user.click(getPostButton());
 
 			await waitFor(() => expect(getInput()).toHaveValue(''));
 		});
@@ -125,22 +134,24 @@ describe('AddCommentForm', () => {
 			expect(onSubmit).not.toHaveBeenCalled();
 		});
 
-		it('sends no request when the box holds only spaces', () => {
+		it('sends no request when the box holds only spaces', async () => {
+			const user = userEvent.setup();
 			const { onSubmit, container } = renderForm();
 
-			userEvent.type(getInput(), '   ');
+			await user.type(getInput(), '   ');
 			fireEvent.submit(container.querySelector('form'));
 
 			expect(onSubmit).not.toHaveBeenCalled();
 		});
 
 		it('disables Post while the request is in flight', async () => {
+			const user = userEvent.setup();
 			const request = buildDeferred();
 
-			renderForm({ onSubmit: jest.fn().mockReturnValue(request.promise) });
+			renderForm({ onSubmit: vi.fn().mockReturnValue(request.promise) });
 
-			userEvent.type(getInput(), 'Nice shot');
-			userEvent.click(getPostButton());
+			await user.type(getInput(), 'Nice shot');
+			await user.click(getPostButton());
 
 			expect(getPostButton()).toBeDisabled();
 
@@ -149,10 +160,11 @@ describe('AddCommentForm', () => {
 		});
 
 		it('sends one request when the form is submitted twice before the first returns', async () => {
+			const user = userEvent.setup();
 			const request = buildDeferred();
-			const { onSubmit, container } = renderForm({ onSubmit: jest.fn().mockReturnValue(request.promise) });
+			const { onSubmit, container } = renderForm({ onSubmit: vi.fn().mockReturnValue(request.promise) });
 
-			userEvent.type(getInput(), 'Nice shot');
+			await user.type(getInput(), 'Nice shot');
 			fireEvent.submit(container.querySelector('form'));
 			fireEvent.submit(container.querySelector('form'));
 
@@ -165,10 +177,11 @@ describe('AddCommentForm', () => {
 
 	describe('errors', () => {
 		const submitFailing = async (error, props = {}) => {
-			const rendered = renderForm({ onSubmit: jest.fn().mockRejectedValue(error), ...props });
+			const user = userEvent.setup();
+			const rendered = renderForm({ onSubmit: vi.fn().mockRejectedValue(error), ...props });
 
-			userEvent.type(getInput(), 'Nice shot');
-			userEvent.click(getPostButton());
+			await user.type(getInput(), 'Nice shot');
+			await user.click(getPostButton());
 
 			await waitFor(() => expect(rendered.onSubmit).toHaveBeenCalledTimes(1));
 
@@ -232,25 +245,28 @@ describe('AddCommentForm', () => {
 		});
 
 		it('clears the message when the user types again', async () => {
+			const user = userEvent.setup();
+
 			await submitFailing({ code: 'INTERNAL_ERROR', status: 500 });
 
 			await screen.findByRole('alert');
-			userEvent.type(getInput(), '!');
+			await user.type(getInput(), '!');
 
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 		});
 
 		it('clears the message when submitting again', async () => {
+			const user = userEvent.setup();
 			const request = buildDeferred();
 			const { onSubmit } = renderForm({
-				onSubmit: jest.fn().mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockReturnValueOnce(request.promise),
+				onSubmit: vi.fn().mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockReturnValueOnce(request.promise),
 			});
 
-			userEvent.type(getInput(), 'Nice shot');
-			userEvent.click(getPostButton());
+			await user.type(getInput(), 'Nice shot');
+			await user.click(getPostButton());
 			await screen.findByRole('alert');
 
-			userEvent.click(getPostButton());
+			await user.click(getPostButton());
 
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 			await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
@@ -273,35 +289,43 @@ describe('AddCommentForm', () => {
 			expect(getPostButton()).toBeDisabled();
 		});
 
-		it('keeps Post disabled when the initial text is left without its trailing space', () => {
+		it('keeps Post disabled when the initial text is left without its trailing space', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ initialText: '@alice ' });
 
-			userEvent.type(getInput(), '{backspace}');
+			await user.type(getInput(), '{Backspace}');
 
 			expect(getPostButton()).toBeDisabled();
 		});
 
-		it('enables Post once text is added after the initial text', () => {
+		it('enables Post once text is added after the initial text', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ initialText: '@alice ' });
 
-			userEvent.type(getInput(), 'thanks');
+			await user.type(getInput(), 'thanks');
 
 			expect(getPostButton()).toBeEnabled();
 		});
 
-		it('disables Post when the initial text is deleted', () => {
+		it('disables Post when the initial text is deleted', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ initialText: '@alice ' });
 
-			userEvent.clear(getInput());
+			await user.clear(getInput());
 
 			expect(getPostButton()).toBeDisabled();
 		});
 
-		it('enables Post when the initial text is replaced by other text', () => {
+		it('enables Post when the initial text is replaced by other text', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ initialText: '@alice ' });
 
-			userEvent.clear(getInput());
-			userEvent.type(getInput(), 'hello');
+			await user.clear(getInput());
+			await user.type(getInput(), 'hello');
 
 			expect(getPostButton()).toBeEnabled();
 		});
@@ -315,29 +339,34 @@ describe('AddCommentForm', () => {
 		});
 
 		it('submits the initial text together with what was typed after it', async () => {
+			const user = userEvent.setup();
 			const { onSubmit } = renderForm({ initialText: '@alice ' });
 
-			userEvent.type(getInput(), 'thanks');
-			userEvent.click(getPostButton());
+			await user.type(getInput(), 'thanks');
+			await user.click(getPostButton());
 
 			await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('@alice thanks'));
 		});
 
 		it('clears the box after a successful submit', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ initialText: '@alice ' });
 
-			userEvent.type(getInput(), 'thanks');
-			userEvent.click(getPostButton());
+			await user.type(getInput(), 'thanks');
+			await user.click(getPostButton());
 
 			await waitFor(() => expect(getInput()).toHaveValue(''));
 		});
 	});
 
 	describe('as a guest', () => {
-		it('sends the guest to /log-in with the current URL, hash included, when the box is clicked', () => {
+		it('sends the guest to /log-in with the current URL, hash included, when the box is clicked', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ user: null, entry: '/user/user2/posts#post7' });
 
-			userEvent.click(getInput());
+			await user.click(getInput());
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post7' } });
 		});
@@ -350,13 +379,14 @@ describe('AddCommentForm', () => {
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post7' } });
 		});
 
-		it('sends a user whose session ended while typing to /log-in on submit, without calling onSubmit', () => {
+		it('sends a user whose session ended while typing to /log-in on submit, without calling onSubmit', async () => {
+			const user = userEvent.setup();
 			const { onSubmit, container, rerender } = renderForm({ entry: '/user/user2/posts#post7' });
 
-			userEvent.type(getInput(), 'Nice shot');
+			await user.type(getInput(), 'Nice shot');
 
 			rerender(
-				<LoggedInUserContext.Provider value={{ loggedInUser: null, endSession: jest.fn() }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser: null, endSession: vi.fn() }}>
 					<MemoryRouter initialEntries={['/user/user2/posts#post7']}>
 						<AddCommentForm onSubmit={onSubmit} />
 					</MemoryRouter>
@@ -369,11 +399,12 @@ describe('AddCommentForm', () => {
 			expect(onSubmit).not.toHaveBeenCalled();
 		});
 
-		it('never calls onSubmit', () => {
+		it('never calls onSubmit', async () => {
+			const user = userEvent.setup();
 			const { onSubmit } = renderForm({ user: null });
 
-			userEvent.click(getInput());
-			userEvent.click(getPostButton());
+			await user.click(getInput());
+			await user.click(getPostButton());
 
 			expect(onSubmit).not.toHaveBeenCalled();
 		});
@@ -386,10 +417,12 @@ describe('AddCommentForm', () => {
 			expect(mockNavigate).not.toHaveBeenCalled();
 		});
 
-		it('does not redirect when the guest tabs into the box', () => {
+		it('does not redirect when the guest tabs into the box', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ user: null });
 
-			userEvent.tab();
+			await user.tab();
 
 			expect(getInput()).toHaveFocus();
 			expect(mockNavigate).not.toHaveBeenCalled();
@@ -407,20 +440,24 @@ describe('AddCommentForm', () => {
 			expect(getPostButton()).toBeDisabled();
 		});
 
-		it('does not redirect when the disabled Post is clicked', () => {
+		it('does not redirect when the disabled Post is clicked', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ user: null });
 
-			userEvent.click(getPostButton());
+			await user.click(getPostButton());
 
 			expect(mockNavigate).not.toHaveBeenCalled();
 		});
 	});
 
 	describe('as a logged-in user', () => {
-		it('does not redirect when the box is clicked', () => {
+		it('does not redirect when the box is clicked', async () => {
+			const user = userEvent.setup();
+
 			renderForm();
 
-			userEvent.click(getInput());
+			await user.click(getInput());
 
 			expect(mockNavigate).not.toHaveBeenCalled();
 		});
@@ -469,10 +506,12 @@ describe('AddCommentForm', () => {
 			expect(getInput()).toHaveValue('@alice ');
 		});
 
-		it('lets the next typed characters land after the mention', () => {
+		it('lets the next typed characters land after the mention', async () => {
+			const user = userEvent.setup();
+
 			renderForm({ shouldFocusOnMount: true, initialText: '@alice ' });
 
-			userEvent.keyboard('thanks');
+			await user.keyboard('thanks');
 
 			expect(getInput()).toHaveValue('@alice thanks');
 		});

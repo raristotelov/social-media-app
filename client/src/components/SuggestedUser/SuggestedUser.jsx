@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { SUGGESTED_USER_ACTION_STYLES } from '../../constants/suggestions';
 import { getSuggestionReason } from '../../utils/suggestions';

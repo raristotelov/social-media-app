@@ -1,5 +1,5 @@
 // Mirrors client/src/constants/serverUrl.js so specs talk to the same API the app does.
-export const serverUrl = Cypress.env('apiUrl') || 'http://localhost:5000';
+export const serverUrl = Cypress.expose('apiUrl') || 'http://localhost:5000';
 
 export const AUTH_COOKIE_NAME = 'sessionToken';
 
@@ -193,6 +193,11 @@ export const getSuggestionsViaApi = (session, placement) =>
 
 export const dismissSuggestionsCarouselViaApi = (session) =>
 	apiRequest({ method: 'POST', url: `${serverUrl}/suggestions/carousel/dismiss`, headers: authHeaders(session) });
+
+export const getUnreadNotificationCountViaApi = (session) =>
+	apiRequest({ method: 'GET', url: `${serverUrl}/notifications/unread-count`, headers: authHeaders(session) }).then(
+		(response) => response.body.count,
+	);
 
 export const setThemeViaApi = (session, theme) =>
 	apiRequest({

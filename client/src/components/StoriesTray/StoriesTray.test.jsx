@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { addStory, getStoryTray, getUserStories, markStoryViewed } from '../../services/storyService';
@@ -12,11 +11,11 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import StoriesTray from './StoriesTray';
 
-jest.mock('../../services/storyService');
-jest.mock('../../services/userPostService');
-jest.mock('../../utils/images', () => ({
-	...jest.requireActual('../../utils/images'),
-	resizeImage: jest.fn(),
+vi.mock('../../services/storyService');
+vi.mock('../../services/userPostService');
+vi.mock('../../utils/images', async () => ({
+	...(await vi.importActual('../../utils/images')),
+	resizeImage: vi.fn(),
 }));
 
 const loggedInUser = { _id: 'me', username: 'me', profilePicture: { imageUrl: 'https://example.com/me.jpg' } };
@@ -46,7 +45,7 @@ const TrayHost = () => {
 	return <StoriesTray entries={entries} isLoaded={isLoaded} reload={reload} />;
 };
 
-const renderTray = ({ endSession = jest.fn() } = {}) => {
+const renderTray = ({ endSession = vi.fn() } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>
 			<ToastProvider>
@@ -60,9 +59,9 @@ const renderTray = ({ endSession = jest.fn() } = {}) => {
 	return { ...rendered, endSession };
 };
 
-const renderTrayWithProps = ({ entries = [], isLoaded = true, reload = jest.fn() } = {}) => {
+const renderTrayWithProps = ({ entries = [], isLoaded = true, reload = vi.fn() } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ loggedInUser, endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, endSession: vi.fn() }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<StoriesTray entries={entries} isLoaded={isLoaded} reload={reload} />
@@ -79,10 +78,13 @@ const getCircleLabels = () => Array.from(document.querySelectorAll('.story-circl
 const getCircleButton = (label) => screen.getByText(label).closest('button');
 
 describe('StoriesTray', () => {
+	let user;
+
 	beforeEach(() => {
-		jest.resetAllMocks();
-		global.URL.createObjectURL = jest.fn(() => 'blob:preview');
-		global.URL.revokeObjectURL = jest.fn();
+		vi.resetAllMocks();
+		user = userEvent.setup();
+		globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+		globalThis.URL.revokeObjectURL = vi.fn();
 		getStoryTray.mockResolvedValue([]);
 		markStoryViewed.mockResolvedValue({});
 		getUserStories.mockImplementation(({ userId }) =>
@@ -115,18 +117,18 @@ describe('StoriesTray', () => {
 		it('calls reload when the viewer closes', async () => {
 			const { reload } = renderTrayWithProps({ entries: [trayEntry('alice')] });
 
-			userEvent.click(screen.getByRole('button', { name: "View alice's story" }));
+			await user.click(screen.getByRole('button', { name: "View alice's story" }));
 			await screen.findByRole('dialog', { name: 'Story viewer' });
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(reload).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not call reload when the Create popup is only cancelled', () => {
+		it('does not call reload when the Create popup is only cancelled', async () => {
 			const { reload } = renderTrayWithProps();
 
-			userEvent.click(screen.getByRole('button', { name: 'Add to your story' }));
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await user.click(screen.getByRole('button', { name: 'Add to your story' }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(reload).not.toHaveBeenCalled();
 		});
@@ -136,9 +138,9 @@ describe('StoriesTray', () => {
 			addStory.mockResolvedValue({ _id: 'story1' });
 			const { reload } = renderTrayWithProps();
 
-			userEvent.click(screen.getByRole('button', { name: 'Add to your story' }));
-			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), new File(['(image)'], 'new.png', { type: 'image/png' }));
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await user.click(screen.getByRole('button', { name: 'Add to your story' }));
+			await user.upload(document.querySelector('.popup-body input[type="file"]'), new File(['(image)'], 'new.png', { type: 'image/png' }));
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
 		});
@@ -247,7 +249,7 @@ describe('StoriesTray', () => {
 		it('is one button that opens Create on the Story tab', async () => {
 			renderTray();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Add to your story' }));
+			await user.click(await screen.findByRole('button', { name: 'Add to your story' }));
 
 			expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
 			expect(screen.queryByPlaceholderText('Write a caption...')).not.toBeInTheDocument();
@@ -264,7 +266,7 @@ describe('StoriesTray', () => {
 		it('opens no viewer', async () => {
 			renderTray();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Add to your story' }));
+			await user.click(await screen.findByRole('button', { name: 'Add to your story' }));
 
 			expect(screen.queryByRole('dialog', { name: 'Story viewer' })).not.toBeInTheDocument();
 			expect(getUserStories).not.toHaveBeenCalled();
@@ -279,7 +281,7 @@ describe('StoriesTray', () => {
 		it('opens your story in the viewer when the picture is tapped', async () => {
 			renderTray();
 
-			userEvent.click(await screen.findByRole('button', { name: 'View your story' }));
+			await user.click(await screen.findByRole('button', { name: 'View your story' }));
 
 			expect(await screen.findByRole('dialog', { name: 'Story viewer' })).toBeInTheDocument();
 			expect(getUserStories).toHaveBeenCalledWith({ userId: 'me' });
@@ -288,7 +290,7 @@ describe('StoriesTray', () => {
 		it('opens Create on the Story tab, not the viewer, when the plus is tapped', async () => {
 			renderTray();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Add to your story' }));
+			await user.click(await screen.findByRole('button', { name: 'Add to your story' }));
 
 			expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
 			expect(screen.queryByRole('dialog', { name: 'Story viewer' })).not.toBeInTheDocument();
@@ -297,7 +299,7 @@ describe('StoriesTray', () => {
 		it('does not open Create when the picture is tapped', async () => {
 			renderTray();
 
-			userEvent.click(await screen.findByRole('button', { name: 'View your story' }));
+			await user.click(await screen.findByRole('button', { name: 'View your story' }));
 
 			expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
 		});
@@ -308,7 +310,7 @@ describe('StoriesTray', () => {
 			getStoryTray.mockResolvedValue([trayEntry('alice'), trayEntry('bob')]);
 
 			renderTray();
-			userEvent.click(await screen.findByRole('button', { name: "View bob's story" }));
+			await user.click(await screen.findByRole('button', { name: "View bob's story" }));
 
 			expect(await screen.findByLabelText('Story viewer')).toBeInTheDocument();
 			await waitFor(() => expect(getUserStories).toHaveBeenCalledWith({ userId: 'bob' }));
@@ -319,7 +321,7 @@ describe('StoriesTray', () => {
 			getStoryTray.mockResolvedValue([ownEntry, trayEntry('alice'), trayEntry('bob')]);
 
 			renderTray();
-			userEvent.click(await screen.findByRole('button', { name: "View bob's story" }));
+			await user.click(await screen.findByRole('button', { name: "View bob's story" }));
 
 			const viewer = await screen.findByRole('dialog', { name: 'Story viewer' });
 
@@ -330,12 +332,12 @@ describe('StoriesTray', () => {
 			getStoryTray.mockResolvedValue([ownEntry, trayEntry('alice'), trayEntry('bob')]);
 
 			renderTray();
-			userEvent.click(await screen.findByRole('button', { name: "View alice's story" }));
+			await user.click(await screen.findByRole('button', { name: "View alice's story" }));
 
 			const viewer = await screen.findByRole('dialog', { name: 'Story viewer' });
 
 			await within(viewer).findByAltText('Story by alice');
-			userEvent.click(within(viewer).getAllByRole('button', { name: 'Next story' })[0]);
+			await user.click(within(viewer).getAllByRole('button', { name: 'Next story' })[0]);
 
 			expect(await within(viewer).findByAltText('Story by bob')).toBeInTheDocument();
 		});
@@ -346,10 +348,10 @@ describe('StoriesTray', () => {
 			getStoryTray.mockResolvedValue([trayEntry('alice')]);
 
 			renderTray();
-			userEvent.click(await screen.findByRole('button', { name: "View alice's story" }));
+			await user.click(await screen.findByRole('button', { name: "View alice's story" }));
 			await screen.findByRole('dialog', { name: 'Story viewer' });
 
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(screen.queryByRole('dialog', { name: 'Story viewer' })).not.toBeInTheDocument();
 		});
@@ -360,9 +362,9 @@ describe('StoriesTray', () => {
 				.mockResolvedValueOnce([trayEntry('alice', { isWatched: true })]);
 
 			renderTray();
-			userEvent.click(await screen.findByRole('button', { name: "View alice's story" }));
+			await user.click(await screen.findByRole('button', { name: "View alice's story" }));
 			await screen.findByRole('dialog', { name: 'Story viewer' });
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			await waitFor(() => expect(getStoryTray).toHaveBeenCalledTimes(2));
 			await waitFor(() => expect(getCircleButton('alice').querySelector('.story-circle-ring')).not.toHaveClass('story-circle-ring-unwatched'));
@@ -378,9 +380,9 @@ describe('StoriesTray', () => {
 			getStoryTray.mockResolvedValueOnce([]).mockResolvedValueOnce([ownEntry]);
 
 			renderTray();
-			userEvent.click(await screen.findByRole('button', { name: 'Add to your story' }));
-			userEvent.upload(document.querySelector('.popup-body input[type="file"]'), new File(['(image)'], 'new.png', { type: 'image/png' }));
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await user.click(await screen.findByRole('button', { name: 'Add to your story' }));
+			await user.upload(document.querySelector('.popup-body input[type="file"]'), new File(['(image)'], 'new.png', { type: 'image/png' }));
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			expect(await screen.findByRole('button', { name: 'View your story' })).toBeInTheDocument();
 			expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
@@ -392,8 +394,8 @@ describe('StoriesTray', () => {
 		it('removes it without reloading the tray', async () => {
 			renderTray();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Add to your story' }));
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await user.click(await screen.findByRole('button', { name: 'Add to your story' }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
 			expect(getStoryTray).toHaveBeenCalledTimes(1);

@@ -1,30 +1,29 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import NotificationsContext from '../../contexts/NotificationsContext';
 
 import AccountMenu from './AccountMenu';
 
-jest.mock('../../services/userService');
+vi.mock('../../services/userService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', theme: 'light' };
 
 const renderAccountMenu = ({ unreadCount = 0, ...props } = {}) => {
-	const onClose = jest.fn();
-	const onNotificationsClick = jest.fn();
+	const onClose = vi.fn();
+	const onNotificationsClick = vi.fn();
 
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn() }}>
-			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn() }}>
+			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: vi.fn() }}>
 				<MemoryRouter>
 					<AccountMenu
 						isOpen
 						onClose={onClose}
-						logoutHandler={jest.fn()}
-						onChangePasswordClick={jest.fn()}
+						logoutHandler={vi.fn()}
+						onChangePasswordClick={vi.fn()}
 						onNotificationsClick={onNotificationsClick}
 						{...props}
 					/>
@@ -36,9 +35,12 @@ const renderAccountMenu = ({ unreadCount = 0, ...props } = {}) => {
 	return { ...rendered, onClose, onNotificationsClick };
 };
 
+let user;
+
 describe('AccountMenu Notifications row', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
+		user = userEvent.setup();
 	});
 
 	it('sits directly under Profile', () => {
@@ -55,22 +57,22 @@ describe('AccountMenu Notifications row', () => {
 		expect(screen.getByRole('button', { name: 'Notifications' })).toHaveAttribute('type', 'button');
 	});
 
-	it('closes the menu and calls onNotificationsClick when clicked', () => {
+	it('closes the menu and calls onNotificationsClick when clicked', async () => {
 		const { onClose, onNotificationsClick } = renderAccountMenu();
 
-		userEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+		await user.click(screen.getByRole('button', { name: 'Notifications' }));
 
 		expect(onClose).toHaveBeenCalledTimes(1);
 		expect(onNotificationsClick).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not log out or change the password when clicked', () => {
-		const logoutHandler = jest.fn();
-		const onChangePasswordClick = jest.fn();
+	it('does not log out or change the password when clicked', async () => {
+		const logoutHandler = vi.fn();
+		const onChangePasswordClick = vi.fn();
 
 		renderAccountMenu({ logoutHandler, onChangePasswordClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+		await user.click(screen.getByRole('button', { name: 'Notifications' }));
 
 		expect(logoutHandler).not.toHaveBeenCalled();
 		expect(onChangePasswordClick).not.toHaveBeenCalled();

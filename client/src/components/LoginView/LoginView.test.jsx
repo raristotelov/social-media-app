@@ -1,32 +1,33 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { login } from '../../services/userService';
 
 import LoginView from './LoginView';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 
-jest.mock('react-router-dom', () => ({
-	...jest.requireActual('react-router-dom'),
+vi.mock('react-router', async () => ({
+	...(await vi.importActual('react-router')),
 	useNavigate: () => mockNavigate,
 }));
 
-jest.mock('../../services/userService');
+vi.mock('../../services/userService');
 
-jest.mock('../LoginForm/LoginForm', () => ({ loginHandler }) => (
-	<button type='button' onClick={() => loginHandler({ email: 'user@example.com', password: 'Password123' }).catch(() => {})}>
-		Submit login
-	</button>
-));
+vi.mock('../LoginForm/LoginForm', () => ({
+	default: ({ loginHandler }) => (
+		<button type='button' onClick={() => loginHandler({ email: 'user@example.com', password: 'Password123' }).catch(() => {})}>
+			Submit login
+		</button>
+	),
+}));
 
 const loggedInUser = { _id: 'user1', username: 'johndoe' };
 
 const renderLoginView = (entry = '/log-in') => {
-	const setLoggedInUser = jest.fn();
+	const setLoggedInUser = vi.fn();
 
 	render(
 		<LoggedInUserContext.Provider value={{ setLoggedInUser }}>
@@ -40,15 +41,18 @@ const renderLoginView = (entry = '/log-in') => {
 };
 
 describe('LoginView', () => {
+	let user;
+
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		login.mockResolvedValue(loggedInUser);
 	});
 
 	it('sends the entered credentials to the login service', async () => {
 		renderLoginView();
 
-		userEvent.click(screen.getByRole('button', { name: 'Submit login' }));
+		await user.click(screen.getByRole('button', { name: 'Submit login' }));
 
 		await waitFor(() => expect(login).toHaveBeenCalledWith({ email: 'user@example.com', password: 'Password123' }));
 	});
@@ -56,7 +60,7 @@ describe('LoginView', () => {
 	it('logs in with the user the server returns, not a token', async () => {
 		const { setLoggedInUser } = renderLoginView();
 
-		userEvent.click(screen.getByRole('button', { name: 'Submit login' }));
+		await user.click(screen.getByRole('button', { name: 'Submit login' }));
 
 		await waitFor(() => expect(setLoggedInUser).toHaveBeenCalledWith(loggedInUser));
 	});
@@ -64,7 +68,7 @@ describe('LoginView', () => {
 	it('goes to the feed by default, replacing the login page in the history', async () => {
 		renderLoginView();
 
-		userEvent.click(screen.getByRole('button', { name: 'Submit login' }));
+		await user.click(screen.getByRole('button', { name: 'Submit login' }));
 
 		await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/user-feed', { replace: true }));
 	});
@@ -72,7 +76,7 @@ describe('LoginView', () => {
 	it('goes back to the page the guest came from', async () => {
 		renderLoginView({ pathname: '/log-in', state: { from: '/user/user2' } });
 
-		userEvent.click(screen.getByRole('button', { name: 'Submit login' }));
+		await user.click(screen.getByRole('button', { name: 'Submit login' }));
 
 		await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/user/user2', { replace: true }));
 	});
@@ -81,7 +85,7 @@ describe('LoginView', () => {
 		window.localStorage.clear();
 		renderLoginView();
 
-		userEvent.click(screen.getByRole('button', { name: 'Submit login' }));
+		await user.click(screen.getByRole('button', { name: 'Submit login' }));
 
 		await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
 		expect(Object.keys(window.localStorage).filter((key) => /jwt|token/i.test(key))).toEqual([]);
@@ -95,7 +99,7 @@ describe('LoginView', () => {
 		it('does not log in or navigate', async () => {
 			const { setLoggedInUser } = renderLoginView();
 
-			userEvent.click(screen.getByRole('button', { name: 'Submit login' }));
+			await user.click(screen.getByRole('button', { name: 'Submit login' }));
 
 			await waitFor(() => expect(login).toHaveBeenCalled());
 

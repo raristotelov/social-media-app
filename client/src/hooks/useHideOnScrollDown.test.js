@@ -39,7 +39,7 @@ describe('useHideOnScrollDown', () => {
 		nextFrameId = 1;
 		setScrollY(0);
 
-		requestFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+		requestFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
 			const frameId = nextFrameId;
 
 			nextFrameId += 1;
@@ -47,7 +47,7 @@ describe('useHideOnScrollDown', () => {
 
 			return frameId;
 		});
-		cancelFrameSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+		cancelFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
 			queuedFrames.delete(frameId);
 		});
 	});

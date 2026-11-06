@@ -35,12 +35,12 @@ describe('formatStoryAge', () => {
 	});
 
 	it('measures from the current time when no time is given', () => {
-		jest.useFakeTimers('modern');
-		jest.setSystemTime(NOW);
+		vi.useFakeTimers();
+		vi.setSystemTime(NOW);
 
 		expect(formatStoryAge(minutesAgo(10))).toBe('10m');
 
-		jest.useRealTimers();
+		vi.useRealTimers();
 	});
 });
 

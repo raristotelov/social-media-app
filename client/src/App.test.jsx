@@ -1,61 +1,66 @@
-import '@testing-library/jest-dom';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 
 import { APP_NAME } from './constants/app';
 import ToastContext from './contexts/ToastContext';
+import { getUnreadNotificationCount } from './services/notificationService';
 import { getCurrentUser, logout } from './services/userService';
 
 import App from './App';
 
 const mockSeenEndSessions = [];
 
-jest.mock('./components/DemoStrip/DemoStrip', () => () => <aside>Demo strip</aside>);
-jest.mock('./components/Header/MainHeader', () => ({ logoutHandler }) => (
-	<header>
-		<button type='button' onClick={logoutHandler}>
-			Log out
-		</button>
-	</header>
-));
-jest.mock('./components/Header/MobileTopBar', () => () => <header>Mobile top bar</header>);
-jest.mock('./components/TabBar/TabBar', () => () => <nav>Tab bar</nav>);
-jest.mock('./Router', () => {
-	const { useContext } = require('react');
-	const { useNavigate } = require('react-router-dom');
-	const LoggedInUserContext = require('./contexts/LoggedInUserContext').default;
+vi.mock('./components/DemoStrip/DemoStrip', () => ({ default: () => <aside>Demo strip</aside> }));
+vi.mock('./components/Header/MainHeader', () => ({
+	default: ({ logoutHandler }) => (
+		<header>
+			<button type='button' onClick={logoutHandler}>
+				Log out
+			</button>
+		</header>
+	),
+}));
+vi.mock('./components/Header/MobileTopBar', () => ({ default: () => <header>Mobile top bar</header> }));
+vi.mock('./components/TabBar/TabBar', () => ({ default: () => <nav>Tab bar</nav> }));
+vi.mock('./Router', async () => {
+	const { useContext } = await import('react');
+	const { useNavigate } = await import('react-router');
+	const { default: LoggedInUserContext } = await import('./contexts/LoggedInUserContext');
 
-	return function MockRouter() {
-		const { endSession, loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
-		const navigate = useNavigate();
+	return {
+		default: function MockRouter() {
+			const { endSession, loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
+			const navigate = useNavigate();
 
-		mockSeenEndSessions.push(endSession);
+			mockSeenEndSessions.push(endSession);
 
-		return (
-			<main>
-				<p data-testid='user'>{loggedInUser ? loggedInUser.username : 'guest'}</p>
+			return (
+				<main>
+					<p data-testid='user'>{loggedInUser ? loggedInUser.username : 'guest'}</p>
 
-				<button type='button' onClick={() => navigate('/popular-posts')}>
-					Go to popular
-				</button>
+					<button type='button' onClick={() => navigate('/popular-posts')}>
+						Go to popular
+					</button>
 
-				<button type='button' onClick={() => navigate('/popular-posts/posts')}>
-					Go to posts view
-				</button>
+					<button type='button' onClick={() => navigate('/popular-posts/posts')}>
+						Go to posts view
+					</button>
 
-				<button type='button' onClick={endSession}>
-					End session
-				</button>
+					<button type='button' onClick={endSession}>
+						End session
+					</button>
 
-				<button type='button' onClick={() => updateLoggedInUser({ user: { _id: 'user1', username: 'renamed' } })}>
-					Update user
-				</button>
-			</main>
-		);
+					<button type='button' onClick={() => updateLoggedInUser({ user: { _id: 'user1', username: 'renamed' } })}>
+						Update user
+					</button>
+				</main>
+			);
+		},
 	};
 });
-jest.mock('./services/userService');
+vi.mock('./services/userService');
+vi.mock('./services/notificationService');
 
 const LocationProbe = () => <p data-testid='path'>{useLocation().pathname}</p>;
 
@@ -70,7 +75,7 @@ const buildDeferred = () => {
 	return deferred;
 };
 
-const showToast = jest.fn();
+const showToast = vi.fn();
 
 const renderApp = (initialEntries = ['/']) =>
 	render(
@@ -83,15 +88,19 @@ const renderApp = (initialEntries = ['/']) =>
 		</ToastContext.Provider>,
 	);
 
+let user;
+
 describe('App', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		mockSeenEndSessions.length = 0;
 		window.localStorage.clear();
 		document.title = '';
-		window.matchMedia = jest.fn().mockReturnValue({ matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn() });
+		window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() });
 		getCurrentUser.mockResolvedValue(null);
 		logout.mockResolvedValue({});
+		getUnreadNotificationCount.mockResolvedValue({ count: 0 });
 	});
 
 	it('sets the tab title from the app name constant', async () => {
@@ -199,7 +208,7 @@ describe('App', () => {
 			renderApp();
 
 			await screen.findByTestId('user');
-			userEvent.click(screen.getByRole('button', { name: 'Update user' }));
+			await user.click(screen.getByRole('button', { name: 'Update user' }));
 
 			expect(screen.getByTestId('user')).toHaveTextContent('renamed');
 			expect(Object.keys(window.localStorage).filter((key) => /jwt|token/i.test(key))).toEqual([]);
@@ -215,7 +224,7 @@ describe('App', () => {
 			renderApp();
 
 			await screen.findByTestId('user');
-			userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+			await user.click(screen.getByRole('button', { name: 'Log out' }));
 
 			await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
 		});
@@ -224,7 +233,7 @@ describe('App', () => {
 			renderApp(['/popular-posts']);
 
 			await screen.findByTestId('user');
-			userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+			await user.click(screen.getByRole('button', { name: 'Log out' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/log-in'));
 			expect(screen.getByTestId('user')).toHaveTextContent('guest');
@@ -238,7 +247,7 @@ describe('App', () => {
 			renderApp(['/popular-posts']);
 
 			await screen.findByTestId('user');
-			userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+			await user.click(screen.getByRole('button', { name: 'Log out' }));
 
 			expect(screen.getByTestId('user')).toHaveTextContent('johndoe');
 			expect(screen.getByTestId('path')).toHaveTextContent('/popular-posts');
@@ -255,7 +264,7 @@ describe('App', () => {
 				renderApp(['/popular-posts']);
 
 				await screen.findByTestId('user');
-				userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+				await user.click(screen.getByRole('button', { name: 'Log out' }));
 
 				await waitFor(() => expect(showToast).toHaveBeenCalled());
 				expect(screen.getByTestId('user')).toHaveTextContent('johndoe');
@@ -266,7 +275,7 @@ describe('App', () => {
 				renderApp();
 
 				await screen.findByTestId('user');
-				userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+				await user.click(screen.getByRole('button', { name: 'Log out' }));
 
 				await waitFor(() => expect(showToast).toHaveBeenCalledWith("Couldn't log you out. Try again."));
 			});
@@ -277,7 +286,7 @@ describe('App', () => {
 				renderApp();
 
 				await screen.findByTestId('user');
-				userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+				await user.click(screen.getByRole('button', { name: 'Log out' }));
 
 				await waitFor(() => expect(showToast).toHaveBeenCalledWith("Couldn't log you out. Try again."));
 			});
@@ -288,10 +297,10 @@ describe('App', () => {
 		it('keeps the same identity across route changes', async () => {
 			renderApp();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Go to popular' }));
+			await user.click(await screen.findByRole('button', { name: 'Go to popular' }));
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/popular-posts'));
 
-			userEvent.click(screen.getByRole('button', { name: 'Go to posts view' }));
+			await user.click(screen.getByRole('button', { name: 'Go to posts view' }));
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/popular-posts/posts'));
 
 			expect(new Set(mockSeenEndSessions).size).toBe(1);
@@ -300,12 +309,10 @@ describe('App', () => {
 		it('still sends the user to /log-in after the route has changed', async () => {
 			renderApp();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Go to popular' }));
+			await user.click(await screen.findByRole('button', { name: 'Go to popular' }));
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/popular-posts'));
 
-			act(() => {
-				userEvent.click(screen.getByRole('button', { name: 'End session' }));
-			});
+			await user.click(screen.getByRole('button', { name: 'End session' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/log-in'));
 		});
@@ -316,7 +323,7 @@ describe('App', () => {
 			renderApp();
 
 			await screen.findByTestId('user');
-			userEvent.click(screen.getByRole('button', { name: 'End session' }));
+			await user.click(screen.getByRole('button', { name: 'End session' }));
 
 			await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('guest'));
 			expect(logout).not.toHaveBeenCalled();

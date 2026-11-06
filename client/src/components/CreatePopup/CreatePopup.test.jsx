@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -9,11 +8,11 @@ import { resizeImage } from '../../utils/images';
 
 import CreatePopup from './CreatePopup';
 
-jest.mock('../../services/userPostService');
-jest.mock('../../services/storyService');
-jest.mock('../../utils/images', () => ({
-	...jest.requireActual('../../utils/images'),
-	resizeImage: jest.fn(),
+vi.mock('../../services/userPostService');
+vi.mock('../../services/storyService');
+vi.mock('../../utils/images', async () => ({
+	...(await vi.importActual('../../utils/images')),
+	resizeImage: vi.fn(),
 }));
 
 const chosenFile = new File(['(image)'], 'new.png', { type: 'image/png' });
@@ -21,7 +20,7 @@ const resizedFile = new File(['(resized)'], 'new.jpg', { type: 'image/jpeg' });
 const savedPost = { _id: 'post1', caption: 'Sunset' };
 const savedStory = { _id: 'story1' };
 
-const renderCreatePopup = ({ initialMode, onPostAdded = jest.fn(), onStoryAdded = jest.fn(), onClose = jest.fn(), endSession = jest.fn() } = {}) => {
+const renderCreatePopup = ({ initialMode, onPostAdded = vi.fn(), onStoryAdded = vi.fn(), onClose = vi.fn(), endSession = vi.fn() } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ endSession }}>
 			<CreatePopup initialMode={initialMode} onClose={onClose} onPostAdded={onPostAdded} onStoryAdded={onStoryAdded} />
@@ -31,17 +30,20 @@ const renderCreatePopup = ({ initialMode, onPostAdded = jest.fn(), onStoryAdded 
 	return { ...rendered, onPostAdded, onStoryAdded, onClose, endSession };
 };
 
-const chooseImage = () => {
-	userEvent.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
+let user;
+
+const chooseImage = async () => {
+	await user.upload(document.querySelector('.popup-body input[type="file"]'), chosenFile);
 };
 
 const getTab = (name) => screen.getByRole('tab', { name });
 
 describe('CreatePopup', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
-		global.URL.createObjectURL = jest.fn(() => 'blob:preview');
-		global.URL.revokeObjectURL = jest.fn();
+		vi.resetAllMocks();
+		user = userEvent.setup();
+		globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+		globalThis.URL.revokeObjectURL = vi.fn();
 		resizeImage.mockResolvedValue(resizedFile);
 		addUserPost.mockResolvedValue(savedPost);
 		addStory.mockResolvedValue(savedStory);
@@ -76,19 +78,19 @@ describe('CreatePopup', () => {
 			expect(screen.queryByPlaceholderText('Write a caption...')).not.toBeInTheDocument();
 		});
 
-		it('switches from Post to Story', () => {
+		it('switches from Post to Story', async () => {
 			renderCreatePopup({ initialMode: 'post' });
 
-			userEvent.click(getTab('Story'));
+			await user.click(getTab('Story'));
 
 			expect(getTab('Story')).toHaveAttribute('aria-selected', 'true');
 			expect(screen.queryByPlaceholderText('Write a caption...')).not.toBeInTheDocument();
 		});
 
-		it('switches from Story to Post', () => {
+		it('switches from Story to Post', async () => {
 			renderCreatePopup({ initialMode: 'story' });
 
-			userEvent.click(getTab('Post'));
+			await user.click(getTab('Post'));
 
 			expect(getTab('Post')).toHaveAttribute('aria-selected', 'true');
 			expect(screen.getByPlaceholderText('Write a caption...')).toBeInTheDocument();
@@ -111,30 +113,30 @@ describe('CreatePopup', () => {
 	});
 
 	describe('switching tabs', () => {
-		it('keeps the chosen picture', () => {
+		it('keeps the chosen picture', async () => {
 			renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.click(getTab('Story'));
+			await chooseImage();
+			await user.click(getTab('Story'));
 
 			expect(document.querySelector('.preview-wrapper img[alt="preview"]')).toHaveAttribute('src', 'blob:preview');
 		});
 
-		it('keeps the caption for Post after switching to Story and back', () => {
+		it('keeps the caption for Post after switching to Story and back', async () => {
 			renderCreatePopup({ initialMode: 'post' });
 
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
-			userEvent.click(getTab('Story'));
-			userEvent.click(getTab('Post'));
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
+			await user.click(getTab('Story'));
+			await user.click(getTab('Post'));
 
 			expect(screen.getByPlaceholderText('Write a caption...')).toHaveValue('Sunset');
 		});
 
-		it('keeps the picture chosen on the Story tab when switching to Post', () => {
+		it('keeps the picture chosen on the Story tab when switching to Post', async () => {
 			renderCreatePopup({ initialMode: 'story' });
 
-			chooseImage();
-			userEvent.click(getTab('Post'));
+			await chooseImage();
+			await user.click(getTab('Post'));
 
 			expect(document.querySelector('.preview-wrapper img[alt="preview"]')).toHaveAttribute('src', 'blob:preview');
 		});
@@ -144,9 +146,9 @@ describe('CreatePopup', () => {
 		it('resizes the picture, sends it with the caption and the token, and tells the page about the saved post', async () => {
 			const { onPostAdded } = renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onPostAdded).toHaveBeenCalledWith(savedPost));
 			expect(resizeImage).toHaveBeenCalledWith(chosenFile);
@@ -156,8 +158,8 @@ describe('CreatePopup', () => {
 		it('closes the popup after the post is saved', async () => {
 			const { onClose } = renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
 		});
@@ -165,8 +167,8 @@ describe('CreatePopup', () => {
 		it('creates no story', async () => {
 			const { onClose } = renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onClose).toHaveBeenCalled());
 			expect(addStory).not.toHaveBeenCalled();
@@ -175,27 +177,27 @@ describe('CreatePopup', () => {
 		it('uses the caption typed before a trip to the Story tab', async () => {
 			const { onPostAdded } = renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
-			userEvent.click(getTab('Story'));
-			userEvent.click(getTab('Post'));
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
+			await user.click(getTab('Story'));
+			await user.click(getTab('Post'));
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onPostAdded).toHaveBeenCalled());
 			expect(addUserPost).toHaveBeenCalledWith({ image: resizedFile, caption: 'Sunset' });
 		});
 
 		it('does not need an onPostAdded handler', async () => {
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 
 			render(
-				<LoggedInUserContext.Provider value={{ endSession: jest.fn() }}>
+				<LoggedInUserContext.Provider value={{ endSession: vi.fn() }}>
 					<CreatePopup initialMode='post' onClose={onClose} />
 				</LoggedInUserContext.Provider>,
 			);
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
 		});
@@ -204,8 +206,8 @@ describe('CreatePopup', () => {
 			addUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { onClose, onPostAdded } = renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't upload the picture. Try again.");
 			expect(onClose).not.toHaveBeenCalled();
@@ -216,8 +218,8 @@ describe('CreatePopup', () => {
 			resizeImage.mockRejectedValue(new Error('The source image could not be decoded'));
 			renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't upload the picture. Try again.");
 			expect(addUserPost).not.toHaveBeenCalled();
@@ -227,8 +229,8 @@ describe('CreatePopup', () => {
 			addUserPost.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -239,8 +241,8 @@ describe('CreatePopup', () => {
 		it('resizes the picture, sends only the picture and the token, and tells the page about the saved story', async () => {
 			const { onStoryAdded } = renderCreatePopup({ initialMode: 'story' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onStoryAdded).toHaveBeenCalledWith(savedStory));
 			expect(resizeImage).toHaveBeenCalledWith(chosenFile);
@@ -250,8 +252,8 @@ describe('CreatePopup', () => {
 		it('closes the popup after the story is saved', async () => {
 			const { onClose } = renderCreatePopup({ initialMode: 'story' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
 		});
@@ -259,8 +261,8 @@ describe('CreatePopup', () => {
 		it('creates no post', async () => {
 			const { onClose } = renderCreatePopup({ initialMode: 'story' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onClose).toHaveBeenCalled());
 			expect(addUserPost).not.toHaveBeenCalled();
@@ -269,20 +271,20 @@ describe('CreatePopup', () => {
 		it('sends no caption, even if one was typed on the Post tab first', async () => {
 			const { onStoryAdded } = renderCreatePopup({ initialMode: 'post' });
 
-			chooseImage();
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
-			userEvent.click(getTab('Story'));
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Sunset');
+			await user.click(getTab('Story'));
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(onStoryAdded).toHaveBeenCalled());
 			expect(addStory).toHaveBeenCalledWith({ image: resizedFile });
 			expect(addUserPost).not.toHaveBeenCalled();
 		});
 
-		it('asks for a picture and sends nothing when none is chosen', () => {
+		it('asks for a picture and sends nothing when none is chosen', async () => {
 			renderCreatePopup({ initialMode: 'story' });
 
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			expect(screen.getByText('Please choose a picture')).toBeInTheDocument();
 			expect(addStory).not.toHaveBeenCalled();
@@ -292,8 +294,8 @@ describe('CreatePopup', () => {
 			addStory.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { onClose, onStoryAdded } = renderCreatePopup({ initialMode: 'story' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't upload the picture. Try again.");
 			expect(onClose).not.toHaveBeenCalled();
@@ -304,8 +306,8 @@ describe('CreatePopup', () => {
 			addStory.mockRejectedValue({ code: 'IMAGE_TOO_LARGE', fields: { image: 'IMAGE_TOO_LARGE' }, status: 413 });
 			renderCreatePopup({ initialMode: 'story' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			expect(await screen.findByText('This image is over 10 MB')).toHaveClass('field-error');
 		});
@@ -314,8 +316,8 @@ describe('CreatePopup', () => {
 			addStory.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = renderCreatePopup({ initialMode: 'story' });
 
-			chooseImage();
-			userEvent.click(screen.getByRole('button', { name: 'Share' }));
+			await chooseImage();
+			await user.click(screen.getByRole('button', { name: 'Share' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -323,26 +325,26 @@ describe('CreatePopup', () => {
 	});
 
 	describe('closing', () => {
-		it('closes from Cancel', () => {
+		it('closes from Cancel', async () => {
 			const { onClose } = renderCreatePopup();
 
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
-		it('closes from the close button', () => {
+		it('closes from the close button', async () => {
 			const { onClose } = renderCreatePopup();
 
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
-		it('closes on Escape', () => {
+		it('closes on Escape', async () => {
 			const { onClose } = renderCreatePopup();
 
-			userEvent.keyboard('{Escape}');
+			await user.keyboard('{Escape}');
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});

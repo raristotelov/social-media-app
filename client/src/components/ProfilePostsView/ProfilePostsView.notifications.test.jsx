@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { NOTIFICATION_TARGET_STATE_KEY } from '../../constants/notifications';
@@ -15,9 +14,9 @@ import ProfileView from '../ProfileView/ProfileView';
 
 import ProfilePostsView from './ProfilePostsView';
 
-jest.mock('../../services/userService');
-jest.mock('../../services/userPostService');
-jest.mock('../../services/commentService');
+vi.mock('../../services/userService');
+vi.mock('../../services/userPostService');
+vi.mock('../../services/commentService');
 
 const buildPost = (id) => ({
 	_id: id,
@@ -47,7 +46,7 @@ const notificationEntry = (postId, shouldOpenComments) => ({
 
 const renderPostsView = (entry) =>
 	render(
-		<LoggedInUserContext.Provider value={{ loggedInUser: viewer, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: viewer, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 			<ToastProvider>
 				<NotFoundProvider>
 					<MemoryRouter initialEntries={[entry]}>
@@ -68,9 +67,8 @@ describe('ProfilePostsView opened from a notification', () => {
 	let mockScrollIntoView;
 
 	beforeEach(() => {
-		jest.resetAllMocks();
-		mockScrollIntoView = jest.fn();
-		window.HTMLElement.prototype.scrollIntoView = mockScrollIntoView;
+		vi.resetAllMocks();
+		mockScrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
 		getUsersProfileData.mockResolvedValue([profile]);
 		getComments.mockResolvedValue([
 			{
@@ -85,7 +83,7 @@ describe('ProfilePostsView opened from a notification', () => {
 	});
 
 	afterEach(() => {
-		delete window.HTMLElement.prototype.scrollIntoView;
+		mockScrollIntoView.mockRestore();
 	});
 
 	describe('a like notification', () => {
@@ -94,7 +92,7 @@ describe('ProfilePostsView opened from a notification', () => {
 
 			await screen.findAllByRole('article');
 
-			await waitFor(() => expect(mockScrollIntoView.mock.instances.map((element) => element.id)).toContain('post2'));
+			await waitFor(() => expect(mockScrollIntoView.mock.contexts.map((element) => element.id)).toContain('post2'));
 		});
 
 		it('does not open the comments', async () => {
@@ -129,15 +127,17 @@ describe('ProfilePostsView opened from a notification', () => {
 
 			await screen.findByRole('heading', { name: 'Comments' });
 
-			await waitFor(() => expect(mockScrollIntoView.mock.instances.map((element) => element.id)).toContain('post2'));
+			await waitFor(() => expect(mockScrollIntoView.mock.contexts.map((element) => element.id)).toContain('post2'));
 		});
 
 		it('does not open the comments again after they were closed', async () => {
+			const user = userEvent.setup();
+
 			renderPostsView(notificationEntry('post2', true));
 
 			await screen.findByRole('heading', { name: 'Comments' });
 			await waitFor(() => expect(getComments).toHaveBeenCalledTimes(1));
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(screen.queryByRole('heading', { name: 'Comments' })).not.toBeInTheDocument();
 			expect(getComments).toHaveBeenCalledTimes(1);

@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import LoggedInUserContext from '../contexts/LoggedInUserContext';
@@ -6,7 +5,7 @@ import { getFollowedUsersPosts } from '../services/userPostService';
 
 import useFeedPosts from './useFeedPosts';
 
-jest.mock('../services/userPostService');
+vi.mock('../services/userPostService');
 
 const buildPost = (id, overrides = {}) => ({
 	_id: id,
@@ -37,7 +36,7 @@ const buildDeferred = () => {
 const getPostIds = (result) => result.current.posts.map((post) => post._id);
 
 const mountFeedPosts = async ({ firstPage = buildPage(['p3', 'p2'], { hasMore: true }), waitForLoad = true } = {}) => {
-	const endSession = jest.fn();
+	const endSession = vi.fn();
 	const context = { endSession };
 
 	if (firstPage) {
@@ -56,7 +55,7 @@ const mountFeedPosts = async ({ firstPage = buildPage(['p3', 'p2'], { hasMore: t
 
 describe('useFeedPosts', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 	});
 
 	describe('loading the first page', () => {
@@ -360,7 +359,7 @@ describe('useFeedPosts', () => {
 		});
 
 		it('does not reload by itself when the logged-in user is refreshed', async () => {
-			const endSession = jest.fn();
+			const endSession = vi.fn();
 			let loggedInUser = { _id: 'user1', following: [] };
 
 			getFollowedUsersPosts.mockResolvedValueOnce(buildPage(['p1']));

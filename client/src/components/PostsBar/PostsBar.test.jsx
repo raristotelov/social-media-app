@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -6,35 +5,36 @@ import PostsBar from './PostsBar';
 
 describe('PostsBar', () => {
 	it('shows the "Posts" heading', () => {
-		render(<PostsBar subtitle='janedoe' onBackClick={jest.fn()} />);
+		render(<PostsBar subtitle='janedoe' onBackClick={vi.fn()} />);
 
 		expect(screen.getByRole('heading', { name: 'Posts' })).toBeInTheDocument();
 	});
 
 	it('shows the subtitle beneath the heading', () => {
-		render(<PostsBar subtitle='janedoe' onBackClick={jest.fn()} />);
+		render(<PostsBar subtitle='janedoe' onBackClick={vi.fn()} />);
 
 		expect(screen.getByText('janedoe')).toBeInTheDocument();
 	});
 
 	it('shows any other subtitle it is given, such as "Popular"', () => {
-		render(<PostsBar subtitle='Popular' onBackClick={jest.fn()} />);
+		render(<PostsBar subtitle='Popular' onBackClick={vi.fn()} />);
 
 		expect(screen.getByText('Popular')).toBeInTheDocument();
 	});
 
-	it('calls onBackClick when the back chevron is clicked', () => {
-		const onBackClick = jest.fn();
+	it('calls onBackClick when the back chevron is clicked', async () => {
+		const user = userEvent.setup();
+		const onBackClick = vi.fn();
 
 		render(<PostsBar subtitle='janedoe' onBackClick={onBackClick} />);
 
-		userEvent.click(screen.getByRole('button', { name: 'Back' }));
+		await user.click(screen.getByRole('button', { name: 'Back' }));
 
 		expect(onBackClick).toHaveBeenCalledTimes(1);
 	});
 
 	it('is visible by default', () => {
-		const { container } = render(<PostsBar subtitle='janedoe' onBackClick={jest.fn()} />);
+		const { container } = render(<PostsBar subtitle='janedoe' onBackClick={vi.fn()} />);
 
 		expect(container.querySelector('.posts-bar')).not.toHaveClass('posts-bar-hidden');
 	});
@@ -68,7 +68,7 @@ describe('PostsBar', () => {
 			nextFrameId = 1;
 			setScrollY(0);
 
-			requestFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+			requestFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
 				const frameId = nextFrameId;
 
 				nextFrameId += 1;
@@ -76,7 +76,7 @@ describe('PostsBar', () => {
 
 				return frameId;
 			});
-			cancelFrameSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+			cancelFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
 				queuedFrames.delete(frameId);
 			});
 		});
@@ -87,7 +87,7 @@ describe('PostsBar', () => {
 		});
 
 		it('is marked hidden when the page is scrolled down', () => {
-			const { container } = render(<PostsBar subtitle='janedoe' onBackClick={jest.fn()} />);
+			const { container } = render(<PostsBar subtitle='janedoe' onBackClick={vi.fn()} />);
 
 			scrollToAndSettle(300);
 
@@ -95,7 +95,7 @@ describe('PostsBar', () => {
 		});
 
 		it('is shown again when the page is scrolled up', () => {
-			const { container } = render(<PostsBar subtitle='janedoe' onBackClick={jest.fn()} />);
+			const { container } = render(<PostsBar subtitle='janedoe' onBackClick={vi.fn()} />);
 
 			scrollToAndSettle(400);
 			scrollToAndSettle(300);
@@ -104,7 +104,7 @@ describe('PostsBar', () => {
 		});
 
 		it('is shown when the page is back at the top', () => {
-			const { container } = render(<PostsBar subtitle='janedoe' onBackClick={jest.fn()} />);
+			const { container } = render(<PostsBar subtitle='janedoe' onBackClick={vi.fn()} />);
 
 			scrollToAndSettle(400);
 			scrollToAndSettle(0);
@@ -113,7 +113,7 @@ describe('PostsBar', () => {
 		});
 
 		it('stops listening to scroll once unmounted', () => {
-			const { unmount } = render(<PostsBar subtitle='janedoe' onBackClick={jest.fn()} />);
+			const { unmount } = render(<PostsBar subtitle='janedoe' onBackClick={vi.fn()} />);
 
 			unmount();
 			act(() => {

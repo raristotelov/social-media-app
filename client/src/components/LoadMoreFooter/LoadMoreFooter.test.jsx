@@ -1,11 +1,10 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import LoadMoreFooter from './LoadMoreFooter';
 
 const renderFooter = (props = {}) => {
-	const onRetryClick = jest.fn();
+	const onRetryClick = vi.fn();
 
 	const rendered = render(<LoadMoreFooter isLoadingMore={false} hasLoadMoreFailed={false} onRetryClick={onRetryClick} {...props} />);
 
@@ -67,10 +66,11 @@ describe('LoadMoreFooter', () => {
 			expect(screen.getByText('·')).toHaveAttribute('aria-hidden', 'true');
 		});
 
-		it('calls onRetryClick once when Try again is clicked', () => {
+		it('calls onRetryClick once when Try again is clicked', async () => {
+			const user = userEvent.setup();
 			const { onRetryClick } = renderFooter({ hasLoadMoreFailed: true });
 
-			userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+			await user.click(screen.getByRole('button', { name: 'Try again' }));
 
 			expect(onRetryClick).toHaveBeenCalledTimes(1);
 		});

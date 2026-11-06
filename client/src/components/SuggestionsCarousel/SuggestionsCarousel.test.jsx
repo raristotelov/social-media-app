@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { dismissSuggestionsCarousel, getSuggestions } from '../../services/suggestionService';
@@ -11,8 +10,8 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import SuggestionsCarousel from './SuggestionsCarousel';
 
-jest.mock('../../services/suggestionService');
-jest.mock('../../services/userService');
+vi.mock('../../services/suggestionService');
+vi.mock('../../services/userService');
 
 const loggedInUser = { _id: 'me', username: 'johndoe', following: [] };
 
@@ -25,11 +24,11 @@ const suggestions = [
 	buildSuggestion('n1', 'new'),
 ];
 
-const renderCarousel = ({ result = { suggestions, reserve: [], isCarouselDismissed: false }, endSession = jest.fn() } = {}) => {
+const renderCarousel = ({ result = { suggestions, reserve: [], isCarouselDismissed: false }, endSession = vi.fn() } = {}) => {
 	getSuggestions.mockResolvedValue(result);
 
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<SuggestionsCarousel />
@@ -43,7 +42,7 @@ const renderCarousel = ({ result = { suggestions, reserve: [], isCarouselDismiss
 
 describe('SuggestionsCarousel', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 		followUser.mockResolvedValue({ user: loggedInUser });
 		dismissSuggestionsCarousel.mockResolvedValue(undefined);
 	});
@@ -82,7 +81,7 @@ describe('SuggestionsCarousel', () => {
 		getSuggestions.mockReturnValue(new Promise(() => {}));
 
 		render(
-			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<SuggestionsCarousel />
@@ -98,7 +97,7 @@ describe('SuggestionsCarousel', () => {
 		getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
 		render(
-			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<SuggestionsCarousel />
@@ -147,28 +146,34 @@ describe('SuggestionsCarousel', () => {
 		});
 
 		it('hides the carousel as soon as the dismiss button is clicked', async () => {
+			const user = userEvent.setup();
+
 			dismissSuggestionsCarousel.mockReturnValue(new Promise(() => {}));
 			renderCarousel();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
+			await user.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
 
 			expect(screen.queryByRole('region', { name: 'Suggested for you' })).not.toBeInTheDocument();
 		});
 
 		it('tells the server with the token', async () => {
+			const user = userEvent.setup();
+
 			renderCarousel();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
+			await user.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
 
 			await waitFor(() => expect(dismissSuggestionsCarousel).toHaveBeenCalledWith());
 			expect(dismissSuggestionsCarousel).toHaveBeenCalledTimes(1);
 		});
 
 		it('stays hidden, with no toast, when the request fails', async () => {
+			const user = userEvent.setup();
+
 			dismissSuggestionsCarousel.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			renderCarousel();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
+			await user.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
 
 			await waitFor(() => expect(dismissSuggestionsCarousel).toHaveBeenCalled());
 
@@ -177,10 +182,12 @@ describe('SuggestionsCarousel', () => {
 		});
 
 		it('ends the session when the request fails with UNAUTHENTICATED', async () => {
+			const user = userEvent.setup();
+
 			dismissSuggestionsCarousel.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
 			const { endSession } = renderCarousel();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
+			await user.click(await screen.findByRole('button', { name: 'Dismiss suggestions' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 		});
@@ -196,10 +203,12 @@ describe('SuggestionsCarousel', () => {
 		});
 
 		it('removes the followed card at once and fills the gap from the spares', async () => {
+			const user = userEvent.setup();
+
 			followUser.mockReturnValue(new Promise(() => {}));
 			renderCarousel({ result: { suggestions, reserve: [buildSuggestion('p3', 'popular')], isCarouselDismissed: false } });
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			expect(screen.queryByRole('button', { name: 'Follow name-p1' })).not.toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Follow name-p3' })).toBeInTheDocument();
@@ -207,18 +216,22 @@ describe('SuggestionsCarousel', () => {
 		});
 
 		it('shows one card fewer when no spare is left', async () => {
+			const user = userEvent.setup();
+
 			renderCarousel();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(3));
 		});
 
 		it('puts the card back and shows the follow toast when the request fails', async () => {
+			const user = userEvent.setup();
+
 			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			renderCarousel();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();

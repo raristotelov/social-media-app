@@ -1,10 +1,9 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import DeletePostConfirm from './DeletePostConfirm';
 
-const renderConfirm = (props = {}) => render(<DeletePostConfirm onDeleteClick={jest.fn()} onCancelClick={jest.fn()} {...props} />);
+const renderConfirm = (props = {}) => render(<DeletePostConfirm onDeleteClick={vi.fn()} onCancelClick={vi.fn()} {...props} />);
 
 describe('DeletePostConfirm', () => {
 	it('warns that the post and its comments will be permanently deleted', () => {
@@ -27,23 +26,25 @@ describe('DeletePostConfirm', () => {
 		expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 	});
 
-	it('calls onDeleteClick and not onCancelClick when Delete is clicked', () => {
-		const onDeleteClick = jest.fn();
-		const onCancelClick = jest.fn();
+	it('calls onDeleteClick and not onCancelClick when Delete is clicked', async () => {
+		const user = userEvent.setup();
+		const onDeleteClick = vi.fn();
+		const onCancelClick = vi.fn();
 		renderConfirm({ onDeleteClick, onCancelClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+		await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 		expect(onDeleteClick).toHaveBeenCalledTimes(1);
 		expect(onCancelClick).not.toHaveBeenCalled();
 	});
 
-	it('calls onCancelClick and not onDeleteClick when Cancel is clicked', () => {
-		const onDeleteClick = jest.fn();
-		const onCancelClick = jest.fn();
+	it('calls onCancelClick and not onDeleteClick when Cancel is clicked', async () => {
+		const user = userEvent.setup();
+		const onDeleteClick = vi.fn();
+		const onCancelClick = vi.fn();
 		renderConfirm({ onDeleteClick, onCancelClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+		await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 		expect(onCancelClick).toHaveBeenCalledTimes(1);
 		expect(onDeleteClick).not.toHaveBeenCalled();

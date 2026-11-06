@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import NotificationsContext from '../../contexts/NotificationsContext';
@@ -10,25 +9,28 @@ import { getUsersProfileData } from '../../services/userService';
 
 import MainHeader from './MainHeader';
 
-jest.mock('../../services/userService');
-jest.mock('../../services/notificationService');
+vi.mock('../../services/userService');
+vi.mock('../../services/notificationService');
 
 const member = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderMainHeader = ({ unreadCount = 0, user = member } = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession: jest.fn() }}>
-			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession: vi.fn() }}>
+			<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: vi.fn() }}>
 				<MemoryRouter>
-					<MainHeader logoutHandler={jest.fn()} />
+					<MainHeader logoutHandler={vi.fn()} />
 				</MemoryRouter>
 			</NotificationsContext.Provider>
 		</LoggedInUserContext.Provider>,
 	);
 
+let user;
+
 describe('MainHeader notifications', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		getUsersProfileData.mockResolvedValue([]);
 		getNotifications.mockResolvedValue({ notifications: [], hasMore: false, nextCursor: null, unreadSince: null });
 		markAllNotificationsRead.mockResolvedValue(undefined);
@@ -61,9 +63,9 @@ describe('MainHeader notifications', () => {
 	});
 
 	describe('notifications popup', () => {
-		const openNotifications = () => {
-			userEvent.click(screen.getByRole('button', { name: /johndoe/ }));
-			userEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+		const openNotifications = async () => {
+			await user.click(screen.getByRole('button', { name: /johndoe/ }));
+			await user.click(screen.getByRole('button', { name: 'Notifications' }));
 		};
 
 		it('is closed to begin with', () => {
@@ -75,7 +77,7 @@ describe('MainHeader notifications', () => {
 		it('opens from the Notifications row of the account menu', async () => {
 			renderMainHeader();
 
-			openNotifications();
+			await openNotifications();
 
 			expect(screen.getByRole('heading', { name: 'Notifications' })).toBeInTheDocument();
 			expect(await screen.findByText('No notifications yet')).toBeInTheDocument();
@@ -84,7 +86,7 @@ describe('MainHeader notifications', () => {
 		it('closes the account menu when it opens', async () => {
 			renderMainHeader();
 
-			openNotifications();
+			await openNotifications();
 
 			expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
 			await screen.findByText('No notifications yet');
@@ -93,9 +95,9 @@ describe('MainHeader notifications', () => {
 		it('closes with its close button', async () => {
 			renderMainHeader();
 
-			openNotifications();
+			await openNotifications();
 			await screen.findByText('No notifications yet');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(screen.queryByRole('heading', { name: 'Notifications' })).not.toBeInTheDocument();
 		});
@@ -103,10 +105,10 @@ describe('MainHeader notifications', () => {
 		it('fetches the list afresh each time it is opened', async () => {
 			renderMainHeader();
 
-			openNotifications();
+			await openNotifications();
 			await screen.findByText('No notifications yet');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
-			openNotifications();
+			await user.click(screen.getByRole('button', { name: 'Close' }));
+			await openNotifications();
 			await screen.findByText('No notifications yet');
 
 			expect(getNotifications).toHaveBeenCalledTimes(2);

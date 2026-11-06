@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import useMarkPageNotFound from '../../hooks/useMarkPageNotFound';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';

@@ -1,10 +1,9 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import StoryCircle, { STORY_RING_STATES } from './StoryCircle';
 
-const renderCircle = (props = {}) => render(<StoryCircle label='alice' ariaLabel="View alice's story" onClick={jest.fn()} {...props} />);
+const renderCircle = (props = {}) => render(<StoryCircle label='alice' ariaLabel="View alice's story" onClick={vi.fn()} {...props} />);
 
 describe('StoryCircle', () => {
 	describe('content', () => {
@@ -55,11 +54,12 @@ describe('StoryCircle', () => {
 	});
 
 	describe('clicking', () => {
-		it('calls onClick when the circle is clicked', () => {
-			const onClick = jest.fn();
+		it('calls onClick when the circle is clicked', async () => {
+			const user = userEvent.setup();
+			const onClick = vi.fn();
 			renderCircle({ onClick });
 
-			userEvent.click(screen.getByRole('button', { name: "View alice's story" }));
+			await user.click(screen.getByRole('button', { name: "View alice's story" }));
 
 			expect(onClick).toHaveBeenCalledTimes(1);
 		});
@@ -72,22 +72,24 @@ describe('StoryCircle', () => {
 			expect(container.querySelector('.story-circle-badge')).not.toBeInTheDocument();
 		});
 
-		it('is its own button, with its own click, when it has an add handler', () => {
-			const onClick = jest.fn();
-			const onAddClick = jest.fn();
+		it('is its own button, with its own click, when it has an add handler', async () => {
+			const user = userEvent.setup();
+			const onClick = vi.fn();
+			const onAddClick = vi.fn();
 			renderCircle({ hasAddBadge: true, onClick, onAddClick, ariaLabel: 'View your story' });
 
-			userEvent.click(screen.getByRole('button', { name: 'Add to your story' }));
+			await user.click(screen.getByRole('button', { name: 'Add to your story' }));
 
 			expect(onAddClick).toHaveBeenCalledTimes(1);
 			expect(onClick).not.toHaveBeenCalled();
 		});
 
-		it('does not trigger the add handler when the circle itself is clicked', () => {
-			const onAddClick = jest.fn();
+		it('does not trigger the add handler when the circle itself is clicked', async () => {
+			const user = userEvent.setup();
+			const onAddClick = vi.fn();
 			renderCircle({ hasAddBadge: true, onAddClick, ariaLabel: 'View your story' });
 
-			userEvent.click(screen.getByRole('button', { name: 'View your story' }));
+			await user.click(screen.getByRole('button', { name: 'View your story' }));
 
 			expect(onAddClick).not.toHaveBeenCalled();
 		});
@@ -102,7 +104,7 @@ describe('StoryCircle', () => {
 		});
 
 		it('is not shown without hasAddBadge even when an add handler is given', () => {
-			const { container } = renderCircle({ onAddClick: jest.fn() });
+			const { container } = renderCircle({ onAddClick: vi.fn() });
 
 			expect(container.querySelector('.story-circle-badge')).not.toBeInTheDocument();
 		});

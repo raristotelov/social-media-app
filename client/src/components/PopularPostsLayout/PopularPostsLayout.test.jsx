@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Link, MemoryRouter, Route, Routes, useLocation, useNavigationType, useOutletContext } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigationType, useOutletContext } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
@@ -9,7 +8,7 @@ import { getPopularPosts, getNextPopularPosts } from '../../services/userPostSer
 
 import PopularPostsLayout from './PopularPostsLayout';
 
-jest.mock('../../services/userPostService');
+vi.mock('../../services/userPostService');
 
 const SNAPSHOT_TIME = '2026-10-24T10:00:00.000Z';
 
@@ -74,8 +73,8 @@ const LocationProbe = () => {
 };
 
 const renderLayout = ({ entries = ['/popular-posts'], loggedInUser = { _id: 'user1' } } = {}) => {
-	const showToast = jest.fn();
-	const endSession = jest.fn();
+	const showToast = vi.fn();
+	const endSession = vi.fn();
 
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>
@@ -102,7 +101,7 @@ const getShownIds = () => screen.getByTestId('post-ids').textContent;
 
 describe('PopularPostsLayout', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 		getPopularPosts.mockResolvedValue(buildPage(['p1', 'p2', 'p3']));
 		getNextPopularPosts.mockResolvedValue(buildPage([]));
 	});
@@ -211,27 +210,33 @@ describe('PopularPostsLayout', () => {
 
 	describe('moving between the grid and the posts view', () => {
 		it('does not request the posts again when a post is opened from the grid', async () => {
+			const user = userEvent.setup();
+
 			renderLayout({ entries: ['/popular-posts'] });
 
-			userEvent.click(await screen.findByRole('link', { name: 'Open post' }));
+			await user.click(await screen.findByRole('link', { name: 'Open post' }));
 
 			await waitFor(() => expect(screen.getByTestId('probe-name')).toHaveTextContent('posts'));
 			expect(getPopularPosts).toHaveBeenCalledTimes(1);
 		});
 
 		it('keeps the loaded posts, in the same order, when going to the posts view', async () => {
+			const user = userEvent.setup();
+
 			renderLayout({ entries: ['/popular-posts'] });
 
-			userEvent.click(await screen.findByRole('link', { name: 'Open post' }));
+			await user.click(await screen.findByRole('link', { name: 'Open post' }));
 
 			await waitFor(() => expect(screen.getByTestId('probe-name')).toHaveTextContent('posts'));
 			expect(getShownIds()).toBe('p1,p2,p3');
 		});
 
 		it('does not request the posts again when going back from the posts view to the grid', async () => {
+			const user = userEvent.setup();
+
 			renderLayout({ entries: ['/popular-posts/posts#p2'] });
 
-			userEvent.click(await screen.findByRole('link', { name: 'Open grid' }));
+			await user.click(await screen.findByRole('link', { name: 'Open grid' }));
 
 			await waitFor(() => expect(screen.getByTestId('probe-name')).toHaveTextContent('grid'));
 			expect(getPopularPosts).toHaveBeenCalledTimes(1);
@@ -239,10 +244,12 @@ describe('PopularPostsLayout', () => {
 		});
 
 		it('keeps a change to a post, such as a like, when moving between the views', async () => {
+			const user = userEvent.setup();
+
 			renderLayout({ entries: ['/popular-posts/posts#p2'] });
 
-			userEvent.click(await screen.findByRole('button', { name: 'Like p1' }));
-			userEvent.click(screen.getByRole('link', { name: 'Open grid' }));
+			await user.click(await screen.findByRole('button', { name: 'Like p1' }));
+			await user.click(screen.getByRole('link', { name: 'Open grid' }));
 
 			await waitFor(() => expect(screen.getByTestId('probe-name')).toHaveTextContent('grid'));
 			expect(screen.getByTestId('likes')).toHaveTextContent('1,0,0');
@@ -285,11 +292,13 @@ describe('PopularPostsLayout', () => {
 		});
 
 		it('requests the posts again when Retry is clicked, and shows them when that works', async () => {
+			const user = userEvent.setup();
+
 			getPopularPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(buildPage(['p1', 'p2']));
 
 			renderLayout();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await screen.findByTestId('probe-name')).toBeInTheDocument();
 			expect(getShownIds()).toBe('p1,p2');
@@ -298,22 +307,25 @@ describe('PopularPostsLayout', () => {
 		});
 
 		it('keeps showing the error when Retry fails again', async () => {
+			const user = userEvent.setup();
+
 			renderLayout();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			await waitFor(() => expect(getPopularPosts).toHaveBeenCalledTimes(2));
 			expect(await screen.findByRole('heading', { name: "Couldn't load popular posts" })).toBeInTheDocument();
 		});
 
 		it('disables Retry while the retry is in flight', async () => {
+			const user = userEvent.setup();
 			const retry = buildDeferred();
 
 			getPopularPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockReturnValueOnce(retry.promise);
 
 			renderLayout();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled());
 
@@ -446,13 +458,15 @@ describe('PopularPostsLayout', () => {
 		});
 
 		it('retries the batch through the retry handler it hands to the page', async () => {
+			const user = userEvent.setup();
+
 			getPopularPosts.mockResolvedValue(buildPage(['p1', 'p2'], { hasMore: true }));
 			getNextPopularPosts.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(buildPage(['p3']));
 
 			renderLayout();
 
 			await waitFor(() => expect(screen.getByTestId('has-load-more-failed')).toHaveTextContent('true'));
-			userEvent.click(screen.getByRole('button', { name: 'Retry batch' }));
+			await user.click(screen.getByRole('button', { name: 'Retry batch' }));
 
 			await waitFor(() => expect(getShownIds()).toBe('p1,p2,p3'));
 			expect(screen.getByTestId('has-load-more-failed')).toHaveTextContent('false');

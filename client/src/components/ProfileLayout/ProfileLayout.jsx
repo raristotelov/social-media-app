@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
-import { Outlet, useMatch, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, useMatch, useNavigate, useParams } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';

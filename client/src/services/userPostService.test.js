@@ -1,7 +1,7 @@
 import { requestFactory } from './requester';
 import { addUserPost, getFollowedUsersPosts, getNextPopularPosts, getPopularPosts, likeUserPost, unlikeUserPost } from './userPostService';
 
-jest.mock('./requester');
+vi.mock('./requester');
 
 describe('userPostService', () => {
 	describe('addUserPost', () => {
@@ -9,7 +9,7 @@ describe('userPostService', () => {
 		let post;
 
 		beforeEach(() => {
-			post = jest.fn().mockResolvedValue({ _id: 'post1' });
+			post = vi.fn().mockResolvedValue({ _id: 'post1' });
 			requestFactory.mockReturnValue({ post });
 		});
 
@@ -49,7 +49,7 @@ describe('userPostService', () => {
 
 	describe('getFollowedUsersPosts', () => {
 		it('gets the followed users posts endpoint', async () => {
-			const get = jest.fn().mockResolvedValue([{ _id: 'post1' }]);
+			const get = vi.fn().mockResolvedValue([{ _id: 'post1' }]);
 
 			requestFactory.mockReturnValue({ get });
 
@@ -62,13 +62,13 @@ describe('userPostService', () => {
 		it('resolves with the page', async () => {
 			const page = { posts: [{ _id: 'post1' }], hasMore: true, nextCursor: '1_abc' };
 
-			requestFactory.mockReturnValue({ get: jest.fn().mockResolvedValue(page) });
+			requestFactory.mockReturnValue({ get: vi.fn().mockResolvedValue(page) });
 
 			await expect(getFollowedUsersPosts()).resolves.toEqual(page);
 		});
 
 		it('sends no query string for the first page', async () => {
-			const get = jest.fn().mockResolvedValue({});
+			const get = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ get });
 
@@ -78,7 +78,7 @@ describe('userPostService', () => {
 		});
 
 		it('sends the cursor of the page to continue from', async () => {
-			const get = jest.fn().mockResolvedValue({});
+			const get = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ get });
 
@@ -90,7 +90,7 @@ describe('userPostService', () => {
 		});
 
 		it('encodes a cursor so no character can break the query', async () => {
-			const get = jest.fn().mockResolvedValue({});
+			const get = vi.fn().mockResolvedValue({});
 
 			requestFactory.mockReturnValue({ get });
 
@@ -106,7 +106,7 @@ describe('userPostService', () => {
 		let get;
 
 		beforeEach(() => {
-			get = jest.fn().mockResolvedValue(page);
+			get = vi.fn().mockResolvedValue(page);
 			requestFactory.mockReturnValue({ get });
 		});
 
@@ -158,7 +158,7 @@ describe('userPostService', () => {
 		let post;
 
 		beforeEach(() => {
-			post = jest.fn().mockResolvedValue(page);
+			post = vi.fn().mockResolvedValue(page);
 			requestFactory.mockReturnValue({ post });
 		});
 
@@ -191,7 +191,7 @@ describe('userPostService', () => {
 
 	describe('likeUserPost', () => {
 		it('posts to the like endpoint of that post', async () => {
-			const post = jest.fn().mockResolvedValue({ _id: 'post1', likes: ['user1'] });
+			const post = vi.fn().mockResolvedValue({ _id: 'post1', likes: ['user1'] });
 
 			requestFactory.mockReturnValue({ post });
 
@@ -204,7 +204,7 @@ describe('userPostService', () => {
 
 	describe('unlikeUserPost', () => {
 		it('posts to the unlike endpoint of that post', async () => {
-			const post = jest.fn().mockResolvedValue({ _id: 'post1', likes: [] });
+			const post = vi.fn().mockResolvedValue({ _id: 'post1', likes: [] });
 
 			requestFactory.mockReturnValue({ post });
 

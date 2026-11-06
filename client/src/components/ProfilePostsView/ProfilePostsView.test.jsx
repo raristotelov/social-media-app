@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getUsersProfileData } from '../../services/userService';
@@ -15,9 +14,9 @@ import ProfileView from '../ProfileView/ProfileView';
 
 import ProfilePostsView from './ProfilePostsView';
 
-jest.mock('../../services/userService');
-jest.mock('../../services/userPostService');
-jest.mock('../../services/commentService');
+vi.mock('../../services/userService');
+vi.mock('../../services/userPostService');
+vi.mock('../../services/commentService');
 
 const LocationProbe = () => {
 	const location = useLocation();
@@ -63,9 +62,9 @@ const buildProfile = (overrides = {}) => ({
 const ownUser = { _id: 'user2', username: 'janedoe', following: [] };
 const otherUser = { _id: 'user1', username: 'johndoe', following: [] };
 
-const renderProfileRoutes = ({ entries = ['/user/user2/posts#post2'], initialIndex, user = otherUser, endSession = jest.fn() } = {}) => {
+const renderProfileRoutes = ({ entries = ['/user/user2/posts#post2'], initialIndex, user = otherUser, endSession = vi.fn() } = {}) => {
 	const rendered = render(
-		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: jest.fn(), endSession }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: vi.fn(), endSession }}>
 			<ToastProvider>
 				<NotFoundProvider>
 					<MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
@@ -98,16 +97,17 @@ const getTileStatTexts = (tileIndex) =>
 
 describe('ProfilePostsView', () => {
 	let mockScrollIntoView;
+	let user;
 
 	beforeEach(() => {
-		jest.resetAllMocks();
-		mockScrollIntoView = jest.fn();
-		window.HTMLElement.prototype.scrollIntoView = mockScrollIntoView;
+		vi.resetAllMocks();
+		user = userEvent.setup();
+		mockScrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
 		getUsersProfileData.mockResolvedValue([buildProfile()]);
 	});
 
 	afterEach(() => {
-		delete window.HTMLElement.prototype.scrollIntoView;
+		mockScrollIntoView.mockRestore();
 		window.history.replaceState(null, '');
 	});
 
@@ -174,7 +174,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			expect(mockScrollIntoView).toHaveBeenCalledTimes(1);
-			expect(mockScrollIntoView.mock.instances[0].id).toBe('post2');
+			expect(mockScrollIntoView.mock.contexts[0].id).toBe('post2');
 		});
 
 		it('scrolls nothing into view when the hash names no post', async () => {
@@ -205,7 +205,7 @@ describe('ProfilePostsView', () => {
 			getUsersProfileData.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce([buildProfile()]);
 			renderProfileRoutes();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+			await user.click(await screen.findByRole('button', { name: 'Retry' }));
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 		});
@@ -232,19 +232,19 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ entries: ['/user/user2'] });
 
 			await screen.findByText('janedoe');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[1]);
+			await user.click(document.querySelectorAll('.profile-post-link')[1]);
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 			expect(screen.getByTestId('path')).toHaveTextContent('/user/user2/posts');
 			expect(screen.getByTestId('hash')).toHaveTextContent('#post2');
-			expect(mockScrollIntoView.mock.instances[0].id).toBe('post2');
+			expect(mockScrollIntoView.mock.contexts[0].id).toBe('post2');
 		});
 
 		it('does not refetch the profile when going from the grid to the posts view', async () => {
 			renderProfileRoutes({ entries: ['/user/user2'] });
 
 			await screen.findByText('janedoe');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[0]);
+			await user.click(document.querySelectorAll('.profile-post-link')[0]);
 			await screen.findAllByRole('article');
 
 			expect(getUsersProfileData).toHaveBeenCalledTimes(1);
@@ -254,9 +254,9 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ entries: ['/user/user2'] });
 
 			await screen.findByText('janedoe');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[0]);
+			await user.click(document.querySelectorAll('.profile-post-link')[0]);
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
 			expect(screen.getAllByAltText('user-post')).toHaveLength(3);
@@ -279,12 +279,12 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ entries: ['/user/user2'] });
 
 			await screen.findByText('janedoe');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[0]);
+			await user.click(document.querySelectorAll('.profile-post-link')[0]);
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[0]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[0]).getByRole('button', { name: 'Like post' }));
 			await within(articles[0]).findByText('1 like');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await screen.findAllByAltText('user-post');
 			expect(getTileStatTexts(0)[0]).toBe('1');
@@ -301,13 +301,13 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ entries: ['/user/user2'] });
 
 			await screen.findByText('janedoe');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[0]);
+			await user.click(document.querySelectorAll('.profile-post-link')[0]);
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.type(within(articles[0]).getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(within(articles[0]).getByRole('button', { name: 'Post' }));
+			await user.type(within(articles[0]).getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(within(articles[0]).getByRole('button', { name: 'Post' }));
 			await within(articles[0]).findByRole('button', { name: '1 comment' });
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await screen.findAllByAltText('user-post');
 			expect(getTileStatTexts(0)[1]).toBe('1');
@@ -319,7 +319,7 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ entries: ['/popular-posts', '/user/user2/posts#post1'], initialIndex: 1 });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			expect(await screen.findByText('Popular posts page')).toBeInTheDocument();
 			expect(screen.getByTestId('path')).toHaveTextContent('/popular-posts');
@@ -329,7 +329,7 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ entries: ['/user/user2', '/user/user2/posts#post1'], initialIndex: 1 });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
 			expect(screen.getAllByAltText('user-post')).toHaveLength(3);
@@ -340,7 +340,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			window.history.replaceState({ idx: 0 }, '');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
 			expect(screen.getAllByAltText('user-post')).toHaveLength(3);
@@ -351,7 +351,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			window.history.replaceState({ idx: 0 }, '');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE'));
 		});
@@ -362,7 +362,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			window.history.replaceState({ idx: 0 }, '');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
 			expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE');
@@ -373,7 +373,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			window.history.replaceState({ idx: 1 }, '');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			expect(await screen.findByText('Popular posts page')).toBeInTheDocument();
 			expect(screen.getByTestId('navigation-type')).toHaveTextContent('POP');
@@ -384,7 +384,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			window.history.replaceState(null, '');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			expect(await screen.findByText('Popular posts page')).toBeInTheDocument();
 		});
@@ -394,7 +394,7 @@ describe('ProfilePostsView', () => {
 
 			await screen.findAllByRole('article');
 			window.history.replaceState({ usr: { idx: 0 } }, '');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			expect(await screen.findByText('Popular posts page')).toBeInTheDocument();
 		});
@@ -426,7 +426,7 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ user: ownUser });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[0]);
+			await user.click(screen.getAllByRole('button', { name: 'Post actions' })[0]);
 
 			expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
@@ -436,8 +436,8 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ user: ownUser });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[1]);
-			userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+			await user.click(screen.getAllByRole('button', { name: 'Post actions' })[1]);
+			await user.click(screen.getByRole('button', { name: 'Edit' }));
 
 			expect(screen.getByRole('heading', { name: 'Edit Picture' })).toBeInTheDocument();
 			expect(screen.getByPlaceholderText('Write a caption...')).toHaveValue('Caption of post2');
@@ -448,11 +448,11 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ user: ownUser });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[1]);
-			userEvent.click(screen.getByRole('button', { name: 'Edit' }));
-			userEvent.clear(screen.getByPlaceholderText('Write a caption...'));
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.click(screen.getAllByRole('button', { name: 'Post actions' })[1]);
+			await user.click(screen.getByRole('button', { name: 'Edit' }));
+			await user.clear(screen.getByPlaceholderText('Write a caption...'));
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(updateUserPostCaption).toHaveBeenCalledWith({ userPostId: 'post2', caption: 'Edited caption' }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Picture' })).not.toBeInTheDocument());
@@ -464,16 +464,16 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ user: ownUser, entries: ['/user/user2', '/user/user2/posts#post3'], initialIndex: 1 });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[0]);
-			userEvent.click(screen.getByRole('button', { name: 'Edit' }));
-			userEvent.clear(screen.getByPlaceholderText('Write a caption...'));
-			userEvent.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.click(screen.getAllByRole('button', { name: 'Post actions' })[0]);
+			await user.click(screen.getByRole('button', { name: 'Edit' }));
+			await user.clear(screen.getByPlaceholderText('Write a caption...'));
+			await user.type(screen.getByPlaceholderText('Write a caption...'), 'Edited caption');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 			await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Picture' })).not.toBeInTheDocument());
 
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 			await screen.findAllByAltText('user-post');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[0]);
+			await user.click(document.querySelectorAll('.profile-post-link')[0]);
 			await screen.findAllByRole('article');
 
 			expect(document.getElementById('post3').querySelector('.post-caption')).toHaveTextContent('Edited caption');
@@ -484,8 +484,8 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ user: ownUser });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[0]);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getAllByRole('button', { name: 'Post actions' })[0]);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			expect(screen.getByText(/permanently deleted/i)).toBeInTheDocument();
 			expect(deleteUserPost).not.toHaveBeenCalled();
@@ -496,9 +496,9 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ user: ownUser });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[1]);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getAllByRole('button', { name: 'Post actions' })[1]);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(getRenderedPostIds()).toEqual(['post3', 'post1']));
 			expect(deleteUserPost).toHaveBeenCalledWith({ userPostId: 'post2' });
@@ -509,20 +509,20 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ user: ownUser, entries: ['/user/user2', '/user/user2/posts#post3'], initialIndex: 1 });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[1]);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getAllByRole('button', { name: 'Post actions' })[1]);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 			await waitFor(() => expect(getRenderedPostIds()).toEqual(['post3', 'post1']));
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			expect(await screen.findAllByAltText('user-post')).toHaveLength(2);
 		});
 
 		describe('deleting from the posts view', () => {
-			const deletePostAt = (index) => {
-				userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[index]);
-				userEvent.click(screen.getByRole('button', { name: 'Delete' }));
-				userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			const deletePostAt = async (index) => {
+				await user.click(screen.getAllByRole('button', { name: 'Post actions' })[index]);
+				await user.click(screen.getByRole('button', { name: 'Delete' }));
+				await user.click(screen.getByRole('button', { name: 'Delete' }));
 			};
 
 			it('goes to the profile grid, replacing the entry, when the last post is deleted', async () => {
@@ -531,7 +531,7 @@ describe('ProfilePostsView', () => {
 				renderProfileRoutes({ user: ownUser, entries: ['/popular-posts', '/user/user2/posts#post1'], initialIndex: 1 });
 
 				await screen.findAllByRole('article');
-				deletePostAt(0);
+				await deletePostAt(0);
 
 				await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
 				expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE');
@@ -544,7 +544,7 @@ describe('ProfilePostsView', () => {
 				renderProfileRoutes({ user: ownUser, entries: ['/user/user2/posts#post1'] });
 
 				await screen.findAllByRole('article');
-				deletePostAt(0);
+				await deletePostAt(0);
 
 				await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2$/));
 				expect(screen.queryByRole('article')).not.toBeInTheDocument();
@@ -556,7 +556,7 @@ describe('ProfilePostsView', () => {
 				renderProfileRoutes({ user: ownUser });
 
 				await screen.findAllByRole('article');
-				deletePostAt(1);
+				await deletePostAt(1);
 
 				await waitFor(() => expect(getRenderedPostIds()).toEqual(['post3', 'post1']));
 				expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2\/posts$/);
@@ -568,7 +568,7 @@ describe('ProfilePostsView', () => {
 				renderProfileRoutes({ user: ownUser, entries: ['/user/user2/posts#post2'] });
 
 				await screen.findAllByRole('article');
-				deletePostAt(0);
+				await deletePostAt(0);
 
 				await waitFor(() => expect(getRenderedPostIds()).toEqual(['post1']));
 				expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2\/posts$/);
@@ -580,7 +580,7 @@ describe('ProfilePostsView', () => {
 				renderProfileRoutes({ user: ownUser, entries: ['/user/user2/posts#post1'] });
 
 				await screen.findAllByRole('article');
-				deletePostAt(0);
+				await deletePostAt(0);
 
 				expect(await screen.findByText("Couldn't delete the post. Try again.")).toBeInTheDocument();
 				expect(screen.getByTestId('path')).toHaveTextContent(/^\/user\/user2\/posts$/);
@@ -593,9 +593,9 @@ describe('ProfilePostsView', () => {
 			renderProfileRoutes({ user: ownUser });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post actions' })[0]);
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
-			userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getAllByRole('button', { name: 'Post actions' })[0]);
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			expect(await screen.findByText('This post no longer exists')).toBeInTheDocument();
 			expect(getRenderedPostIds()).toEqual(['post3', 'post2', 'post1']);
@@ -623,7 +623,7 @@ describe('ProfilePostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
 
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/user/user2/posts#post2');
 			expect(likeUserPost).not.toHaveBeenCalled();
@@ -634,7 +634,7 @@ describe('ProfilePostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByPlaceholderText('Add a comment...'));
+			await user.click(within(articles[1]).getByPlaceholderText('Add a comment...'));
 
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/user/user2/posts#post2');
 		});
@@ -644,7 +644,7 @@ describe('ProfilePostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: 'Post' }));
+			await user.click(within(articles[1]).getByRole('button', { name: 'Post' }));
 
 			expect(within(articles[1]).getByRole('button', { name: 'Post' })).toBeDisabled();
 			expect(screen.queryByTestId('login-from')).not.toBeInTheDocument();
@@ -660,7 +660,7 @@ describe('ProfilePostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[0]).getByRole('button', { name: '0 comments' }));
+			await user.click(within(articles[0]).getByRole('button', { name: '0 comments' }));
 
 			expect(await screen.findByText('Hello there', { selector: '.comment-text' })).toBeInTheDocument();
 			expect(screen.getByText('Second comment', { selector: '.comment-text' })).toBeInTheDocument();
@@ -673,9 +673,9 @@ describe('ProfilePostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: '0 comments' }));
+			await user.click(within(articles[1]).getByRole('button', { name: '0 comments' }));
 			await screen.findByText('Hello there', { selector: '.comment-text' });
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/user/user2/posts#post2');
 			expect(likeComment).not.toHaveBeenCalled();
@@ -687,9 +687,9 @@ describe('ProfilePostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: '0 comments' }));
+			await user.click(within(articles[1]).getByRole('button', { name: '0 comments' }));
 			await screen.findByText('Hello there', { selector: '.comment-text' });
-			userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+			await user.click(screen.getByRole('button', { name: 'Reply' }));
 
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/user/user2/posts#post2');
 		});
@@ -700,9 +700,9 @@ describe('ProfilePostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: '0 comments' }));
+			await user.click(within(articles[1]).getByRole('button', { name: '0 comments' }));
 			await screen.findByText('Hello there', { selector: '.comment-text' });
-			userEvent.click(document.querySelector('.comments-popup-form input'));
+			await user.click(document.querySelector('.comments-popup-form input'));
 
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/user/user2/posts#post2');
 		});
@@ -739,7 +739,7 @@ describe('ProfilePostsView', () => {
 			queuedFrames = new Map();
 			nextFrameId = 1;
 			Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: 0 });
-			requestFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+			requestFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
 				const frameId = nextFrameId;
 
 				nextFrameId += 1;
@@ -747,7 +747,7 @@ describe('ProfilePostsView', () => {
 
 				return frameId;
 			});
-			cancelFrameSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+			cancelFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
 				queuedFrames.delete(frameId);
 			});
 		});

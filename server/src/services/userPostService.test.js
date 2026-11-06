@@ -632,7 +632,7 @@ describe('userPostService', () => {
 
 			const result = await run();
 
-			expect(UserPostModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: POST_ID }, expectedUpdate, { new: true });
+			expect(UserPostModel.findOneAndUpdate).toHaveBeenCalledWith({ _id: POST_ID }, expectedUpdate, { returnDocument: 'after' });
 			expect(result).toBe(updatedPost);
 		});
 

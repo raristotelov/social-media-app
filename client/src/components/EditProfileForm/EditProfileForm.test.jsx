@@ -1,8 +1,15 @@
-import '@testing-library/jest-dom';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { validateEditProfile } from '../../utils/validators';
+
 import EditProfileForm from './EditProfileForm';
+
+vi.mock('../../utils/validators', async (importOriginal) => {
+	const actual = await importOriginal();
+
+	return { ...actual, validateEditProfile: vi.fn(actual.validateEditProfile) };
+});
 
 const userData = {
 	email: 'user@example.com',
@@ -14,8 +21,14 @@ const renderEditProfileForm = (editProfileData, onCancelClick, data = userData) 
 	render(<EditProfileForm userData={data} editProfileData={editProfileData} onCancelClick={onCancelClick} />);
 
 describe('EditProfileForm', () => {
+	let user;
+
+	beforeEach(() => {
+		user = userEvent.setup({ applyAccept: false });
+	});
+
 	it('prefills email, username and bio from userData', () => {
-		renderEditProfileForm(jest.fn(), jest.fn());
+		renderEditProfileForm(vi.fn(), vi.fn());
 
 		expect(screen.getByPlaceholderText('Email')).toHaveValue(userData.email);
 		expect(screen.getByPlaceholderText('Username')).toHaveValue(userData.username);
@@ -23,59 +36,74 @@ describe('EditProfileForm', () => {
 	});
 
 	it('labels the submit button "Save", not "Submit"', () => {
-		renderEditProfileForm(jest.fn(), jest.fn());
+		renderEditProfileForm(vi.fn(), vi.fn());
 
 		expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('type', 'submit');
 		expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
 	});
 
 	it('shows "Email is required" and does not call editProfileData when the email is cleared', async () => {
-		const editProfileData = jest.fn();
-		renderEditProfileForm(editProfileData, jest.fn());
+		const editProfileData = vi.fn();
+		renderEditProfileForm(editProfileData, vi.fn());
 
-		userEvent.clear(screen.getByPlaceholderText('Email'));
-		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await user.clear(screen.getByPlaceholderText('Email'));
+		await user.click(screen.getByRole('button', { name: 'Save' }));
 
 		expect(await screen.findByText('Email is required')).toBeInTheDocument();
 		expect(editProfileData).not.toHaveBeenCalled();
 	});
 
-	it('shows "Username is required" and does not call editProfileData when the username is cleared', async () => {
-		const editProfileData = jest.fn();
-		renderEditProfileForm(editProfileData, jest.fn());
+	it('shows the app validation error, not the browser one, for an email without an @, and sends nothing', async () => {
+		const editProfileData = vi.fn();
+		const onCancelClick = vi.fn();
+		const { container } = renderEditProfileForm(editProfileData, onCancelClick);
 
-		userEvent.clear(screen.getByPlaceholderText('Username'));
-		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await user.clear(screen.getByPlaceholderText('Email'));
+		await user.type(screen.getByPlaceholderText('Email'), 'not-an-email');
+		await user.click(screen.getByRole('button', { name: 'Save' }));
+
+		expect(await screen.findByText('Please provide a valid email address')).toHaveClass('field-error');
+		expect(container.querySelector('form')).toHaveAttribute('novalidate');
+		expect(editProfileData).not.toHaveBeenCalled();
+		expect(onCancelClick).not.toHaveBeenCalled();
+	});
+
+	it('shows "Username is required" and does not call editProfileData when the username is cleared', async () => {
+		const editProfileData = vi.fn();
+		renderEditProfileForm(editProfileData, vi.fn());
+
+		await user.clear(screen.getByPlaceholderText('Username'));
+		await user.click(screen.getByRole('button', { name: 'Save' }));
 
 		expect(await screen.findByText('Username is required')).toBeInTheDocument();
 		expect(editProfileData).not.toHaveBeenCalled();
 	});
 
 	it('calls onCancelClick and not editProfileData when the untouched form is submitted', async () => {
-		const editProfileData = jest.fn();
-		const onCancelClick = jest.fn();
+		const editProfileData = vi.fn();
+		const onCancelClick = vi.fn();
 		renderEditProfileForm(editProfileData, onCancelClick);
 
-		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await user.click(screen.getByRole('button', { name: 'Save' }));
 
 		await waitFor(() => expect(onCancelClick).toHaveBeenCalledTimes(1));
 		expect(editProfileData).not.toHaveBeenCalled();
 	});
 
 	it('calls editProfileData with only the changed values', async () => {
-		const editProfileData = jest.fn();
-		renderEditProfileForm(editProfileData, jest.fn());
+		const editProfileData = vi.fn();
+		renderEditProfileForm(editProfileData, vi.fn());
 
-		userEvent.clear(screen.getByPlaceholderText('Username'));
-		userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
-		userEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await user.clear(screen.getByPlaceholderText('Username'));
+		await user.type(screen.getByPlaceholderText('Username'), 'newname');
+		await user.click(screen.getByRole('button', { name: 'Save' }));
 
 		await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
 		expect(editProfileData).toHaveBeenCalledWith({ username: 'newname' });
 	});
 
 	it('renders the bio field as a textarea, not an input', () => {
-		renderEditProfileForm(jest.fn(), jest.fn());
+		renderEditProfileForm(vi.fn(), vi.fn());
 
 		const bioField = screen.getByPlaceholderText('Bio');
 		expect(bioField.tagName).toBe('TEXTAREA');
@@ -89,116 +117,116 @@ describe('EditProfileForm', () => {
 		const getFileInput = (container) => container.querySelector('input[type="file"]');
 
 		beforeEach(() => {
-			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
-			global.URL.revokeObjectURL = jest.fn();
+			globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+			globalThis.URL.revokeObjectURL = vi.fn();
 		});
 
 		it('shows the remove button when the user has a picture', () => {
-			renderEditProfileForm(jest.fn(), jest.fn(), userDataWithPicture);
+			renderEditProfileForm(vi.fn(), vi.fn(), userDataWithPicture);
 
 			expect(screen.getByRole('button', { name: 'Remove picture' })).toBeInTheDocument();
 		});
 
 		it('sends profilePicture: null and nothing else when the existing picture is removed and Save is clicked', async () => {
-			const editProfileData = jest.fn();
-			renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+			const editProfileData = vi.fn();
+			renderEditProfileForm(editProfileData, vi.fn(), userDataWithPicture);
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
 			expect(editProfileData).toHaveBeenCalledWith({ profilePicture: null });
 		});
 
-		it('does not call editProfileData or close the form on removal alone, until Save is clicked', () => {
-			const editProfileData = jest.fn();
-			const onCancelClick = jest.fn();
+		it('does not call editProfileData or close the form on removal alone, until Save is clicked', async () => {
+			const editProfileData = vi.fn();
+			const onCancelClick = vi.fn();
 			renderEditProfileForm(editProfileData, onCancelClick, userDataWithPicture);
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
 
 			expect(editProfileData).not.toHaveBeenCalled();
 			expect(onCancelClick).not.toHaveBeenCalled();
 		});
 
 		it('sends profilePicture: null together with other changed values', async () => {
-			const editProfileData = jest.fn();
-			renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+			const editProfileData = vi.fn();
+			renderEditProfileForm(editProfileData, vi.fn(), userDataWithPicture);
 
-			userEvent.clear(screen.getByPlaceholderText('Bio'));
-			userEvent.type(screen.getByPlaceholderText('Bio'), 'New bio');
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.clear(screen.getByPlaceholderText('Bio'));
+			await user.type(screen.getByPlaceholderText('Bio'), 'New bio');
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ bio: 'New bio', profilePicture: null }));
 		});
 
 		it('sends the chosen file when a new picture is picked after removing the old one', async () => {
-			const editProfileData = jest.fn();
+			const editProfileData = vi.fn();
 			const file = buildFile();
-			const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+			const { container } = renderEditProfileForm(editProfileData, vi.fn(), userDataWithPicture);
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.upload(getFileInput(container), file);
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.upload(getFileInput(container), file);
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
 			expect(editProfileData).toHaveBeenCalledWith({ profilePicture: file });
 		});
 
 		it('sends the chosen file when a replacement is picked without removing first', async () => {
-			const editProfileData = jest.fn();
+			const editProfileData = vi.fn();
 			const file = buildFile();
-			const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+			const { container } = renderEditProfileForm(editProfileData, vi.fn(), userDataWithPicture);
 
-			userEvent.upload(getFileInput(container), file);
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.upload(getFileInput(container), file);
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ profilePicture: file }));
 		});
 
 		it('sends nothing for the picture when a new file is chosen and then removed on a user who had no picture', async () => {
-			const editProfileData = jest.fn();
-			const onCancelClick = jest.fn();
+			const editProfileData = vi.fn();
+			const onCancelClick = vi.fn();
 			const { container } = renderEditProfileForm(editProfileData, onCancelClick);
 
-			userEvent.upload(getFileInput(container), buildFile());
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.upload(getFileInput(container), buildFile());
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(onCancelClick).toHaveBeenCalledTimes(1));
 			expect(editProfileData).not.toHaveBeenCalled();
 		});
 
 		it('sends profilePicture: null when a new file is chosen and then removed on a user who had a picture', async () => {
-			const editProfileData = jest.fn();
-			const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+			const editProfileData = vi.fn();
+			const { container } = renderEditProfileForm(editProfileData, vi.fn(), userDataWithPicture);
 
-			userEvent.upload(getFileInput(container), buildFile());
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.upload(getFileInput(container), buildFile());
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ profilePicture: null }));
 		});
 
 		it('does not send profilePicture when the picture was never touched', async () => {
-			const editProfileData = jest.fn();
-			renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+			const editProfileData = vi.fn();
+			renderEditProfileForm(editProfileData, vi.fn(), userDataWithPicture);
 
-			userEvent.clear(screen.getByPlaceholderText('Username'));
-			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.clear(screen.getByPlaceholderText('Username'));
+			await user.type(screen.getByPlaceholderText('Username'), 'newname');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ username: 'newname' }));
 		});
 
-		it('calls onCancelClick and sends nothing when Cancel is clicked after removing the picture', () => {
-			const editProfileData = jest.fn();
-			const onCancelClick = jest.fn();
+		it('calls onCancelClick and sends nothing when Cancel is clicked after removing the picture', async () => {
+			const editProfileData = vi.fn();
+			const onCancelClick = vi.fn();
 			renderEditProfileForm(editProfileData, onCancelClick, userDataWithPicture);
 
-			userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(onCancelClick).toHaveBeenCalledTimes(1);
 			expect(editProfileData).not.toHaveBeenCalled();
@@ -217,13 +245,13 @@ describe('EditProfileForm', () => {
 			return deferred;
 		};
 
-		const changeUsername = () => {
-			userEvent.clear(screen.getByPlaceholderText('Username'));
-			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
+		const changeUsername = async () => {
+			await user.clear(screen.getByPlaceholderText('Username'));
+			await user.type(screen.getByPlaceholderText('Username'), 'newname');
 		};
 
 		it('enables Save before anything is sent', () => {
-			renderEditProfileForm(jest.fn(), jest.fn());
+			renderEditProfileForm(vi.fn(), vi.fn());
 
 			expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
 		});
@@ -231,9 +259,9 @@ describe('EditProfileForm', () => {
 		it('disables Save while the request is in flight', async () => {
 			const request = buildDeferred();
 
-			renderEditProfileForm(jest.fn().mockReturnValue(request.promise), jest.fn());
-			changeUsername();
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			renderEditProfileForm(vi.fn().mockReturnValue(request.promise), vi.fn());
+			await changeUsername();
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
@@ -244,9 +272,9 @@ describe('EditProfileForm', () => {
 		it('keeps Cancel enabled while the request is in flight', async () => {
 			const request = buildDeferred();
 
-			renderEditProfileForm(jest.fn().mockReturnValue(request.promise), jest.fn());
-			changeUsername();
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			renderEditProfileForm(vi.fn().mockReturnValue(request.promise), vi.fn());
+			await changeUsername();
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
 
@@ -256,11 +284,11 @@ describe('EditProfileForm', () => {
 
 		it('sends one request when Save is double-clicked', async () => {
 			const request = buildDeferred();
-			const editProfileData = jest.fn().mockReturnValue(request.promise);
+			const editProfileData = vi.fn().mockReturnValue(request.promise);
 
-			renderEditProfileForm(editProfileData, jest.fn());
-			changeUsername();
-			userEvent.dblClick(screen.getByRole('button', { name: 'Save' }));
+			renderEditProfileForm(editProfileData, vi.fn());
+			await changeUsername();
+			await user.dblClick(screen.getByRole('button', { name: 'Save' }));
 
 			expect(editProfileData).toHaveBeenCalledTimes(1);
 
@@ -270,12 +298,12 @@ describe('EditProfileForm', () => {
 
 		it('sends one request when the form is submitted twice synchronously before React re-renders, and allows a new submit once it settles', async () => {
 			const request = buildDeferred();
-			const editProfileData = jest.fn().mockReturnValue(request.promise);
+			const editProfileData = vi.fn().mockReturnValue(request.promise);
 
-			const { container } = renderEditProfileForm(editProfileData, jest.fn());
+			const { container } = renderEditProfileForm(editProfileData, vi.fn());
 			const form = container.querySelector('form');
 
-			changeUsername();
+			await changeUsername();
 			act(() => {
 				form.requestSubmit();
 				form.requestSubmit();
@@ -296,9 +324,9 @@ describe('EditProfileForm', () => {
 		});
 
 		it('enables Save again after a failed request', async () => {
-			renderEditProfileForm(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }), jest.fn());
-			changeUsername();
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			renderEditProfileForm(vi.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }), vi.fn());
+			await changeUsername();
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			await screen.findByRole('alert');
 
@@ -326,74 +354,74 @@ describe('EditProfileForm', () => {
 		const getPictureWrapper = (container) => container.querySelector('.profile-form-profile-picture-wrapper');
 
 		beforeEach(() => {
-			global.URL.createObjectURL = jest.fn(() => 'blob:preview');
-			global.URL.revokeObjectURL = jest.fn();
+			globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
+			globalThis.URL.revokeObjectURL = vi.fn();
 		});
 
 		describe('choosing a file in the browser', () => {
-			it('shows the type message under the picture for a file that is not JPEG, PNG or WebP', () => {
-				const { container } = renderEditProfileForm(jest.fn(), jest.fn());
+			it('shows the type message under the picture for a file that is not JPEG, PNG or WebP', async () => {
+				const { container } = renderEditProfileForm(vi.fn(), vi.fn());
 
-				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				await user.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
 
 				expect(within(getPictureWrapper(container)).getByText(TYPE_MESSAGE)).toHaveClass('field-error');
 			});
 
-			it('shows the size message under the picture for a file over 10 MB', () => {
-				const { container } = renderEditProfileForm(jest.fn(), jest.fn());
+			it('shows the size message under the picture for a file over 10 MB', async () => {
+				const { container } = renderEditProfileForm(vi.fn(), vi.fn());
 
-				userEvent.upload(getFileInput(container), buildOversizedFile());
+				await user.upload(getFileInput(container), buildOversizedFile());
 
 				expect(within(getPictureWrapper(container)).getByText(SIZE_MESSAGE)).toHaveClass('field-error');
 			});
 
-			it('does not use the form message for a rejected file', () => {
-				const { container } = renderEditProfileForm(jest.fn(), jest.fn());
+			it('does not use the form message for a rejected file', async () => {
+				const { container } = renderEditProfileForm(vi.fn(), vi.fn());
 
-				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				await user.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
 
 				expect(container.querySelector('.form-error')).not.toBeInTheDocument();
 			});
 
 			it('sends nothing for a rejected file, and closes the form as an untouched submit', async () => {
-				const editProfileData = jest.fn();
-				const onCancelClick = jest.fn();
+				const editProfileData = vi.fn();
+				const onCancelClick = vi.fn();
 				const { container } = renderEditProfileForm(editProfileData, onCancelClick);
 
-				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
-				userEvent.click(screen.getByRole('button', { name: 'Save' }));
+				await user.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				await user.click(screen.getByRole('button', { name: 'Save' }));
 
 				await waitFor(() => expect(onCancelClick).toHaveBeenCalledTimes(1));
 				expect(editProfileData).not.toHaveBeenCalled();
 			});
 
-			it('clears the message when a valid file is chosen', () => {
-				const { container } = renderEditProfileForm(jest.fn(), jest.fn());
+			it('clears the message when a valid file is chosen', async () => {
+				const { container } = renderEditProfileForm(vi.fn(), vi.fn());
 
-				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
-				userEvent.upload(getFileInput(container), buildFile());
+				await user.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				await user.upload(getFileInput(container), buildFile());
 
 				expect(screen.queryByText(TYPE_MESSAGE)).not.toBeInTheDocument();
 			});
 
-			it('clears the message when the picture is removed', () => {
+			it('clears the message when the picture is removed', async () => {
 				const userDataWithPicture = { ...userData, profilePicture: { imageUrl: 'https://example.com/me.jpg' } };
-				const { container } = renderEditProfileForm(jest.fn(), jest.fn(), userDataWithPicture);
+				const { container } = renderEditProfileForm(vi.fn(), vi.fn(), userDataWithPicture);
 
-				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
-				userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+				await user.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				await user.click(screen.getByRole('button', { name: 'Remove picture' }));
 
 				expect(screen.queryByText(TYPE_MESSAGE)).not.toBeInTheDocument();
 			});
 
 			it('clears the message when the form is submitted with other changes', async () => {
-				const editProfileData = jest.fn().mockResolvedValue(undefined);
-				const { container } = renderEditProfileForm(editProfileData, jest.fn());
+				const editProfileData = vi.fn().mockResolvedValue(undefined);
+				const { container } = renderEditProfileForm(editProfileData, vi.fn());
 
-				userEvent.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
-				userEvent.clear(screen.getByPlaceholderText('Username'));
-				userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
-				userEvent.click(screen.getByRole('button', { name: 'Save' }));
+				await user.upload(getFileInput(container), buildFile('notes.txt', 'text/plain'));
+				await user.clear(screen.getByPlaceholderText('Username'));
+				await user.type(screen.getByPlaceholderText('Username'), 'newname');
+				await user.click(screen.getByRole('button', { name: 'Save' }));
 
 				await waitFor(() => expect(editProfileData).toHaveBeenCalledWith({ username: 'newname' }));
 				expect(screen.queryByText(TYPE_MESSAGE)).not.toBeInTheDocument();
@@ -402,11 +430,11 @@ describe('EditProfileForm', () => {
 
 		describe('rejected by the server', () => {
 			const submitNewPictureRejectedWith = async (error) => {
-				const editProfileData = jest.fn().mockRejectedValue(error);
-				const view = renderEditProfileForm(editProfileData, jest.fn());
+				const editProfileData = vi.fn().mockRejectedValue(error);
+				const view = renderEditProfileForm(editProfileData, vi.fn());
 
-				userEvent.upload(getFileInput(view.container), buildFile());
-				userEvent.click(screen.getByRole('button', { name: 'Save' }));
+				await user.upload(getFileInput(view.container), buildFile());
+				await user.click(screen.getByRole('button', { name: 'Save' }));
 
 				await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
 
@@ -449,23 +477,23 @@ describe('EditProfileForm', () => {
 					status: 413,
 				});
 
-				userEvent.upload(getFileInput(container), buildFile('other.png'));
+				await user.upload(getFileInput(container), buildFile('other.png'));
 
 				expect(screen.queryByText(SIZE_MESSAGE)).not.toBeInTheDocument();
 			});
 
 			it('clears the picture message when the picture is removed', async () => {
 				const userDataWithPicture = { ...userData, profilePicture: { imageUrl: 'https://example.com/me.jpg' } };
-				const editProfileData = jest
+				const editProfileData = vi
 					.fn()
 					.mockRejectedValue({ code: 'IMAGE_TOO_LARGE', fields: { profilePicture: 'IMAGE_TOO_LARGE' }, status: 413 });
-				const { container } = renderEditProfileForm(editProfileData, jest.fn(), userDataWithPicture);
+				const { container } = renderEditProfileForm(editProfileData, vi.fn(), userDataWithPicture);
 
-				userEvent.upload(getFileInput(container), buildFile());
-				userEvent.click(screen.getByRole('button', { name: 'Save' }));
+				await user.upload(getFileInput(container), buildFile());
+				await user.click(screen.getByRole('button', { name: 'Save' }));
 				await screen.findByText(SIZE_MESSAGE);
 
-				userEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+				await user.click(screen.getByRole('button', { name: 'Remove picture' }));
 
 				expect(screen.queryByText(SIZE_MESSAGE)).not.toBeInTheDocument();
 			});
@@ -473,12 +501,12 @@ describe('EditProfileForm', () => {
 	});
 
 	describe('submit failures', () => {
-		const submitChangedUsername = (editProfileData) => {
-			const rendered = renderEditProfileForm(editProfileData, jest.fn());
+		const submitChangedUsername = async (editProfileData) => {
+			const rendered = renderEditProfileForm(editProfileData, vi.fn());
 
-			userEvent.clear(screen.getByPlaceholderText('Username'));
-			userEvent.type(screen.getByPlaceholderText('Username'), 'newname');
-			userEvent.click(screen.getByRole('button', { name: 'Save' }));
+			await user.clear(screen.getByPlaceholderText('Username'));
+			await user.type(screen.getByPlaceholderText('Username'), 'newname');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
 
 			return rendered;
 		};
@@ -489,8 +517,8 @@ describe('EditProfileForm', () => {
 			['USERNAME_TAKEN', 'username', 'This username is taken'],
 			['BIO_TOO_LONG', 'bio', 'Bio must be at most 150 characters'],
 		])('shows %s under the %s field', async (code, field, copy) => {
-			const editProfileData = jest.fn().mockRejectedValue({ code, fields: { [field]: code }, status: 400 });
-			const { container } = submitChangedUsername(editProfileData);
+			const editProfileData = vi.fn().mockRejectedValue({ code, fields: { [field]: code }, status: 400 });
+			const { container } = await submitChangedUsername(editProfileData);
 
 			const message = await screen.findByText(copy);
 			expect(message).toHaveClass('field-error');
@@ -498,12 +526,12 @@ describe('EditProfileForm', () => {
 		});
 
 		it('shows a field code the form has no input for (PASSWORD_NOT_EDITABLE) as the form message', async () => {
-			const editProfileData = jest.fn().mockRejectedValue({
+			const editProfileData = vi.fn().mockRejectedValue({
 				code: 'PASSWORD_NOT_EDITABLE',
 				fields: { password: 'PASSWORD_NOT_EDITABLE' },
 				status: 400,
 			});
-			const { container } = submitChangedUsername(editProfileData);
+			const { container } = await submitChangedUsername(editProfileData);
 
 			const message = await screen.findByText('Password cannot be changed from the profile form');
 			expect(message).toHaveClass('form-error');
@@ -511,26 +539,26 @@ describe('EditProfileForm', () => {
 		});
 
 		it('renders the form message with an alert role so it is announced', async () => {
-			submitChangedUsername(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
+			await submitChangedUsername(vi.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
 
 			expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save your profile. Try again.");
 		});
 
 		it('shows the save-profile fallback copy for INTERNAL_ERROR', async () => {
-			submitChangedUsername(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
+			await submitChangedUsername(vi.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
 
 			expect(await screen.findByText("Couldn't save your profile. Try again.")).toHaveClass('form-error');
 		});
 
 		it('shows the save-profile fallback copy for a network failure', async () => {
-			submitChangedUsername(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 0 }));
+			await submitChangedUsername(vi.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 0 }));
 
 			expect(await screen.findByText("Couldn't save your profile. Try again.")).toBeInTheDocument();
 		});
 
 		it('shows no form error for UNAUTHENTICATED', async () => {
-			const editProfileData = jest.fn().mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
-			const { container } = submitChangedUsername(editProfileData);
+			const editProfileData = vi.fn().mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			const { container } = await submitChangedUsername(editProfileData);
 
 			await waitFor(() => expect(editProfileData).toHaveBeenCalledTimes(1));
 			await screen.findByRole('button', { name: 'Save' });
@@ -539,12 +567,104 @@ describe('EditProfileForm', () => {
 		});
 
 		it('clears the form message when the user edits a field again', async () => {
-			submitChangedUsername(jest.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
+			await submitChangedUsername(vi.fn().mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 }));
 			await screen.findByText("Couldn't save your profile. Try again.");
 
-			userEvent.type(screen.getByPlaceholderText('Username'), 'x');
+			await user.type(screen.getByPlaceholderText('Username'), 'x');
 
 			expect(screen.queryByText("Couldn't save your profile. Try again.")).not.toBeInTheDocument();
+		});
+	});
+
+	describe('field error accessibility', () => {
+		it('marks neither the email nor the username input invalid before any error', () => {
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'false');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'false');
+		});
+
+		it('marks only the email input invalid when the email fails validation', async () => {
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.clear(screen.getByPlaceholderText('Email'));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			await screen.findByText('Email is required');
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'true');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'false');
+		});
+
+		it('marks only the username input invalid when the username fails validation', async () => {
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.clear(screen.getByPlaceholderText('Username'));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			await screen.findByText('Username is required');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'true');
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'false');
+		});
+
+		it('marks the username input invalid when the server rejects the username', async () => {
+			const editProfileData = vi.fn().mockRejectedValue({ code: 'USERNAME_TAKEN', fields: { username: 'USERNAME_TAKEN' }, status: 400 });
+			renderEditProfileForm(editProfileData, vi.fn());
+
+			await user.clear(screen.getByPlaceholderText('Username'));
+			await user.type(screen.getByPlaceholderText('Username'), 'newname');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			await screen.findByText('This username is taken');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'true');
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'false');
+		});
+
+		it('clears aria-invalid on a field once the user edits it again', async () => {
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.clear(screen.getByPlaceholderText('Email'));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+			await screen.findByText('Email is required');
+
+			await user.type(screen.getByPlaceholderText('Email'), 'a');
+
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'false');
+		});
+	});
+
+	describe('several messages for one field', () => {
+		it('renders every email message, each as a field error', async () => {
+			validateEditProfile.mockReturnValue({ fields: { email: ['First email problem', 'Second email problem'] } });
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			expect(await screen.findByText('First email problem')).toHaveClass('field-error');
+			expect(screen.getByText('Second email problem')).toHaveClass('field-error');
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'true');
+		});
+
+		it('renders every username message, each as a field error', async () => {
+			validateEditProfile.mockReturnValue({ fields: { username: ['First username problem', 'Second username problem'] } });
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			expect(await screen.findByText('First username problem')).toHaveClass('field-error');
+			expect(screen.getByText('Second username problem')).toHaveClass('field-error');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'true');
+		});
+
+		it('keeps the messages of one field out of the other field', async () => {
+			validateEditProfile.mockReturnValue({ fields: { email: ['First email problem', 'Second email problem'] } });
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+			await screen.findByText('First email problem');
+
+			const usernameWrapper = screen.getByPlaceholderText('Username').closest('.profile-form-input-wrapper');
+
+			expect(within(usernameWrapper).queryByText(/email problem/)).not.toBeInTheDocument();
 		});
 	});
 });

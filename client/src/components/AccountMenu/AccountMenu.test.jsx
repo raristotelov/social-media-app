@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { updateUserProfileData } from '../../services/userService';
@@ -9,22 +8,25 @@ import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBott
 
 import AccountMenu from './AccountMenu';
 
-jest.mock('../../services/userService');
+vi.mock('../../services/userService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', theme: 'light' };
 
 const renderAccountMenu = (isOpen, props = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn() }}>
 			<MemoryRouter>
-				<AccountMenu isOpen={isOpen} onClose={jest.fn()} logoutHandler={jest.fn()} {...props} />
+				<AccountMenu isOpen={isOpen} onClose={vi.fn()} logoutHandler={vi.fn()} {...props} />
 			</MemoryRouter>
 		</LoggedInUserContext.Provider>,
 	);
 
+let user;
+
 describe('AccountMenu', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
+		user = userEvent.setup();
 	});
 
 	it('renders the Profile, Dark mode and Log out rows when open', () => {
@@ -36,29 +38,29 @@ describe('AccountMenu', () => {
 	});
 
 	it('places the Change password row between Dark mode and Log out', () => {
-		renderAccountMenu(true, { onChangePasswordClick: jest.fn() });
+		renderAccountMenu(true, { onChangePasswordClick: vi.fn() });
 
 		const rowLabels = screen.getAllByText(/^(Profile|Dark mode|Change password|Log out)$/).map((row) => row.textContent);
 
 		expect(rowLabels).toEqual(['Profile', 'Dark mode', 'Change password', 'Log out']);
 	});
 
-	it('closes the menu and calls onChangePasswordClick when Change password is clicked', () => {
-		const onClose = jest.fn();
-		const onChangePasswordClick = jest.fn();
+	it('closes the menu and calls onChangePasswordClick when Change password is clicked', async () => {
+		const onClose = vi.fn();
+		const onChangePasswordClick = vi.fn();
 		renderAccountMenu(true, { onClose, onChangePasswordClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+		await user.click(screen.getByRole('button', { name: 'Change password' }));
 
 		expect(onClose).toHaveBeenCalledTimes(1);
 		expect(onChangePasswordClick).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not log out or toggle the theme when Change password is clicked', () => {
-		const logoutHandler = jest.fn();
-		renderAccountMenu(true, { logoutHandler, onChangePasswordClick: jest.fn() });
+	it('does not log out or toggle the theme when Change password is clicked', async () => {
+		const logoutHandler = vi.fn();
+		renderAccountMenu(true, { logoutHandler, onChangePasswordClick: vi.fn() });
 
-		userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+		await user.click(screen.getByRole('button', { name: 'Change password' }));
 
 		expect(logoutHandler).not.toHaveBeenCalled();
 		expect(updateUserProfileData).not.toHaveBeenCalled();
@@ -70,11 +72,11 @@ describe('AccountMenu', () => {
 		expect(container.querySelector('.account-menu')).not.toBeInTheDocument();
 	});
 
-	it('calls logoutHandler when Log out is clicked', () => {
-		const logoutHandler = jest.fn();
+	it('calls logoutHandler when Log out is clicked', async () => {
+		const logoutHandler = vi.fn();
 		renderAccountMenu(true, { logoutHandler });
 
-		userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+		await user.click(screen.getByRole('button', { name: 'Log out' }));
 
 		expect(logoutHandler).toHaveBeenCalledTimes(1);
 	});
@@ -84,7 +86,7 @@ describe('AccountMenu', () => {
 
 		renderAccountMenu(true);
 
-		userEvent.click(screen.getByRole('button', { name: 'Dark mode' }));
+		await user.click(screen.getByRole('button', { name: 'Dark mode' }));
 
 		await waitFor(() =>
 			expect(updateUserProfileData).toHaveBeenCalledWith({
@@ -125,7 +127,7 @@ describe('AccountMenu', () => {
 		});
 
 		it('slides out and then calls onClose when the handle is dragged down past 25%', () => {
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderAccountMenu(true, { isBottomSheet: true, onClose });
 
 			dragDown(getHandle(container), 120);
@@ -138,7 +140,7 @@ describe('AccountMenu', () => {
 		});
 
 		it('springs back and stays open on a short drag', () => {
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderAccountMenu(true, { isBottomSheet: true, onClose });
 
 			dragDown(getHandle(container), 40);
@@ -149,7 +151,7 @@ describe('AccountMenu', () => {
 		});
 
 		it('does not start a drag from a row', () => {
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderAccountMenu(true, { isBottomSheet: true, onClose });
 
 			dragDown(screen.getByRole('button', { name: 'Log out' }), 300);
@@ -161,7 +163,7 @@ describe('AccountMenu', () => {
 
 		it('does not drag on a screen of 600px or wider', () => {
 			installBottomSheetEnvironment({ isMobile: false });
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderAccountMenu(true, { isBottomSheet: true, onClose });
 
 			dragDown(getHandle(container), 300);
@@ -171,7 +173,7 @@ describe('AccountMenu', () => {
 		});
 
 		it('does not drag when it is not a bottom sheet', () => {
-			const onClose = jest.fn();
+			const onClose = vi.fn();
 			const { container } = renderAccountMenu(true, { onClose });
 
 			dragDown(screen.getByText('Profile'), 300);

@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getPopularPosts, getNextPopularPosts, likeUserPost } from '../../services/userPostService';
@@ -15,11 +14,11 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import PopularPostsPostsView from './PopularPostsPostsView';
 
-jest.mock('../../services/userPostService');
-jest.mock('../../services/commentService');
-jest.mock('../../services/storyService');
-jest.mock('../../services/suggestionService');
-jest.mock('../../services/userService');
+vi.mock('../../services/userPostService');
+vi.mock('../../services/commentService');
+vi.mock('../../services/storyService');
+vi.mock('../../services/suggestionService');
+vi.mock('../../services/userService');
 
 const SNAPSHOT_TIME = '2026-10-24T10:00:00.000Z';
 
@@ -67,7 +66,7 @@ const memberUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderPosts = ({ entries = ['/popular-posts/posts#p2'], initialIndex, user = memberUser } = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
 					<Routes>
@@ -95,17 +94,18 @@ const getTileStatTexts = (tileIndex) =>
 
 describe('PopularPostsPostsView', () => {
 	let mockScrollIntoView;
+	let user;
 
 	beforeEach(() => {
-		jest.resetAllMocks();
-		mockScrollIntoView = jest.fn();
-		window.HTMLElement.prototype.scrollIntoView = mockScrollIntoView;
+		vi.resetAllMocks();
+		user = userEvent.setup();
+		mockScrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
 		getPopularPosts.mockResolvedValue(buildPage(['p1', 'p2', 'p3']));
 		getNextPopularPosts.mockResolvedValue(buildPage([]));
 	});
 
 	afterEach(() => {
-		delete window.HTMLElement.prototype.scrollIntoView;
+		mockScrollIntoView.mockRestore();
 		window.history.replaceState(null, '');
 	});
 
@@ -205,7 +205,7 @@ describe('PopularPostsPostsView', () => {
 			await screen.findAllByRole('article');
 
 			expect(mockScrollIntoView).toHaveBeenCalledTimes(1);
-			expect(mockScrollIntoView.mock.instances[0].id).toBe('p2');
+			expect(mockScrollIntoView.mock.contexts[0].id).toBe('p2');
 		});
 
 		it('asks the server for that post first, ranked ones after it', async () => {
@@ -238,11 +238,11 @@ describe('PopularPostsPostsView', () => {
 			renderPosts({ entries: ['/popular-posts'] });
 
 			await screen.findAllByAltText('user-post');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[1]);
+			await user.click(document.querySelectorAll('.profile-post-link')[1]);
 
 			expect(await screen.findAllByRole('article')).toHaveLength(3);
 			expect(screen.getByTestId('hash')).toHaveTextContent('#p2');
-			expect(mockScrollIntoView.mock.instances[0].id).toBe('p2');
+			expect(mockScrollIntoView.mock.contexts[0].id).toBe('p2');
 			expect(getPopularPosts).toHaveBeenCalledTimes(1);
 		});
 
@@ -250,7 +250,7 @@ describe('PopularPostsPostsView', () => {
 			renderPosts({ entries: ['/popular-posts'] });
 
 			await screen.findAllByAltText('user-post');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[1]);
+			await user.click(document.querySelectorAll('.profile-post-link')[1]);
 			await screen.findAllByRole('article');
 
 			const ids = getRenderedPostIds();
@@ -288,7 +288,7 @@ describe('PopularPostsPostsView', () => {
 			renderPosts({ entries: ['/popular-posts', '/popular-posts/posts#p2'], initialIndex: 1 });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/popular-posts$/));
 			expect(screen.getByTestId('navigation-type')).toHaveTextContent('POP');
@@ -299,7 +299,7 @@ describe('PopularPostsPostsView', () => {
 			renderPosts({ entries: ['/other', '/popular-posts/posts#p2'], initialIndex: 1 });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			expect(await screen.findByText('Other page')).toBeInTheDocument();
 		});
@@ -308,7 +308,7 @@ describe('PopularPostsPostsView', () => {
 			renderPosts({ entries: ['/popular-posts', '/popular-posts/posts#p2'], initialIndex: 1 });
 
 			await screen.findAllByRole('article');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await screen.findAllByAltText('user-post');
 
@@ -320,7 +320,7 @@ describe('PopularPostsPostsView', () => {
 
 			await screen.findAllByRole('article');
 			window.history.replaceState({ idx: 0 }, '');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/popular-posts$/));
 			expect(screen.getByTestId('navigation-type')).toHaveTextContent('REPLACE');
@@ -333,7 +333,7 @@ describe('PopularPostsPostsView', () => {
 
 			await screen.findAllByRole('article');
 			window.history.replaceState({ idx: 0 }, '');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			const images = await screen.findAllByAltText('user-post');
 
@@ -368,7 +368,7 @@ describe('PopularPostsPostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
 
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/popular-posts/posts#p2');
 			expect(likeUserPost).not.toHaveBeenCalled();
@@ -379,7 +379,7 @@ describe('PopularPostsPostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByPlaceholderText('Add a comment...'));
+			await user.click(within(articles[1]).getByPlaceholderText('Add a comment...'));
 
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/popular-posts/posts#p2');
 			expect(addComment).not.toHaveBeenCalled();
@@ -392,7 +392,7 @@ describe('PopularPostsPostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[0]).getByRole('button', { name: '0 comments' }));
+			await user.click(within(articles[0]).getByRole('button', { name: '0 comments' }));
 
 			expect(await screen.findByText('Hello there', { selector: '.comment-text' })).toBeInTheDocument();
 			expect(screen.queryByTestId('login-from')).not.toBeInTheDocument();
@@ -405,9 +405,9 @@ describe('PopularPostsPostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: '0 comments' }));
+			await user.click(within(articles[1]).getByRole('button', { name: '0 comments' }));
 			await screen.findByText('Hello there', { selector: '.comment-text' });
-			userEvent.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			expect(await screen.findByTestId('login-from')).toHaveTextContent('/popular-posts/posts#p2');
 			expect(likeComment).not.toHaveBeenCalled();
@@ -418,7 +418,7 @@ describe('PopularPostsPostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[0]).getByRole('button', { name: 'Post' }));
+			await user.click(within(articles[0]).getByRole('button', { name: 'Post' }));
 
 			expect(within(articles[0]).getByRole('button', { name: 'Post' })).toBeDisabled();
 			expect(addComment).not.toHaveBeenCalled();
@@ -433,7 +433,7 @@ describe('PopularPostsPostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
 
 			expect(await within(articles[1]).findByText('1 like')).toBeInTheDocument();
 			expect(likeUserPost).toHaveBeenCalledWith({ userPostToLikeId: 'p2' });
@@ -445,13 +445,13 @@ describe('PopularPostsPostsView', () => {
 			renderPosts({ entries: ['/popular-posts'] });
 
 			await screen.findAllByAltText('user-post');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[0]);
+			await user.click(document.querySelectorAll('.profile-post-link')[0]);
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[0]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[0]).getByRole('button', { name: 'Like post' }));
 			await within(articles[0]).findByText('1 like');
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await screen.findAllByAltText('user-post');
 
@@ -470,14 +470,14 @@ describe('PopularPostsPostsView', () => {
 			renderPosts({ entries: ['/popular-posts'] });
 
 			await screen.findAllByAltText('user-post');
-			userEvent.click(document.querySelectorAll('.profile-post-link')[0]);
+			await user.click(document.querySelectorAll('.profile-post-link')[0]);
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.type(within(articles[0]).getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(within(articles[0]).getByRole('button', { name: 'Post' }));
+			await user.type(within(articles[0]).getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(within(articles[0]).getByRole('button', { name: 'Post' }));
 			await within(articles[0]).findByRole('button', { name: '1 comment' });
-			userEvent.click(screen.getByRole('button', { name: 'Back' }));
+			await user.click(screen.getByRole('button', { name: 'Back' }));
 
 			await screen.findAllByAltText('user-post');
 
@@ -491,7 +491,7 @@ describe('PopularPostsPostsView', () => {
 
 			const articles = await screen.findAllByRole('article');
 
-			userEvent.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
+			await user.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
 
 			expect(await screen.findByText('This post no longer exists')).toBeInTheDocument();
 			expect(getRenderedPostIds()).toEqual(['p1', 'p2', 'p3']);
@@ -535,7 +535,7 @@ describe('PopularPostsPostsView', () => {
 
 			renderPosts({ entries: ['/popular-posts/posts#p1'] });
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(getRenderedPostIds()).toEqual(['p1', 'p2', 'p3']));
 			expect(document.querySelector('.load-more-error')).not.toBeInTheDocument();
@@ -565,7 +565,7 @@ describe('PopularPostsPostsView', () => {
 			queuedFrames = new Map();
 			nextFrameId = 1;
 			Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: 0 });
-			requestFrameSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+			requestFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
 				const frameId = nextFrameId;
 
 				nextFrameId += 1;
@@ -573,7 +573,7 @@ describe('PopularPostsPostsView', () => {
 
 				return frameId;
 			});
-			cancelFrameSpy = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
+			cancelFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frameId) => {
 				queuedFrames.delete(frameId);
 			});
 		});

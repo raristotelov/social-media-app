@@ -12,32 +12,32 @@ const buildPost = (overrides = {}) => ({
 
 describe('UserPostModel', () => {
 	describe('caption length', () => {
-		it('allows a caption of exactly the maximum length', () => {
+		it('allows a caption of exactly the maximum length', async () => {
 			const post = new UserPostModel(buildPost({ caption: 'a'.repeat(constants.MAX_CAPTION_LENGTH) }));
 
-			expect(post.validateSync()).toBeUndefined();
+			await expect(post.validate()).resolves.toBeUndefined();
 		});
 
 		it('sets the maximum to 1000 characters', () => {
 			expect(constants.MAX_CAPTION_LENGTH).toBe(1000);
 		});
 
-		it('rejects a caption one character over the maximum', () => {
+		it('rejects a caption one character over the maximum', async () => {
 			const post = new UserPostModel(buildPost({ caption: 'a'.repeat(constants.MAX_CAPTION_LENGTH + 1) }));
 
-			expect(post.validateSync().errors.caption.kind).toBe('maxlength');
+			await expect(post.validate()).rejects.toMatchObject({ errors: { caption: { kind: 'maxlength' } } });
 		});
 
-		it('allows an empty caption', () => {
+		it('allows an empty caption', async () => {
 			const post = new UserPostModel(buildPost({ caption: '' }));
 
-			expect(post.validateSync()).toBeUndefined();
+			await expect(post.validate()).resolves.toBeUndefined();
 		});
 
-		it('allows a post without a caption', () => {
+		it('allows a post without a caption', async () => {
 			const post = new UserPostModel(buildPost({ caption: undefined }));
 
-			expect(post.validateSync()).toBeUndefined();
+			await expect(post.validate()).resolves.toBeUndefined();
 		});
 
 		it('rejects a too long caption when only the caption is validated, as the upload check does', async () => {
@@ -53,34 +53,34 @@ describe('UserPostModel', () => {
 
 	describe('image dimensions', () => {
 		describe.each(['imageWidth', 'imageHeight'])('%s', (field) => {
-			it('is required', () => {
+			it('is required', async () => {
 				const post = new UserPostModel(buildPost({ [field]: undefined }));
 
-				expect(post.validateSync().errors[field].kind).toBe('required');
+				await expect(post.validate()).rejects.toMatchObject({ errors: { [field]: { kind: 'required' } } });
 			});
 
-			it('rejects 0', () => {
+			it('rejects 0', async () => {
 				const post = new UserPostModel(buildPost({ [field]: 0 }));
 
-				expect(post.validateSync().errors[field].kind).toBe('min');
+				await expect(post.validate()).rejects.toMatchObject({ errors: { [field]: { kind: 'min' } } });
 			});
 
-			it('rejects a negative value', () => {
+			it('rejects a negative value', async () => {
 				const post = new UserPostModel(buildPost({ [field]: -5 }));
 
-				expect(post.validateSync().errors[field].kind).toBe('min');
+				await expect(post.validate()).rejects.toMatchObject({ errors: { [field]: { kind: 'min' } } });
 			});
 
-			it('accepts the minimum of 1', () => {
+			it('accepts the minimum of 1', async () => {
 				const post = new UserPostModel(buildPost({ [field]: 1 }));
 
-				expect(post.validateSync()).toBeUndefined();
+				await expect(post.validate()).resolves.toBeUndefined();
 			});
 
-			it('rejects a value that is not a number', () => {
+			it('rejects a value that is not a number', async () => {
 				const post = new UserPostModel(buildPost({ [field]: 'wide' }));
 
-				expect(post.validateSync().errors[field].kind).toBe('Number');
+				await expect(post.validate()).rejects.toMatchObject({ errors: { [field]: { kind: 'Number' } } });
 			});
 		});
 

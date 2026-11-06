@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import SearchResults from './SearchResults';
 
@@ -15,7 +14,7 @@ const buildUser = (overrides = {}) => ({
 const renderSearchResults = (props = {}) =>
 	render(
 		<MemoryRouter>
-			<SearchResults results={[buildUser()]} isLoading={false} onResultClick={jest.fn()} {...props} />
+			<SearchResults results={[buildUser()]} isLoading={false} onResultClick={vi.fn()} {...props} />
 		</MemoryRouter>,
 	);
 
@@ -105,12 +104,13 @@ describe('SearchResults', () => {
 			expect(container.querySelector('img.search-result-avatar')).toHaveAttribute('src', 'https://example.com/jane.jpg');
 		});
 
-		it('calls onResultClick when a row is clicked', () => {
-			const onResultClick = jest.fn();
+		it('calls onResultClick when a row is clicked', async () => {
+			const user = userEvent.setup();
+			const onResultClick = vi.fn();
 
 			renderSearchResults({ onResultClick });
 
-			userEvent.click(screen.getByRole('link', { name: /janedoe/ }));
+			await user.click(screen.getByRole('link', { name: /janedoe/ }));
 
 			expect(onResultClick).toHaveBeenCalledTimes(1);
 		});

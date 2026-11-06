@@ -5,7 +5,7 @@ import LoggedInUserContext from '../contexts/LoggedInUserContext';
 import useSessionGuard from './useSessionGuard';
 
 const renderSessionGuard = () => {
-	const endSession = jest.fn();
+	const endSession = vi.fn();
 	const wrapper = ({ children }) => <LoggedInUserContext.Provider value={{ endSession }}>{children}</LoggedInUserContext.Provider>;
 	const rendered = renderHook(() => useSessionGuard(), { wrapper });
 

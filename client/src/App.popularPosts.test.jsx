@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import ToastContext from './contexts/ToastContext';
 import { getCurrentUser } from './services/userService';
@@ -9,12 +8,12 @@ import { getPopularPosts, getNextPopularPosts } from './services/userPostService
 
 import App from './App';
 
-jest.mock('./components/Header/MainHeader', () => () => <header>Main header</header>);
-jest.mock('./components/Header/MobileTopBar', () => () => <header>Mobile top bar</header>);
-jest.mock('./components/TabBar/TabBar', () => () => <nav>Tab bar</nav>);
-jest.mock('./Router', () => {
-	const { Link, Route, Routes, useOutletContext } = require('react-router-dom');
-	const PopularPostsLayout = require('./components/PopularPostsLayout/PopularPostsLayout').default;
+vi.mock('./components/Header/MainHeader', () => ({ default: () => <header>Main header</header> }));
+vi.mock('./components/Header/MobileTopBar', () => ({ default: () => <header>Mobile top bar</header> }));
+vi.mock('./components/TabBar/TabBar', () => ({ default: () => <nav>Tab bar</nav> }));
+vi.mock('./Router', async () => {
+	const { Link, Route, Routes, useOutletContext } = await import('react-router');
+	const { default: PopularPostsLayout } = await import('./components/PopularPostsLayout/PopularPostsLayout');
 
 	const Page = ({ name }) => {
 		const { posts } = useOutletContext();
@@ -32,20 +31,22 @@ jest.mock('./Router', () => {
 		);
 	};
 
-	return function MockRouter() {
-		return (
-			<Routes>
-				<Route path='/popular-posts' element={<PopularPostsLayout />}>
-					<Route index element={<Page name='grid' />} />
+	return {
+		default: function MockRouter() {
+			return (
+				<Routes>
+					<Route path='/popular-posts' element={<PopularPostsLayout />}>
+						<Route index element={<Page name='grid' />} />
 
-					<Route path='posts' element={<Page name='posts' />} />
-				</Route>
-			</Routes>
-		);
+						<Route path='posts' element={<Page name='posts' />} />
+					</Route>
+				</Routes>
+			);
+		},
 	};
 });
-jest.mock('./services/userService');
-jest.mock('./services/userPostService');
+vi.mock('./services/userService');
+vi.mock('./services/userPostService');
 
 const SNAPSHOT_TIME = '2026-10-24T10:00:00.000Z';
 const FIRST_BATCH_IDS = Array.from({ length: 30 }, (_, index) => `p${index + 1}`);
@@ -54,11 +55,14 @@ const ALL_IDS = [...FIRST_BATCH_IDS, ...SECOND_BATCH_IDS].join(',');
 
 const buildPost = (id) => ({ _id: id, likes: [], commentsCount: 0, previewComments: [], userId: { _id: 'author', username: 'author' } });
 
+let user;
+
 describe('App with the popular posts pages', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		window.localStorage.clear();
-		window.matchMedia = jest.fn().mockReturnValue({ matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn() });
+		window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() });
 
 		getCurrentUser.mockResolvedValue(null);
 		getPopularPosts.mockResolvedValue({ posts: FIRST_BATCH_IDS.map(buildPost), snapshotTime: SNAPSHOT_TIME, hasMore: true });
@@ -67,7 +71,7 @@ describe('App with the popular posts pages', () => {
 
 	const renderApp = () =>
 		render(
-			<ToastContext.Provider value={{ showToast: jest.fn() }}>
+			<ToastContext.Provider value={{ showToast: vi.fn() }}>
 				<MemoryRouter initialEntries={['/popular-posts']}>
 					<App />
 				</MemoryRouter>
@@ -79,12 +83,12 @@ describe('App with the popular posts pages', () => {
 
 		await waitFor(() => expect(screen.getByTestId('post-ids')).toHaveTextContent(ALL_IDS));
 
-		userEvent.click(screen.getByRole('link', { name: 'Open last post' }));
+		await user.click(screen.getByRole('link', { name: 'Open last post' }));
 
 		await waitFor(() => expect(screen.getByTestId('page-name')).toHaveTextContent('posts'));
 		expect(screen.getByTestId('post-ids')).toHaveTextContent(ALL_IDS);
 
-		userEvent.click(screen.getByRole('link', { name: 'Back to grid' }));
+		await user.click(screen.getByRole('link', { name: 'Back to grid' }));
 
 		await waitFor(() => expect(screen.getByTestId('page-name')).toHaveTextContent('grid'));
 		expect(screen.getByTestId('post-ids')).toHaveTextContent(ALL_IDS);

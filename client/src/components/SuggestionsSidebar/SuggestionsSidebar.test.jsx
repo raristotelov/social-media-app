@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getSuggestions } from '../../services/suggestionService';
@@ -11,8 +10,8 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import SuggestionsSidebar from './SuggestionsSidebar';
 
-jest.mock('../../services/suggestionService');
-jest.mock('../../services/userService');
+vi.mock('../../services/suggestionService');
+vi.mock('../../services/userService');
 
 const loggedInUser = { _id: 'me', username: 'johndoe', following: [] };
 
@@ -30,7 +29,7 @@ const renderSidebar = ({ result = { suggestions, reserve: [], isCarouselDismisse
 	getSuggestions.mockResolvedValue(result);
 
 	return render(
-		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 			<ToastProvider>
 				<MemoryRouter>
 					<SuggestionsSidebar />
@@ -42,7 +41,7 @@ const renderSidebar = ({ result = { suggestions, reserve: [], isCarouselDismisse
 
 describe('SuggestionsSidebar', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 		followUser.mockResolvedValue({ user: loggedInUser });
 	});
 
@@ -89,7 +88,7 @@ describe('SuggestionsSidebar', () => {
 		getSuggestions.mockReturnValue(new Promise(() => {}));
 
 		render(
-			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<SuggestionsSidebar />
@@ -106,7 +105,7 @@ describe('SuggestionsSidebar', () => {
 		getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
 		render(
-			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 				<ToastProvider>
 					<MemoryRouter>
 						<SuggestionsSidebar />
@@ -130,10 +129,12 @@ describe('SuggestionsSidebar', () => {
 	});
 
 	it('removes a followed user at once and fills the gap from the spares', async () => {
+		const user = userEvent.setup();
+
 		followUser.mockReturnValue(new Promise(() => {}));
 		renderSidebar({ result: { suggestions, reserve: [buildSuggestion('p3', 'popular')], isCarouselDismissed: false } });
 
-		userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+		await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 		expect(screen.queryByRole('button', { name: 'Follow name-p1' })).not.toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Follow name-p3' })).toBeInTheDocument();
@@ -141,18 +142,22 @@ describe('SuggestionsSidebar', () => {
 	});
 
 	it('shows the list one shorter when no spare is left', async () => {
+		const user = userEvent.setup();
+
 		renderSidebar();
 
-		userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+		await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 		await waitFor(() => expect(screen.getAllByRole('button', { name: /^Follow / })).toHaveLength(4));
 	});
 
 	it('puts the user back and shows the follow toast when the request fails', async () => {
+		const user = userEvent.setup();
+
 		followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 		renderSidebar();
 
-		userEvent.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+		await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
 		expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();

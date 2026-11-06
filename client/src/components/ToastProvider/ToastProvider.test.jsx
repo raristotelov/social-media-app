@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useContext } from 'react';
@@ -43,13 +42,15 @@ const renderProvider = (messages = ['First failure']) =>
 		</ToastProvider>,
 	);
 
+const setupUser = () => userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
 describe('ToastProvider', () => {
 	beforeEach(() => {
-		jest.useFakeTimers();
+		vi.useFakeTimers();
 	});
 
 	afterEach(() => {
-		jest.useRealTimers();
+		vi.useRealTimers();
 	});
 
 	it('renders its children', () => {
@@ -73,98 +74,114 @@ describe('ToastProvider', () => {
 		expect(region).toHaveAttribute('aria-atomic', 'true');
 	});
 
-	it('shows the message inside the alert region when showToast is called', () => {
+	it('shows the message inside the alert region when showToast is called', async () => {
+		const user = setupUser();
+
 		renderProvider();
 
-		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
+		await user.click(screen.getByRole('button', { name: 'Show First failure' }));
 
 		expect(within(screen.getByRole('alert')).getByText('First failure')).toBeInTheDocument();
 	});
 
-	it('shows the error look by default, when showToast is called without a type', () => {
+	it('shows the error look by default, when showToast is called without a type', async () => {
+		const user = setupUser();
+
 		renderProvider();
 
-		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
+		await user.click(screen.getByRole('button', { name: 'Show First failure' }));
 
 		expect(screen.getByRole('alert').querySelector('.toast-icon')).not.toHaveClass('toast-icon-success');
 	});
 
-	it('passes the type through, so a success toast gets the success look', () => {
+	it('passes the type through, so a success toast gets the success look', async () => {
+		const user = setupUser();
+
 		render(
 			<ToastProvider>
 				<SuccessToastTrigger />
 			</ToastProvider>,
 		);
 
-		userEvent.click(screen.getByRole('button', { name: 'Show success' }));
+		await user.click(screen.getByRole('button', { name: 'Show success' }));
 
 		expect(within(screen.getByRole('alert')).getByText('Password changed')).toBeInTheDocument();
 		expect(screen.getByRole('alert').querySelector('.toast-icon')).toHaveClass('toast-icon-success');
 	});
 
-	it('replaces the showing toast with a new one instead of stacking them', () => {
+	it('replaces the showing toast with a new one instead of stacking them', async () => {
+		const user = setupUser();
+
 		renderProvider(['First failure', 'Second failure']);
 
-		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
-		userEvent.click(screen.getByRole('button', { name: 'Show Second failure' }));
+		await user.click(screen.getByRole('button', { name: 'Show First failure' }));
+		await user.click(screen.getByRole('button', { name: 'Show Second failure' }));
 
 		expect(screen.queryByText('First failure')).not.toBeInTheDocument();
 		expect(screen.getByText('Second failure')).toBeInTheDocument();
 		expect(within(screen.getByRole('alert')).getAllByRole('button', { name: 'Close' })).toHaveLength(1);
 	});
 
-	it('restarts the 5 second timer when the same message is shown again', () => {
+	it('restarts the 5 second timer when the same message is shown again', async () => {
+		const user = setupUser();
+
 		renderProvider();
 
-		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
+		await user.click(screen.getByRole('button', { name: 'Show First failure' }));
 		act(() => {
-			jest.advanceTimersByTime(4000);
+			vi.advanceTimersByTime(4000);
 		});
-		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
+		await user.click(screen.getByRole('button', { name: 'Show First failure' }));
 		act(() => {
-			jest.advanceTimersByTime(4000);
+			vi.advanceTimersByTime(4000);
 		});
 
 		expect(screen.getByText('First failure')).toBeInTheDocument();
 
 		act(() => {
-			jest.advanceTimersByTime(1000);
+			vi.advanceTimersByTime(1000);
 		});
 
 		expect(screen.queryByText('First failure')).not.toBeInTheDocument();
 	});
 
-	it('removes the toast when its close button is clicked', () => {
+	it('removes the toast when its close button is clicked', async () => {
+		const user = setupUser();
+
 		renderProvider();
 
-		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
-		userEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Close' }));
+		await user.click(screen.getByRole('button', { name: 'Show First failure' }));
+		await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Close' }));
 
 		expect(screen.queryByText('First failure')).not.toBeInTheDocument();
 	});
 
-	it('removes the toast automatically after 5 seconds', () => {
+	it('removes the toast automatically after 5 seconds', async () => {
+		const user = setupUser();
+
 		renderProvider();
 
-		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
+		await user.click(screen.getByRole('button', { name: 'Show First failure' }));
 		act(() => {
-			jest.advanceTimersByTime(4999);
+			vi.advanceTimersByTime(4999);
 		});
 
 		expect(screen.getByText('First failure')).toBeInTheDocument();
 
 		act(() => {
-			jest.advanceTimersByTime(1);
+			vi.advanceTimersByTime(1);
 		});
 
 		expect(screen.queryByText('First failure')).not.toBeInTheDocument();
 	});
 
-	it('removes the toast when dismissToast is called from the context', () => {
+	it('removes the toast when dismissToast is called from the context', async () => {
+		const user = setupUser();
+
 		renderProvider();
 
-		userEvent.click(screen.getByRole('button', { name: 'Show First failure' }));
-		userEvent.click(screen.getByRole('button', { name: 'Dismiss from context' }));
+		await user.click(screen.getByRole('button', { name: 'Show First failure' }));
+		await user.click(screen.getByRole('button', { name: 'Dismiss from context' }));
 
 		expect(screen.queryByText('First failure')).not.toBeInTheDocument();
 	});

@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, renderHook, screen, waitFor } from '@testing-library/react';
 
 import LoggedInUserContext from '../contexts/LoggedInUserContext';
@@ -9,8 +8,8 @@ import ToastProvider from '../components/ToastProvider/ToastProvider';
 
 import useSuggestions from './useSuggestions';
 
-jest.mock('../services/suggestionService');
-jest.mock('../services/userService');
+vi.mock('../services/suggestionService');
+vi.mock('../services/userService');
 
 const loggedInUser = { _id: 'me', username: 'johndoe', following: [] };
 
@@ -44,8 +43,8 @@ const buildResult = ({ suggestions = SIDEBAR_SUGGESTIONS, reserve = [], isCarous
 const getIds = (result) => result.current.suggestions.map((suggestion) => suggestion._id);
 
 const renderSuggestions = async ({ placement = 'sidebar', options, serverResult = buildResult(), waitForLoad = true } = {}) => {
-	const updateLoggedInUser = jest.fn();
-	const endSession = jest.fn();
+	const updateLoggedInUser = vi.fn();
+	const endSession = vi.fn();
 
 	getSuggestions.mockResolvedValue(serverResult);
 
@@ -65,7 +64,7 @@ const renderSuggestions = async ({ placement = 'sidebar', options, serverResult 
 
 describe('useSuggestions', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 		followUser.mockResolvedValue({ user: loggedInUser });
 		unfollowUser.mockResolvedValue({ user: loggedInUser });
 		dismissSuggestionsCarousel.mockResolvedValue(undefined);
@@ -105,8 +104,8 @@ describe('useSuggestions', () => {
 
 		it('stays not loaded, shows no toast and does not end the session when loading fails', async () => {
 			getSuggestions.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			const updateLoggedInUser = jest.fn();
-			const endSession = jest.fn();
+			const updateLoggedInUser = vi.fn();
+			const endSession = vi.fn();
 			const wrapper = ({ children }) => (
 				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser, endSession }}>
 					<ToastProvider>{children}</ToastProvider>
@@ -125,9 +124,9 @@ describe('useSuggestions', () => {
 
 		it('ends the session when loading fails with UNAUTHENTICATED', async () => {
 			getSuggestions.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
-			const endSession = jest.fn();
+			const endSession = vi.fn();
 			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession }}>
 					<ToastProvider>{children}</ToastProvider>
 				</LoggedInUserContext.Provider>
 			);
@@ -142,7 +141,7 @@ describe('useSuggestions', () => {
 
 			getSuggestions.mockReturnValue(request.promise);
 			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 					<ToastProvider>{children}</ToastProvider>
 				</LoggedInUserContext.Provider>
 			);
@@ -354,7 +353,7 @@ describe('useSuggestions', () => {
 		});
 
 		it('tells the caller about a successful follow', async () => {
-			const onFollowChange = jest.fn();
+			const onFollowChange = vi.fn();
 			const { result } = await renderEmptyFeed({ onFollowChange });
 
 			await act(() => result.current.followSuggestion('p1'));
@@ -364,7 +363,7 @@ describe('useSuggestions', () => {
 
 		it('marks the user as not followed again and shows the follow toast when the request fails', async () => {
 			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			const onFollowChange = jest.fn();
+			const onFollowChange = vi.fn();
 			const { result } = await renderEmptyFeed({ onFollowChange });
 
 			await act(() => result.current.followSuggestion('p1'));
@@ -391,7 +390,7 @@ describe('useSuggestions', () => {
 		});
 
 		it('tells the caller about a successful unfollow', async () => {
-			const onFollowChange = jest.fn();
+			const onFollowChange = vi.fn();
 			const { result } = await renderEmptyFeed({ onFollowChange });
 
 			await act(() => result.current.followSuggestion('p1'));
@@ -402,7 +401,7 @@ describe('useSuggestions', () => {
 
 		it('marks the user as followed again and shows the unfollow toast when the unfollow fails', async () => {
 			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			const onFollowChange = jest.fn();
+			const onFollowChange = vi.fn();
 			const { result } = await renderEmptyFeed({ onFollowChange });
 
 			await act(() => result.current.followSuggestion('p1'));
@@ -488,7 +487,7 @@ describe('useSuggestions', () => {
 		it('loads again for the new placement and drops the previous list', async () => {
 			getSuggestions.mockResolvedValue(buildResult());
 			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: jest.fn(), endSession: jest.fn() }}>
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
 					<ToastProvider>{children}</ToastProvider>
 				</LoggedInUserContext.Provider>
 			);

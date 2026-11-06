@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import NotFoundContext from '../../contexts/NotFoundContext';
@@ -10,22 +9,28 @@ import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBott
 
 import MobileTopBar from './MobileTopBar';
 
-jest.mock('../../services/userService');
+vi.mock('../../services/userService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderTopBarAt = (path, user = loggedInUser, isNotFound = false) =>
 	render(
 		<LoggedInUserContext.Provider value={{ loggedInUser: user }}>
-			<NotFoundContext.Provider value={{ isNotFound, setIsNotFound: jest.fn() }}>
+			<NotFoundContext.Provider value={{ isNotFound, setIsNotFound: vi.fn() }}>
 				<MemoryRouter initialEntries={[path]}>
-					<MobileTopBar logoutHandler={jest.fn()} />
+					<MobileTopBar logoutHandler={vi.fn()} />
 				</MemoryRouter>
 			</NotFoundContext.Provider>
 		</LoggedInUserContext.Provider>,
 	);
 
+let user;
+
 describe('MobileTopBar', () => {
+	beforeEach(() => {
+		user = userEvent.setup();
+	});
+
 	describe('on the profile posts view', () => {
 		it.each([['/user/user2/posts'], ['/user/user2/posts/'], ['/user/user1/posts']])(
 			'renders nothing at %s, because the Posts bar replaces it',
@@ -120,10 +125,10 @@ describe('MobileTopBar', () => {
 			expect(screen.queryByRole('button', { name: 'Search' })).not.toBeInTheDocument();
 		});
 
-		it('opens the search field from the Search action', () => {
+		it('opens the search field from the Search action', async () => {
 			renderTopBarAt('/some/unknown/path', loggedInUser, true);
 
-			userEvent.click(screen.getByRole('button', { name: 'Search' }));
+			await user.click(screen.getByRole('button', { name: 'Search' }));
 
 			expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
 		});
@@ -133,42 +138,42 @@ describe('MobileTopBar', () => {
 		const renderOwnProfileTopBar = () =>
 			render(
 				<LoggedInUserContext.Provider value={{ loggedInUser }}>
-					<NotFoundContext.Provider value={{ isNotFound: false, setIsNotFound: jest.fn() }}>
-						<ToastContext.Provider value={{ showToast: jest.fn(), dismissToast: jest.fn() }}>
+					<NotFoundContext.Provider value={{ isNotFound: false, setIsNotFound: vi.fn() }}>
+						<ToastContext.Provider value={{ showToast: vi.fn(), dismissToast: vi.fn() }}>
 							<MemoryRouter initialEntries={['/user/user1']}>
-								<MobileTopBar logoutHandler={jest.fn()} />
+								<MobileTopBar logoutHandler={vi.fn()} />
 							</MemoryRouter>
 						</ToastContext.Provider>
 					</NotFoundContext.Provider>
 				</LoggedInUserContext.Provider>,
 			);
 
-		it('opens the Change Password popup from the account menu sheet and closes the sheet', () => {
+		it('opens the Change Password popup from the account menu sheet and closes the sheet', async () => {
 			renderOwnProfileTopBar();
 
-			userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
-			userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+			await user.click(screen.getByRole('button', { name: 'Account menu' }));
+			await user.click(screen.getByRole('button', { name: 'Change password' }));
 
 			expect(screen.getByRole('heading', { name: 'Change Password' })).toBeInTheDocument();
 			expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
 		});
 
-		it('closes the popup again with Cancel', () => {
+		it('closes the popup again with Cancel', async () => {
 			renderOwnProfileTopBar();
 
-			userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
-			userEvent.click(screen.getByRole('button', { name: 'Change password' }));
-			userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+			await user.click(screen.getByRole('button', { name: 'Account menu' }));
+			await user.click(screen.getByRole('button', { name: 'Change password' }));
+			await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 			expect(screen.queryByRole('heading', { name: 'Change Password' })).not.toBeInTheDocument();
 		});
 	});
 
 	describe('the account menu sheet', () => {
-		const openMenu = () => {
+		const openMenu = async () => {
 			const rendered = renderTopBarAt('/user/user1');
 
-			userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+			await user.click(screen.getByRole('button', { name: 'Account menu' }));
 
 			return {
 				...rendered,
@@ -185,8 +190,8 @@ describe('MobileTopBar', () => {
 			restoreBottomSheetEnvironment();
 		});
 
-		it('shows the drag handle when opened', () => {
-			const { sheet, handle } = openMenu();
+		it('shows the drag handle when opened', async () => {
+			const { sheet, handle } = await openMenu();
 
 			expect(sheet).toContainElement(handle);
 		});
@@ -197,8 +202,8 @@ describe('MobileTopBar', () => {
 			expect(container.querySelector('.bottom-sheet-handle')).not.toBeInTheDocument();
 		});
 
-		it('closes after the handle is dragged down past 25% and the sheet has slid out', () => {
-			const { sheet, handle } = openMenu();
+		it('closes after the handle is dragged down past 25% and the sheet has slid out', async () => {
+			const { sheet, handle } = await openMenu();
 
 			dragDown(handle, 120);
 
@@ -211,8 +216,8 @@ describe('MobileTopBar', () => {
 			expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute('aria-expanded', 'false');
 		});
 
-		it('stays open when released short of 25%', () => {
-			const { sheet, handle } = openMenu();
+		it('stays open when released short of 25%', async () => {
+			const { sheet, handle } = await openMenu();
 
 			dragDown(handle, 40);
 			fireTransitionEnd(sheet);
@@ -221,8 +226,8 @@ describe('MobileTopBar', () => {
 			expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute('aria-expanded', 'true');
 		});
 
-		it('stays open when the drag starts on a row', () => {
-			const { sheet } = openMenu();
+		it('stays open when the drag starts on a row', async () => {
+			const { sheet } = await openMenu();
 
 			dragDown(screen.getByRole('button', { name: 'Log out' }), 300);
 			fireTransitionEnd(sheet);
@@ -230,12 +235,12 @@ describe('MobileTopBar', () => {
 			expect(sheet).toBeInTheDocument();
 		});
 
-		it('can be opened again after being swiped closed', () => {
-			const { sheet, handle } = openMenu();
+		it('can be opened again after being swiped closed', async () => {
+			const { sheet, handle } = await openMenu();
 
 			dragDown(handle, 120);
 			fireTransitionEnd(sheet);
-			userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+			await user.click(screen.getByRole('button', { name: 'Account menu' }));
 
 			expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
 		});

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 
 const useLoginRedirect = () => {
 	const navigate = useNavigate();

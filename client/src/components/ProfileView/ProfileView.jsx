@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useRef } from 'react';
-import { useParams, useOutletContext } from 'react-router-dom';
+import { useParams, useOutletContext } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';

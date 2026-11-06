@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import NotFoundContext from '../../contexts/NotFoundContext';
@@ -10,27 +9,30 @@ import { getNotifications, markAllNotificationsRead } from '../../services/notif
 
 import MobileTopBar from './MobileTopBar';
 
-jest.mock('../../services/userService');
-jest.mock('../../services/notificationService');
+vi.mock('../../services/userService');
+vi.mock('../../services/notificationService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', following: [] };
 
 const renderTopBarAt = (path, { unreadCount = 0, user = loggedInUser } = {}) =>
 	render(
-		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession: jest.fn() }}>
-			<NotFoundContext.Provider value={{ isNotFound: false, setIsNotFound: jest.fn() }}>
-				<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: jest.fn() }}>
+		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession: vi.fn() }}>
+			<NotFoundContext.Provider value={{ isNotFound: false, setIsNotFound: vi.fn() }}>
+				<NotificationsContext.Provider value={{ unreadCount, clearUnreadCount: vi.fn() }}>
 					<MemoryRouter initialEntries={[path]}>
-						<MobileTopBar logoutHandler={jest.fn()} />
+						<MobileTopBar logoutHandler={vi.fn()} />
 					</MemoryRouter>
 				</NotificationsContext.Provider>
 			</NotFoundContext.Provider>
 		</LoggedInUserContext.Provider>,
 	);
 
+let user;
+
 describe('MobileTopBar notifications', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		getNotifications.mockResolvedValue({ notifications: [], hasMore: false, nextCursor: null, unreadSince: null });
 		markAllNotificationsRead.mockResolvedValue(undefined);
 	});
@@ -70,15 +72,15 @@ describe('MobileTopBar notifications', () => {
 	});
 
 	describe('the full-screen list', () => {
-		const openNotifications = () => {
-			userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
-			userEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+		const openNotifications = async () => {
+			await user.click(screen.getByRole('button', { name: 'Account menu' }));
+			await user.click(screen.getByRole('button', { name: 'Notifications' }));
 		};
 
 		it('opens from the Notifications row of the account menu sheet and closes the sheet', async () => {
 			renderTopBarAt('/user/user1');
 
-			openNotifications();
+			await openNotifications();
 
 			expect(screen.getByRole('heading', { name: 'Notifications' })).toBeInTheDocument();
 			expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
@@ -88,9 +90,9 @@ describe('MobileTopBar notifications', () => {
 		it('closes again with its close button', async () => {
 			renderTopBarAt('/user/user1');
 
-			openNotifications();
+			await openNotifications();
 			await screen.findByText('No notifications yet');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(screen.queryByRole('heading', { name: 'Notifications' })).not.toBeInTheDocument();
 		});

@@ -11,6 +11,18 @@ describe('login errors', () => {
 		cy.contains('button', 'Submit').click();
 	};
 
+	it('shows the app message for an email without an @ and never reaches the server', () => {
+		cy.intercept('POST', `${serverUrl}/users/login`).as('loginRequest');
+
+		cy.get('input#email').type('not-an-email');
+		cy.get('input#password').type('SomePassword1');
+		cy.contains('button', 'Submit').click();
+
+		cy.get('input#email').closest('.auth-input-wrapper').contains('.field-error', 'Please provide a valid email address').should('be.visible');
+		cy.location('pathname').should('eq', '/log-in');
+		cy.get('@loginRequest.all').should('have.length', 0);
+	});
+
 	it('shows WRONG_CREDENTIALS as the form message and stays on the page', () => {
 		cy.intercept('POST', `${serverUrl}/users/login`, {
 			statusCode: 401,

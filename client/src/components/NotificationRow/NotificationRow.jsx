@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 import { formatNotificationAge, getNotificationMessage, getNotificationProfilePath, getNotificationTarget } from '../../utils/notifications';
 

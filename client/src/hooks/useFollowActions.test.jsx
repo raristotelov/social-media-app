@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { act, renderHook, screen } from '@testing-library/react';
 
 import LoggedInUserContext from '../contexts/LoggedInUserContext';
@@ -8,7 +7,7 @@ import ToastProvider from '../components/ToastProvider/ToastProvider';
 
 import useFollowActions from './useFollowActions';
 
-jest.mock('../services/userService');
+vi.mock('../services/userService');
 
 const loggedInUser = { _id: 'user1', username: 'johndoe', following: [] };
 
@@ -24,8 +23,8 @@ const buildDeferred = () => {
 };
 
 const renderFollowActions = () => {
-	const updateLoggedInUser = jest.fn();
-	const endSession = jest.fn();
+	const updateLoggedInUser = vi.fn();
+	const endSession = vi.fn();
 	const wrapper = ({ children }) => (
 		<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser, endSession }}>
 			<ToastProvider>{children}</ToastProvider>
@@ -38,7 +37,7 @@ const renderFollowActions = () => {
 
 describe('useFollowActions', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
 	});
 
 	describe('follow', () => {

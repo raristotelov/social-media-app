@@ -1,15 +1,20 @@
-import '@testing-library/jest-dom';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import UserProfilePost from './UserProfilePost';
 
 const post = { _id: 'post1', imageIdentifier: 'img1', imageUrl: 'https://example.com/1.jpg', caption: 'Hello' };
 
-const renderPost = (props = {}) => render(<UserProfilePost post={post} onEditClick={jest.fn()} onDeleteClick={jest.fn()} {...props} />);
+const renderPost = (props = {}) => render(<UserProfilePost post={post} onEditClick={vi.fn()} onDeleteClick={vi.fn()} {...props} />);
+
+let user;
 
 describe('UserProfilePost', () => {
+	beforeEach(() => {
+		user = userEvent.setup();
+	});
+
 	it('renders the post image', () => {
 		renderPost();
 
@@ -83,80 +88,80 @@ describe('UserProfilePost', () => {
 		expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
 	});
 
-	it('opens a menu with Edit and Delete when the actions button is clicked', () => {
+	it('opens a menu with Edit and Delete when the actions button is clicked', async () => {
 		renderPost({ showActions: true });
 
-		userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
+		await user.click(screen.getByRole('button', { name: 'Post actions' }));
 
 		expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
 	});
 
-	it('reflects whether the menu is open in aria-expanded', () => {
+	it('reflects whether the menu is open in aria-expanded', async () => {
 		renderPost({ showActions: true });
 
 		const actionsButton = screen.getByRole('button', { name: 'Post actions' });
 
 		expect(actionsButton).toHaveAttribute('aria-expanded', 'false');
 
-		userEvent.click(actionsButton);
+		await user.click(actionsButton);
 
 		expect(actionsButton).toHaveAttribute('aria-expanded', 'true');
 	});
 
-	it('closes the menu when the actions button is clicked again', () => {
+	it('closes the menu when the actions button is clicked again', async () => {
 		renderPost({ showActions: true });
 
-		userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
-		userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
+		await user.click(screen.getByRole('button', { name: 'Post actions' }));
+		await user.click(screen.getByRole('button', { name: 'Post actions' }));
 
 		expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
 	});
 
-	it('calls onEditClick with the post and closes the menu when Edit is clicked', () => {
-		const onEditClick = jest.fn();
+	it('calls onEditClick with the post and closes the menu when Edit is clicked', async () => {
+		const onEditClick = vi.fn();
 		renderPost({ showActions: true, onEditClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
-		userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+		await user.click(screen.getByRole('button', { name: 'Post actions' }));
+		await user.click(screen.getByRole('button', { name: 'Edit' }));
 
 		expect(onEditClick).toHaveBeenCalledWith(post);
 		expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
 	});
 
-	it('calls onDeleteClick with the post and closes the menu when Delete is clicked', () => {
-		const onDeleteClick = jest.fn();
+	it('calls onDeleteClick with the post and closes the menu when Delete is clicked', async () => {
+		const onDeleteClick = vi.fn();
 		renderPost({ showActions: true, onDeleteClick });
 
-		userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
-		userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+		await user.click(screen.getByRole('button', { name: 'Post actions' }));
+		await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 		expect(onDeleteClick).toHaveBeenCalledWith(post);
 		expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
 	});
 
-	it('closes the menu when the mouse is pressed outside the post', () => {
+	it('closes the menu when the mouse is pressed outside the post', async () => {
 		renderPost({ showActions: true });
 
-		userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
+		await user.click(screen.getByRole('button', { name: 'Post actions' }));
 		fireEvent.mouseDown(document.body);
 
 		expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
 	});
 
-	it('closes the menu when Escape is pressed', () => {
+	it('closes the menu when Escape is pressed', async () => {
 		renderPost({ showActions: true });
 
-		userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
+		await user.click(screen.getByRole('button', { name: 'Post actions' }));
 		fireEvent.keyDown(document, { key: 'Escape' });
 
 		expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
 	});
 
-	it('keeps the menu open when another key is pressed', () => {
+	it('keeps the menu open when another key is pressed', async () => {
 		renderPost({ showActions: true });
 
-		userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
+		await user.click(screen.getByRole('button', { name: 'Post actions' }));
 		fireEvent.keyDown(document, { key: 'Enter' });
 
 		expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
@@ -166,7 +171,7 @@ describe('UserProfilePost', () => {
 		const renderLinkedPost = (props = {}) =>
 			render(
 				<MemoryRouter>
-					<UserProfilePost post={post} to='/user/user2/posts#post1' onEditClick={jest.fn()} onDeleteClick={jest.fn()} {...props} />
+					<UserProfilePost post={post} to='/user/user2/posts#post1' onEditClick={vi.fn()} onDeleteClick={vi.fn()} {...props} />
 				</MemoryRouter>,
 			);
 
@@ -194,10 +199,10 @@ describe('UserProfilePost', () => {
 			expect(screen.getByRole('link')).not.toContainElement(screen.getByRole('button', { name: 'Post actions' }));
 		});
 
-		it('opens the menu from the actions button on a linked tile', () => {
+		it('opens the menu from the actions button on a linked tile', async () => {
 			renderLinkedPost({ showActions: true });
 
-			userEvent.click(screen.getByRole('button', { name: 'Post actions' }));
+			await user.click(screen.getByRole('button', { name: 'Post actions' }));
 
 			expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
 		});

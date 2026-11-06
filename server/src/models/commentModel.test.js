@@ -27,18 +27,18 @@ describe('CommentModel', () => {
 			expect(String(comment.mentionedUserId)).toBe('64b7f0a1c2d3e4f5a6b7c8d2');
 		});
 
-		it('is not required', () => {
-			expect(new CommentModel(buildComment()).validateSync()).toBeUndefined();
+		it('is not required', async () => {
+			await expect(new CommentModel(buildComment()).validate()).resolves.toBeUndefined();
 		});
 
 		it('references the User collection', () => {
 			expect(CommentModel.schema.path('mentionedUserId').options.ref).toBe('User');
 		});
 
-		it('rejects a value that is not an ObjectId', () => {
+		it('rejects a value that is not an ObjectId', async () => {
 			const comment = new CommentModel(buildComment({ mentionedUserId: 'not-an-object-id' }));
 
-			expect(comment.validateSync().errors.mentionedUserId).toBeDefined();
+			await expect(comment.validate()).rejects.toMatchObject({ errors: { mentionedUserId: expect.anything() } });
 		});
 	});
 });

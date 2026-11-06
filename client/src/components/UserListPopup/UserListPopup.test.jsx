@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getFollowers, getFollowing } from '../../services/userService';
@@ -12,10 +11,12 @@ import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBott
 
 import UserListPopup from './UserListPopup';
 
-jest.mock('../../services/userService');
-jest.mock('../../services/storyService');
-jest.mock('../../services/userPostService');
-jest.mock('../../services/commentService');
+vi.mock('../../services/userService');
+vi.mock('../../services/storyService');
+vi.mock('../../services/userPostService');
+vi.mock('../../services/commentService');
+
+let user;
 
 const buildRow = (overrides = {}) => ({
 	_id: 'user1',
@@ -33,9 +34,9 @@ const renderPopup = ({
 	userPostId,
 	commentId,
 	listType = 'followers',
-	onClose = jest.fn(),
+	onClose = vi.fn(),
 	onAccountClick,
-	endSession = jest.fn(),
+	endSession = vi.fn(),
 } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser, endSession }}>
@@ -62,7 +63,8 @@ const getRowUsernames = (container) => Array.from(container.querySelectorAll('.s
 
 describe('UserListPopup', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		getFollowers.mockResolvedValue([buildRow({ _id: 'user1', username: 'janedoe' }), buildRow({ _id: 'user2', username: 'johndoe' })]);
 		getFollowing.mockResolvedValue([buildRow({ _id: 'user3', username: 'followedone' })]);
 	});
@@ -158,7 +160,7 @@ describe('UserListPopup', () => {
 
 			renderPopup({ listType: 'viewers', storyId: 'story1' });
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			expect(await screen.findByText('alice')).toBeInTheDocument();
 			expect(getStoryViewers).toHaveBeenCalledTimes(2);
@@ -185,7 +187,7 @@ describe('UserListPopup', () => {
 			const { onClose } = renderPopup({ listType: 'viewers', storyId: 'story1' });
 
 			await screen.findByText('alice');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -295,7 +297,7 @@ describe('UserListPopup', () => {
 
 			renderLikes();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			expect(await screen.findByText('newestliker')).toBeInTheDocument();
 			expect(loadLikes).toHaveBeenCalledTimes(2);
@@ -315,18 +317,18 @@ describe('UserListPopup', () => {
 			const { onClose } = renderLikes();
 
 			await screen.findByText('newestliker');
-			userEvent.click(screen.getByRole('link', { name: /olderliker/ }));
+			await user.click(screen.getByRole('link', { name: /olderliker/ }));
 
 			expect(screen.getByTestId('current-path')).toHaveTextContent('/user/liker2');
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
 		it('calls onAccountClick instead of onClose when an account is clicked and onAccountClick is given', async () => {
-			const onAccountClick = jest.fn();
+			const onAccountClick = vi.fn();
 			const { onClose } = renderLikes({ onAccountClick });
 
 			await screen.findByText('newestliker');
-			userEvent.click(screen.getByRole('link', { name: /newestliker/ }));
+			await user.click(screen.getByRole('link', { name: /newestliker/ }));
 
 			expect(onAccountClick).toHaveBeenCalledTimes(1);
 			expect(onClose).not.toHaveBeenCalled();
@@ -334,11 +336,11 @@ describe('UserListPopup', () => {
 		});
 
 		it('calls onClose from the close button, not onAccountClick', async () => {
-			const onAccountClick = jest.fn();
+			const onAccountClick = vi.fn();
 			const { onClose } = renderLikes({ onAccountClick });
 
 			await screen.findByText('newestliker');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 			expect(onAccountClick).not.toHaveBeenCalled();
@@ -451,7 +453,7 @@ describe('UserListPopup', () => {
 			renderPopup();
 
 			await screen.findByText('janedoe');
-			userEvent.click(screen.getByRole('link', { name: /johndoe/ }));
+			await user.click(screen.getByRole('link', { name: /johndoe/ }));
 
 			expect(screen.getByTestId('current-path')).toHaveTextContent('/user/user2');
 		});
@@ -460,7 +462,7 @@ describe('UserListPopup', () => {
 			const { onClose } = renderPopup();
 
 			await screen.findByText('janedoe');
-			userEvent.click(screen.getByRole('link', { name: /janedoe/ }));
+			await user.click(screen.getByRole('link', { name: /janedoe/ }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -471,7 +473,7 @@ describe('UserListPopup', () => {
 			const { onClose } = renderPopup();
 
 			await screen.findByText('janedoe');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -533,7 +535,7 @@ describe('UserListPopup', () => {
 
 			renderPopup();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			expect(await screen.findByText('janedoe')).toBeInTheDocument();
 			expect(getFollowers).toHaveBeenCalledTimes(2);
@@ -545,7 +547,7 @@ describe('UserListPopup', () => {
 
 			const { container } = renderPopup();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(container.querySelector('.loading-spinner')).toBeInTheDocument());
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -556,7 +558,7 @@ describe('UserListPopup', () => {
 
 			renderPopup();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(getFollowers).toHaveBeenCalledTimes(2));
 			expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();

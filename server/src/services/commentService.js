@@ -149,7 +149,7 @@ const updateCommentLikes = async ({ commentId, likesUpdate, viewerId }) => {
 
 	await assertCommentNotHidden(commentId, hiddenVisitorIds);
 
-	const updatedComment = await CommentModel.findByIdAndUpdate(commentId, likesUpdate, { new: true });
+	const updatedComment = await CommentModel.findByIdAndUpdate(commentId, likesUpdate, { returnDocument: 'after' });
 
 	if (!updatedComment) {
 		throw createCommentNotFoundError();

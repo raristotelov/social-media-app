@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router';
 
 import useGoBackOrTo from '../../hooks/useGoBackOrTo';
 import usePostHashSync from '../../hooks/usePostHashSync';

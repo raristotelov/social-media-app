@@ -10,7 +10,7 @@ describe('useSessionFlag', () => {
 	});
 
 	afterEach(() => {
-		jest.restoreAllMocks();
+		vi.restoreAllMocks();
 		sessionStorage.clear();
 	});
 
@@ -80,7 +80,7 @@ describe('useSessionFlag', () => {
 	});
 
 	it('should be unset when reading session storage throws', () => {
-		jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+		vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
 			throw new Error('storage blocked');
 		});
 
@@ -90,7 +90,7 @@ describe('useSessionFlag', () => {
 	});
 
 	it('should still set the flag for the session of the page when writing to session storage throws', () => {
-		jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+		vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
 			throw new Error('storage blocked');
 		});
 

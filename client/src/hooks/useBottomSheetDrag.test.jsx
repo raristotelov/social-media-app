@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, renderHook, screen } from '@testing-library/react';
 
 import {
@@ -35,7 +34,7 @@ const Sheet = ({ onClose }) => {
 const renderSheet = (environment) => {
 	installBottomSheetEnvironment(environment);
 
-	const onClose = jest.fn();
+	const onClose = vi.fn();
 
 	render(<Sheet onClose={onClose} />);
 
@@ -57,7 +56,7 @@ describe('useBottomSheetDrag', () => {
 		it('returns the pointer and transition handlers', () => {
 			installBottomSheetEnvironment();
 
-			const { result } = renderHook(() => useBottomSheetDrag(jest.fn()));
+			const { result } = renderHook(() => useBottomSheetDrag(vi.fn()));
 
 			expect(Object.keys(result.current).sort()).toEqual([
 				'onPointerCancel',
@@ -100,7 +99,7 @@ describe('useBottomSheetDrag', () => {
 			it('captures the pointer on the sheet so the drag continues outside it', () => {
 				const { sheet, handle } = renderSheet();
 
-				sheet.setPointerCapture = jest.fn();
+				sheet.setPointerCapture = vi.fn();
 				firePointer(handle, 'pointerdown', { clientY: 100, pointerId: 7 });
 
 				expect(sheet.setPointerCapture).toHaveBeenCalledWith(7);
@@ -472,7 +471,7 @@ describe('useBottomSheetDrag', () => {
 			const renderSheetWithFailingCapture = () => {
 				const rendered = renderSheet();
 
-				rendered.sheet.setPointerCapture = jest.fn(throwNotFound);
+				rendered.sheet.setPointerCapture = vi.fn(throwNotFound);
 
 				return rendered;
 			};
@@ -541,7 +540,7 @@ describe('useBottomSheetDrag', () => {
 			const renderSheetWithFailingRelease = () => {
 				const rendered = renderSheet();
 
-				rendered.sheet.releasePointerCapture = jest.fn(throwNotFound);
+				rendered.sheet.releasePointerCapture = vi.fn(throwNotFound);
 
 				return rendered;
 			};
@@ -667,7 +666,7 @@ describe('useBottomSheetDrag', () => {
 		it('returns no handlers', () => {
 			installBottomSheetEnvironment({ isMobile: false });
 
-			const { result } = renderHook(() => useBottomSheetDrag(jest.fn()));
+			const { result } = renderHook(() => useBottomSheetDrag(vi.fn()));
 
 			expect(result.current).toEqual({});
 		});
@@ -687,7 +686,7 @@ describe('useBottomSheetDrag', () => {
 		it('returns no handlers', () => {
 			window.matchMedia = undefined;
 
-			const { result } = renderHook(() => useBottomSheetDrag(jest.fn()));
+			const { result } = renderHook(() => useBottomSheetDrag(vi.fn()));
 
 			expect(result.current).toEqual({});
 		});

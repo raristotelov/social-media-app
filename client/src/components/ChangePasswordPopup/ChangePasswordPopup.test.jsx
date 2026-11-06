@@ -1,4 +1,3 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -9,9 +8,9 @@ import { changePassword } from '../../services/userService';
 import ToastProvider from '../ToastProvider/ToastProvider';
 import ChangePasswordPopup from './ChangePasswordPopup';
 
-jest.mock('../../services/userService');
+vi.mock('../../services/userService');
 
-const renderPopup = ({ onClose = jest.fn(), endSession = jest.fn() } = {}) => {
+const renderPopup = ({ onClose = vi.fn(), endSession = vi.fn() } = {}) => {
 	render(
 		<LoggedInUserContext.Provider value={{ endSession }}>
 			<ToastProvider>
@@ -23,16 +22,19 @@ const renderPopup = ({ onClose = jest.fn(), endSession = jest.fn() } = {}) => {
 	return { onClose, endSession };
 };
 
-const fillAndSave = ({ current = 'oldPassword1', next = 'newPassword1', confirm = 'newPassword1' } = {}) => {
-	userEvent.type(screen.getByPlaceholderText('Current password'), current);
-	userEvent.type(screen.getByPlaceholderText('New password'), next);
-	userEvent.type(screen.getByPlaceholderText('Confirm new password'), confirm);
-	userEvent.click(screen.getByRole('button', { name: 'Save' }));
+let user;
+
+const fillAndSave = async ({ current = 'oldPassword1', next = 'newPassword1', confirm = 'newPassword1' } = {}) => {
+	await user.type(screen.getByPlaceholderText('Current password'), current);
+	await user.type(screen.getByPlaceholderText('New password'), next);
+	await user.type(screen.getByPlaceholderText('Confirm new password'), confirm);
+	await user.click(screen.getByRole('button', { name: 'Save' }));
 };
 
 describe('ChangePasswordPopup', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 		changePassword.mockResolvedValue({});
 	});
 
@@ -45,7 +47,7 @@ describe('ChangePasswordPopup', () => {
 	it('sends only the current and new password with the token', async () => {
 		renderPopup();
 
-		fillAndSave();
+		await fillAndSave();
 
 		await waitFor(() => expect(changePassword).toHaveBeenCalledTimes(1));
 		expect(changePassword).toHaveBeenCalledWith({ currentPassword: 'oldPassword1', newPassword: 'newPassword1' });
@@ -54,7 +56,7 @@ describe('ChangePasswordPopup', () => {
 	it('closes and shows the "Password changed" success toast on success', async () => {
 		const { onClose } = renderPopup();
 
-		fillAndSave();
+		await fillAndSave();
 
 		await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
 		expect(within(screen.getByRole('alert')).getByText('Password changed')).toBeInTheDocument();
@@ -63,7 +65,7 @@ describe('ChangePasswordPopup', () => {
 	it('does not end the session on success', async () => {
 		const { onClose, endSession } = renderPopup();
 
-		fillAndSave();
+		await fillAndSave();
 
 		await waitFor(() => expect(onClose).toHaveBeenCalled());
 		expect(endSession).not.toHaveBeenCalled();
@@ -75,7 +77,7 @@ describe('ChangePasswordPopup', () => {
 		);
 		const { onClose } = renderPopup();
 
-		fillAndSave({ current: 'wrongPassword1' });
+		await fillAndSave({ current: 'wrongPassword1' });
 
 		expect(await screen.findByText('Current password is incorrect')).toBeInTheDocument();
 		expect(onClose).not.toHaveBeenCalled();
@@ -86,7 +88,7 @@ describe('ChangePasswordPopup', () => {
 		changePassword.mockRejectedValue(new RequestError({ code: 'INTERNAL_ERROR', status: 500 }));
 		const { onClose } = renderPopup();
 
-		fillAndSave();
+		await fillAndSave();
 
 		expect(await screen.findByText("Couldn't change your password. Try again.")).toBeInTheDocument();
 		expect(onClose).not.toHaveBeenCalled();
@@ -96,49 +98,49 @@ describe('ChangePasswordPopup', () => {
 		changePassword.mockRejectedValue(new RequestError({ code: 'UNAUTHENTICATED', status: 401 }));
 		const { onClose, endSession } = renderPopup();
 
-		fillAndSave();
+		await fillAndSave();
 
 		await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
 		expect(endSession).toHaveBeenCalledTimes(1);
 	});
 
-	it('closes without calling the server when Cancel is clicked', () => {
+	it('closes without calling the server when Cancel is clicked', async () => {
 		const { onClose } = renderPopup();
 
-		userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+		await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 		expect(onClose).toHaveBeenCalledTimes(1);
 		expect(changePassword).not.toHaveBeenCalled();
 	});
 
-	it('closes when the close button is clicked', () => {
+	it('closes when the close button is clicked', async () => {
 		const { onClose } = renderPopup();
 
-		userEvent.click(screen.getByRole('button', { name: 'Close' }));
+		await user.click(screen.getByRole('button', { name: 'Close' }));
 
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
-	it('closes when Escape is pressed', () => {
+	it('closes when Escape is pressed', async () => {
 		const { onClose } = renderPopup();
 
-		userEvent.keyboard('{esc}');
+		await user.keyboard('{Escape}');
 
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
-	it('closes when the scrim is clicked', () => {
+	it('closes when the scrim is clicked', async () => {
 		const { onClose } = renderPopup();
 
-		userEvent.click(screen.getByRole('heading', { name: 'Change Password' }).closest('.popup-container'));
+		await user.click(screen.getByRole('heading', { name: 'Change Password' }).closest('.popup-container'));
 
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
-	it('does not close when the popup body is clicked', () => {
+	it('does not close when the popup body is clicked', async () => {
 		const { onClose } = renderPopup();
 
-		userEvent.click(screen.getByRole('heading', { name: 'Change Password' }));
+		await user.click(screen.getByRole('heading', { name: 'Change Password' }));
 
 		expect(onClose).not.toHaveBeenCalled();
 	});

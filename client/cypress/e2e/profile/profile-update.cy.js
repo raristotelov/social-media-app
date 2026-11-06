@@ -64,6 +64,19 @@ describe('profile update', () => {
 		cy.get('@updateRequest.all').should('have.length', 0);
 	});
 
+	it('shows the app message for an email without an @ and never reaches the server', () => {
+		cy.get('input#email').clear().type('not-an-email');
+
+		submitForm();
+
+		cy.get('input#email')
+			.closest('.profile-form-input-wrapper')
+			.contains('.field-error', 'Please provide a valid email address')
+			.should('be.visible');
+		cy.get('.popup-body').should('be.visible');
+		cy.get('@updateRequest.all').should('have.length', 0);
+	});
+
 	it('requires a username and never reaches the server', () => {
 		cy.get('input#username').clear();
 

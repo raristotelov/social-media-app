@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import NotificationsContext from '../../contexts/NotificationsContext';
@@ -12,7 +11,7 @@ import { NOTIFICATION_TYPES } from '../../constants/notifications';
 
 import NotificationsPopup from './NotificationsPopup';
 
-jest.mock('../../services/notificationService');
+vi.mock('../../services/notificationService');
 
 const HOUR_MS = 60 * 60 * 1000;
 const NOW = Date.now();
@@ -43,9 +42,9 @@ const unauthenticatedError = () => new RequestError({ code: ERROR_CODES.UNAUTHEN
 const serverError = () => new RequestError({ code: ERROR_CODES.INTERNAL_ERROR, status: 500, message: 'Failed' });
 
 const renderPopup = () => {
-	const onClose = jest.fn();
-	const endSession = jest.fn();
-	const clearUnreadCount = jest.fn();
+	const onClose = vi.fn();
+	const endSession = vi.fn();
+	const clearUnreadCount = vi.fn();
 
 	const ui = (
 		<LoggedInUserContext.Provider value={{ loggedInUser: { _id: 'user1', username: 'johndoe' }, endSession }}>
@@ -64,7 +63,7 @@ const renderPopup = () => {
 
 describe('NotificationsPopup', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 		markAllNotificationsRead.mockResolvedValue(undefined);
 	});
 
@@ -306,11 +305,13 @@ describe('NotificationsPopup', () => {
 		});
 
 		it('loads the list when Try again is clicked', async () => {
+			const user = userEvent.setup();
+
 			getNotifications.mockRejectedValueOnce(serverError()).mockResolvedValueOnce(buildPage([buildNotification('n1')]));
 
 			renderPopup();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			expect(await screen.findByText('user-n1')).toBeInTheDocument();
 			expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -318,11 +319,13 @@ describe('NotificationsPopup', () => {
 		});
 
 		it('shows the error again when Try again fails again', async () => {
+			const user = userEvent.setup();
+
 			getNotifications.mockRejectedValue(serverError());
 
 			renderPopup();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(2));
 			expect(await screen.findByRole('alert')).toBeInTheDocument();
@@ -413,6 +416,8 @@ describe('NotificationsPopup', () => {
 		});
 
 		it('retries the same cursor and appends the page when Try again is clicked', async () => {
+			const user = userEvent.setup();
+
 			getNotifications
 				.mockResolvedValueOnce(firstPage())
 				.mockRejectedValueOnce(serverError())
@@ -420,7 +425,7 @@ describe('NotificationsPopup', () => {
 
 			renderPopup();
 
-			userEvent.click(await within(await screen.findByRole('alert')).findByRole('button', { name: 'Try again' }));
+			await user.click(await within(await screen.findByRole('alert')).findByRole('button', { name: 'Try again' }));
 
 			expect(await screen.findByText('user-n1')).toBeInTheDocument();
 			expect(getNotifications).toHaveBeenNthCalledWith(3, { cursor: 'cursor-1' });
@@ -468,35 +473,39 @@ describe('NotificationsPopup', () => {
 		});
 
 		it('closes when a row is clicked', async () => {
+			const user = userEvent.setup();
 			const { onClose } = renderPopup();
 
-			userEvent.click(await screen.findByRole('link', { name: 'user-n1 liked your post.' }));
+			await user.click(await screen.findByRole('link', { name: 'user-n1 liked your post.' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
 		it('closes when the name on a row is clicked', async () => {
+			const user = userEvent.setup();
 			const { onClose } = renderPopup();
 
-			userEvent.click(await screen.findByText('user-n1'));
+			await user.click(await screen.findByText('user-n1'));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
 		it('closes when the close button is clicked', async () => {
+			const user = userEvent.setup();
 			const { onClose } = renderPopup();
 
 			await screen.findByText('user-n1');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
 		it('closes on Escape', async () => {
+			const user = userEvent.setup();
 			const { onClose } = renderPopup();
 
 			await screen.findByText('user-n1');
-			userEvent.keyboard('{Escape}');
+			await user.keyboard('{Escape}');
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});

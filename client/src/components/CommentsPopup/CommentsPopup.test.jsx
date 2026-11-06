@@ -1,7 +1,6 @@
-import '@testing-library/jest-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getComments, addComment, likeComment, unlikeComment, getCommentLikes } from '../../services/commentService';
@@ -11,12 +10,12 @@ import ToastProvider from '../ToastProvider/ToastProvider';
 
 import CommentsPopup from './CommentsPopup';
 
-jest.mock('../../services/commentService');
+vi.mock('../../services/commentService');
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 
-jest.mock('react-router-dom', () => ({
-	...jest.requireActual('react-router-dom'),
+vi.mock('react-router', async () => ({
+	...(await vi.importActual('react-router')),
 	useNavigate: () => mockNavigate,
 }));
 
@@ -47,9 +46,9 @@ const buildDeferred = () => {
 const renderPopup = ({
 	user = loggedInUser,
 	entry = '/user/user2/posts#post1',
-	onClose = jest.fn(),
-	onCommentsLoaded = jest.fn(),
-	endSession = jest.fn(),
+	onClose = vi.fn(),
+	onCommentsLoaded = vi.fn(),
+	endSession = vi.fn(),
 } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
@@ -67,9 +66,12 @@ const renderPopup = ({
 const getCommentTexts = (container) =>
 	Array.from(container.querySelectorAll('.comments-popup-list > .comment .comment-text')).map((element) => element.textContent);
 
+let user;
+
 describe('CommentsPopup', () => {
 	beforeEach(() => {
-		jest.resetAllMocks();
+		vi.resetAllMocks();
+		user = userEvent.setup();
 	});
 
 	describe('focus', () => {
@@ -87,7 +89,7 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]);
+			await user.click(screen.getAllByRole('button', { name: 'Reply' })[0]);
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveFocus();
 		});
@@ -200,7 +202,7 @@ describe('CommentsPopup', () => {
 		it('loads the comments again when Try again is clicked', async () => {
 			renderPopup();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
 		});
@@ -209,7 +211,7 @@ describe('CommentsPopup', () => {
 			getComments.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce(topComments);
 			renderPopup();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			expect(await screen.findByText('Most liked comment')).toBeInTheDocument();
 			expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
@@ -219,7 +221,7 @@ describe('CommentsPopup', () => {
 		it('keeps the error when the retry fails again', async () => {
 			renderPopup();
 
-			userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+			await user.click(await screen.findByRole('button', { name: 'Try again' }));
 
 			await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
 			expect(await screen.findByText("Couldn't load comments")).toBeInTheDocument();
@@ -234,8 +236,8 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(addComment).toHaveBeenCalledWith({ userPostId: 'post1', text: 'Nice shot' }));
 		});
@@ -248,8 +250,8 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			expect(await screen.findByText('Nice shot', { selector: '.comment-text' })).toBeInTheDocument();
 			expect(getComments).toHaveBeenCalledTimes(2);
@@ -263,8 +265,8 @@ describe('CommentsPopup', () => {
 			const { onCommentsLoaded } = renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(onCommentsLoaded).toHaveBeenLastCalledWith(withNew));
 		});
@@ -275,8 +277,8 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('No comments yet. Be the first to comment.');
-			userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'First!');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.type(screen.getByPlaceholderText('Add a comment...'), 'First!');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			expect(await screen.findByText('First!', { selector: '.comment-text' })).toBeInTheDocument();
 			expect(screen.queryByText('No comments yet. Be the first to comment.')).not.toBeInTheDocument();
@@ -287,7 +289,7 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.type(screen.getByPlaceholderText('Add a comment...'), '   ');
+			await user.type(screen.getByPlaceholderText('Add a comment...'), '   ');
 
 			expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
 			expect(addComment).not.toHaveBeenCalled();
@@ -299,8 +301,8 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			expect(await screen.findByText("Couldn't post your comment. Try again.")).toBeInTheDocument();
 			expect(getComments).toHaveBeenCalledTimes(1);
@@ -315,8 +317,8 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			expect(await screen.findByText(copy)).toBeInTheDocument();
 		});
@@ -328,9 +330,9 @@ describe('CommentsPopup', () => {
 			];
 			const savedComment = buildComment('c3', 'Nice shot', { createdAt: '2024-06-01T00:00:00.000Z', parentCommentId: null });
 
-			const postComment = (text) => {
-				userEvent.type(screen.getByPlaceholderText('Add a comment...'), text);
-				userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			const postComment = async (text) => {
+				await user.type(screen.getByPlaceholderText('Add a comment...'), text);
+				await user.click(screen.getByRole('button', { name: 'Post' }));
 			};
 
 			beforeEach(() => {
@@ -342,7 +344,7 @@ describe('CommentsPopup', () => {
 				const { container } = renderPopup();
 
 				await screen.findByText('Most liked comment');
-				postComment('Nice shot');
+				await postComment('Nice shot');
 
 				expect(await screen.findByText('Nice shot', { selector: '.comment-text' })).toBeInTheDocument();
 				expect(getCommentTexts(container.ownerDocument.body)).toEqual(['Most liked comment', 'Nice shot', 'Older comment']);
@@ -352,7 +354,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Most liked comment');
-				postComment('Nice shot');
+				await postComment('Nice shot');
 				await screen.findByText('Nice shot', { selector: '.comment-text' });
 
 				expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
@@ -366,7 +368,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Most liked comment');
-				postComment('Nice shot');
+				await postComment('Nice shot');
 				await screen.findByText('Nice shot', { selector: '.comment-text' });
 
 				await waitFor(() => expect(screen.getByPlaceholderText('Add a comment...')).toHaveValue(''));
@@ -380,10 +382,10 @@ describe('CommentsPopup', () => {
 				const { container } = renderPopup();
 
 				await screen.findByText('Most liked comment');
-				postComment('Nice shot');
+				await postComment('Nice shot');
 				await screen.findByText('Nice shot', { selector: '.comment-text' });
 				await waitFor(() => expect(screen.getByPlaceholderText('Add a comment...')).toHaveValue(''));
-				postComment('Second one');
+				await postComment('Second one');
 
 				expect(await screen.findByText('Second one', { selector: '.comment-text' })).toBeInTheDocument();
 				expect(addComment).toHaveBeenCalledTimes(2);
@@ -394,7 +396,7 @@ describe('CommentsPopup', () => {
 				const { onCommentsLoaded } = renderPopup();
 
 				await screen.findByText('Most liked comment');
-				postComment('Nice shot');
+				await postComment('Nice shot');
 
 				await waitFor(() =>
 					expect(onCommentsLoaded).toHaveBeenLastCalledWith([datedComments[0], { ...savedComment, replies: [] }, datedComments[1]]),
@@ -407,7 +409,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('No comments yet. Be the first to comment.');
-				postComment('Nice shot');
+				await postComment('Nice shot');
 
 				expect(await screen.findByText('Nice shot', { selector: '.comment-text' })).toBeInTheDocument();
 				expect(screen.queryByText('No comments yet. Be the first to comment.')).not.toBeInTheDocument();
@@ -421,8 +423,8 @@ describe('CommentsPopup', () => {
 			const { endSession } = renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.type(screen.getByPlaceholderText('Add a comment...'), 'Nice shot');
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 			expect(screen.queryByText("Couldn't post your comment. Try again.")).not.toBeInTheDocument();
@@ -438,7 +440,7 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
+			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
 
 			expect(await screen.findByText('3 likes')).toBeInTheDocument();
 			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1' });
@@ -470,7 +472,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+				await user.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
 
 				await waitFor(() => expect(getTopLevelLikeLabels()).toEqual(['2 likes', '1 like', '0 likes']));
 				expect(getComments).toHaveBeenCalledTimes(2);
@@ -482,7 +484,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+				await user.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
 
 				await waitFor(() => expect(getTopLevelTexts()).toEqual(['Top', 'Older', 'Newer']));
 			});
@@ -497,7 +499,7 @@ describe('CommentsPopup', () => {
 
 				await screen.findByText('Mine');
 				expect(getTopLevelTexts()).toEqual(['Mine', 'Rival']);
-				userEvent.click(screen.getByRole('button', { name: 'Unlike comment' }));
+				await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
 
 				await waitFor(() => expect(getTopLevelTexts()).toEqual(['Rival', 'Mine']));
 				expect(getTopLevelLikeLabels()).toEqual(['1 like', '1 like']);
@@ -514,8 +516,8 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Parent');
-				userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+				await user.click(screen.getByRole('button', { name: 'View replies' }));
+				await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
 				await waitFor(() => expect(getReplyLikeLabels()).toEqual(['1 like']));
 				expect(getTopLevelLikeLabels()).toEqual(['0 likes']);
@@ -528,7 +530,7 @@ describe('CommentsPopup', () => {
 				const { onCommentsLoaded } = renderPopup();
 
 				await screen.findByText('Top');
-				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+				await user.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
 
 				await waitFor(() => expect(onCommentsLoaded).toHaveBeenLastCalledWith([top, { ...older, likes: ['user1'] }, newer]));
 			});
@@ -539,7 +541,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+				await user.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
 				await waitFor(() => expect(getTopLevelLikeLabels()).toEqual(['2 likes', '1 like', '0 likes']));
 
 				expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
@@ -554,7 +556,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+				await user.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
 				await waitFor(() => expect(getTopLevelLikeLabels()).toEqual(['2 likes', '1 like', '0 likes']));
 
 				expect(screen.getByPlaceholderText('Add a comment...')).toBeEnabled();
@@ -566,7 +568,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
+				await user.click(screen.getAllByRole('button', { name: 'Like comment' })[2]);
 
 				expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
 				expect(getTopLevelLikeLabels()).toEqual(['2 likes', '0 likes', '0 likes']);
@@ -600,12 +602,12 @@ describe('CommentsPopup', () => {
 				return { firstReload, secondReload };
 			};
 
-			const postMainComment = () => {
-				userEvent.type(screen.getByPlaceholderText('Add a comment...'), 'Brand new');
-				userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			const postMainComment = async () => {
+				await user.type(screen.getByPlaceholderText('Add a comment...'), 'Brand new');
+				await user.click(screen.getByRole('button', { name: 'Post' }));
 			};
 
-			const likeOther = () => userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+			const likeOther = () => user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
 			it('builds the second fallback on the first when a comment is added and then a like is made', async () => {
 				const { firstReload, secondReload } = givenTwoPendingReloads();
@@ -615,9 +617,9 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				postMainComment();
+				await postMainComment();
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
-				likeOther();
+				await likeOther();
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(3));
 
 				firstReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
@@ -637,9 +639,9 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				postMainComment();
+				await postMainComment();
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
-				likeOther();
+				await likeOther();
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(3));
 
 				secondReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
@@ -658,12 +660,12 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				postMainComment();
+				await postMainComment();
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
 
-				userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[1]);
-				userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Reply text');
-				userEvent.click(screen.getAllByRole('button', { name: 'Post' })[0]);
+				await user.click(screen.getAllByRole('button', { name: 'Reply' })[1]);
+				await user.type(screen.getByPlaceholderText('Write a reply...'), 'Reply text');
+				await user.click(screen.getAllByRole('button', { name: 'Post' })[0]);
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(3));
 
 				firstReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
@@ -682,9 +684,9 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Top');
-				postMainComment();
+				await postMainComment();
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
-				likeOther();
+				await likeOther();
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(3));
 
 				firstReload.reject({ code: 'INTERNAL_ERROR', status: 500 });
@@ -702,7 +704,7 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
+			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
 
 			expect(await screen.findByText('This comment no longer exists')).toBeInTheDocument();
 		});
@@ -723,7 +725,7 @@ describe('CommentsPopup', () => {
 			renderPopup({ user: null, entry: '/user/user2/posts#post1' });
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getByPlaceholderText('Add a comment...'));
+			await user.click(screen.getByPlaceholderText('Add a comment...'));
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 		});
@@ -733,7 +735,7 @@ describe('CommentsPopup', () => {
 			renderPopup({ user: null });
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
+			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[0]);
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 			expect(likeComment).not.toHaveBeenCalled();
@@ -744,7 +746,7 @@ describe('CommentsPopup', () => {
 			renderPopup({ user: null });
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]);
+			await user.click(screen.getAllByRole('button', { name: 'Reply' })[0]);
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
 		});
@@ -754,7 +756,7 @@ describe('CommentsPopup', () => {
 			renderPopup({ user: null });
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getByRole('button', { name: 'Post' }));
+			await user.click(screen.getByRole('button', { name: 'Post' }));
 
 			expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
 			expect(mockNavigate).not.toHaveBeenCalled();
@@ -768,7 +770,7 @@ describe('CommentsPopup', () => {
 			const { onClose } = renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getByRole('button', { name: 'Close' }));
+			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -778,7 +780,7 @@ describe('CommentsPopup', () => {
 			const { onClose } = renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.keyboard('{esc}');
+			await user.keyboard('{Escape}');
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -886,10 +888,10 @@ describe('CommentsPopup', () => {
 
 			const getReplyTexts = () => Array.from(document.querySelectorAll('.comment-reply .comment-text')).map((element) => element.textContent);
 
-			const postReply = () => {
-				userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]);
-				userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
-				userEvent.click(screen.getAllByRole('button', { name: 'Post' })[0]);
+			const postReply = async () => {
+				await user.click(screen.getAllByRole('button', { name: 'Reply' })[0]);
+				await user.type(screen.getByPlaceholderText('Write a reply...'), 'Thanks');
+				await user.click(screen.getAllByRole('button', { name: 'Post' })[0]);
 			};
 
 			beforeEach(() => {
@@ -901,7 +903,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Parent');
-				postReply();
+				await postReply();
 
 				await waitFor(() => expect(getComments).toHaveBeenCalledTimes(2));
 				expect(addComment).toHaveBeenCalledWith({
@@ -916,7 +918,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Parent');
-				postReply();
+				await postReply();
 
 				await waitFor(() => expect(getReplyTexts()).toEqual(['oldest reply', 'Thanks']));
 			});
@@ -925,7 +927,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Parent');
-				postReply();
+				await postReply();
 				await waitFor(() => expect(getReplyTexts()).toEqual(['oldest reply', 'Thanks']));
 
 				const topLevelTexts = Array.from(document.querySelectorAll('.comments-popup-list > .comment > .comment-row .comment-text')).map(
@@ -939,7 +941,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Parent');
-				postReply();
+				await postReply();
 				await waitFor(() => expect(getReplyTexts()).toEqual(['oldest reply', 'Thanks']));
 
 				expect(screen.queryByText("Couldn't load comments")).not.toBeInTheDocument();
@@ -953,7 +955,7 @@ describe('CommentsPopup', () => {
 				renderPopup();
 
 				await screen.findByText('Parent');
-				postReply();
+				await postReply();
 				await waitFor(() => expect(getReplyTexts()).toEqual(['oldest reply', 'Thanks']));
 
 				expect(screen.getByPlaceholderText('Add a comment...')).toBeEnabled();
@@ -963,7 +965,7 @@ describe('CommentsPopup', () => {
 				const { onCommentsLoaded } = renderPopup();
 
 				await screen.findByText('Parent');
-				postReply();
+				await postReply();
 
 				await waitFor(() =>
 					expect(onCommentsLoaded).toHaveBeenLastCalledWith([
@@ -982,13 +984,13 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Parent');
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
-			userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[1]);
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getAllByRole('button', { name: 'Reply' })[1]);
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@bob ');
 
-			userEvent.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
-			userEvent.click(screen.getAllByRole('button', { name: 'Post' })[0]);
+			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
+			await user.click(screen.getAllByRole('button', { name: 'Post' })[0]);
 
 			await waitFor(() =>
 				expect(addComment).toHaveBeenCalledWith({
@@ -1007,7 +1009,7 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Parent');
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			expect(document.querySelector('.comment-reply .comment-mention')).toHaveAttribute('href', '/user/user3');
 		});
@@ -1023,7 +1025,7 @@ describe('CommentsPopup', () => {
 			renderPopup();
 
 			await screen.findByText('Parent');
-			userEvent.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies' }));
 
 			const replyTexts = Array.from(document.querySelectorAll('.comment-reply .comment-text')).map((element) => element.textContent);
 
@@ -1044,7 +1046,7 @@ describe('CommentsPopup', () => {
 			const rendered = renderPopup();
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
 			await screen.findByText('newestliker');
 
 			return rendered;
@@ -1078,7 +1080,7 @@ describe('CommentsPopup', () => {
 		it('closes only the likes popup with its Close button and returns to the comments, which are not reloaded', async () => {
 			const { onClose } = await openLikes();
 
-			userEvent.click(within(screen.getByRole('heading', { name: 'Likes' }).closest('.popup-body')).getByRole('button', { name: 'Close' }));
+			await user.click(within(screen.getByRole('heading', { name: 'Likes' }).closest('.popup-body')).getByRole('button', { name: 'Close' }));
 
 			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
 			expect(screen.getByText('Most liked comment')).toBeInTheDocument();
@@ -1089,7 +1091,7 @@ describe('CommentsPopup', () => {
 		it('closes only the likes popup on Escape', async () => {
 			const { onClose } = await openLikes();
 
-			userEvent.keyboard('{Escape}');
+			await user.keyboard('{Escape}');
 
 			expect(screen.queryByRole('heading', { name: 'Likes' })).not.toBeInTheDocument();
 			expect(screen.getByRole('heading', { name: 'Comments' })).toBeInTheDocument();
@@ -1099,8 +1101,8 @@ describe('CommentsPopup', () => {
 		it('closes the comments popup on Escape once the likes popup is gone', async () => {
 			const { onClose } = await openLikes();
 
-			userEvent.keyboard('{Escape}');
-			userEvent.keyboard('{Escape}');
+			await user.keyboard('{Escape}');
+			await user.keyboard('{Escape}');
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -1108,7 +1110,7 @@ describe('CommentsPopup', () => {
 		it('closes the comments popup as well when an account is clicked', async () => {
 			const { onClose } = await openLikes();
 
-			userEvent.click(screen.getByRole('link', { name: /olderliker/ }));
+			await user.click(screen.getByRole('link', { name: /olderliker/ }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
@@ -1126,7 +1128,7 @@ describe('CommentsPopup', () => {
 			renderPopup({ user: null });
 
 			await screen.findByText('Most liked comment');
-			userEvent.click(screen.getByRole('button', { name: '2 likes' }));
+			await user.click(screen.getByRole('button', { name: '2 likes' }));
 
 			expect(await screen.findByText('newestliker')).toBeInTheDocument();
 			expect(mockNavigate).not.toHaveBeenCalled();
