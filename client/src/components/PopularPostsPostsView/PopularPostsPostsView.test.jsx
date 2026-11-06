@@ -99,14 +99,13 @@ describe('PopularPostsPostsView', () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
 		user = userEvent.setup();
-		mockScrollIntoView = vi.fn();
-		window.HTMLElement.prototype.scrollIntoView = mockScrollIntoView;
+		mockScrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
 		getPopularPosts.mockResolvedValue(buildPage(['p1', 'p2', 'p3']));
 		getNextPopularPosts.mockResolvedValue(buildPage([]));
 	});
 
 	afterEach(() => {
-		delete window.HTMLElement.prototype.scrollIntoView;
+		mockScrollIntoView.mockRestore();
 		window.history.replaceState(null, '');
 	});
 

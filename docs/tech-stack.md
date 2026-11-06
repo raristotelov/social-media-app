@@ -5,12 +5,13 @@ Overview of the technologies used across the social media app. Versions reflect 
 ## Frontend (`client/`)
 
 - **Language:** JavaScript (JSX).
-- **Framework:** React 19, bootstrapped with Create React App (`react-scripts` 5).
-- **Routing:** `react-router-dom` 6.
+- **Framework:** React 19, built with Vite 8 and `@vitejs/plugin-react`. Output goes to `dist`.
+- **Routing:** `react-router` 8.
 - **State:** React Context (`LoggedInUserContext`) + hooks; the session is restored on load from `GET /users/me`.
 - **API calls:** native `fetch` wrapped in a custom `requester` service, sent with `credentials: 'include'`.
 - **Styling:** plain CSS, one `.css` file per component; custom fonts (Pacifico, Mada, Vollkorn).
-- **Utilities:** `uuid` for unique image identifiers.
+- **Env:** `VITE_API_URL` — server base URL (falls back to `http://localhost:5000` when unset).
+- **Node:** `^22.22.2 || ^24.15.0 || >=26.0.0` (`engines` in `client/package.json`).
 
 ## Backend (`server/`)
 
@@ -44,14 +45,14 @@ Overview of the technologies used across the social media app. Versions reflect 
 
 ## Hosting
 
-- **Client:** Vercel.
+- **Client:** Vercel. `client/vercel.json` rewrites every path to `/index.html` so nested routes survive a refresh.
 - **Server:** Render.
 - **Database:** MongoDB Atlas.
 - **Domain:** client on `sharesnap.app` (`www` redirects to it), server on `api.sharesnap.app`. Same site, so the session cookie works with `sameSite: 'lax'`.
 
 ## Tooling
 
-- **Client:** Prettier, ESLint (`react-app` config), Testing Library + Jest via `react-scripts`, Cypress for end-to-end.
+- **Client:** Prettier, ESLint 9 (flat config), Vitest 5 with jsdom, Testing Library, Cypress for end-to-end.
 - **Server:** Prettier, ESLint, Jest, `nodemon` for dev reload.
 
 ### Commands
@@ -59,7 +60,8 @@ Overview of the technologies used across the social media app. Versions reflect 
 Run from `client/` or `server/`:
 
 - `npm run lint` · `npm run format` · `npm run format:check`
-- `npm test` — unit tests. The client runs in watch mode; use `CI=true npm test -- --watchAll=false` for a single pass.
+- `npm test` — unit tests, single run.
+- Client only: `npm run test:watch` · `npm run test:coverage` · `npm run build` · `npm run preview`.
 - `npm run cypress:open` / `npm run cypress:run` — end-to-end, client only. **The client and the server must both already be running.**
 
 End-to-end specs run against the local dev database with its real data. A spec creates the records it needs and deletes only those; it never clears the database.

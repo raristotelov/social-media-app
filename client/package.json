@@ -14,23 +14,14 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "lint": "eslint src cypress cypress.config.js vite.config.mjs eslint.config.js",
+        "lint": "eslint --max-warnings 0 src cypress cypress.config.js vite.config.mjs eslint.config.js",
         "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"cypress/**/*.js\" cypress.config.js vite.config.mjs eslint.config.js",
         "format:check": "prettier --check \"src/**/*.{js,jsx,css}\" \"cypress/**/*.js\" cypress.config.js vite.config.mjs eslint.config.js",
         "cypress:open": "cypress open",
         "cypress:run": "cypress run"
     },
-    "browserslist": {
-        "production": [
-            ">0.2%",
-            "not dead",
-            "not op_mini all"
-        ],
-        "development": [
-            "last 1 chrome version",
-            "last 1 firefox version",
-            "last 1 safari version"
-        ]
+    "engines": {
+        "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.5",

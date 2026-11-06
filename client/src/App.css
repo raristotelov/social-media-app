@@ -1,22 +1,22 @@
 @font-face {
 	font-family: 'Pacifico';
-	src: url('../public/Fonts/Pacifico/Pacifico-Regular.ttf') format('truetype');
+	src: url('/Fonts/Pacifico/Pacifico-Regular.ttf') format('truetype');
 }
 
 @font-face {
 	font-family: 'Vollkorn';
-	src: url('../public/Fonts/Vollkorn/Vollkorn-VariableFont_wght.ttf') format('truetype');
+	src: url('/Fonts/Vollkorn/Vollkorn-VariableFont_wght.ttf') format('truetype');
 }
 
 @font-face {
 	font-family: 'Mada';
-	src: url('../public/Fonts/Mada/Mada-Regular.ttf') format('truetype');
+	src: url('/Fonts/Mada/Mada-Regular.ttf') format('truetype');
 	font-weight: 400;
 }
 
 @font-face {
 	font-family: 'Mada';
-	src: url('../public/Fonts/Mada/Mada-Bold.ttf') format('truetype');
+	src: url('/Fonts/Mada/Mada-Bold.ttf') format('truetype');
 	font-weight: 700;
 }
 

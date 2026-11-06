@@ -20,7 +20,7 @@ const LoginForm = ({ loginHandler }) => {
 
 	return (
 		<section className='login-section'>
-			<form id='login-form' onSubmit={onSubmit} className='login-form'>
+			<form id='login-form' onSubmit={onSubmit} className='login-form' noValidate>
 				<h1>Login</h1>
 
 				<div className='auth-input-wrapper'>

@@ -1439,7 +1439,7 @@ describe('ProfileView followers and following popup', () => {
 	it('opens the Followers popup listing the profile followers when the followers count is clicked', async () => {
 		await renderProfile();
 
-		await user.click(screen.getByRole('button', { name: '2followers' }));
+		await user.click(screen.getByRole('button', { name: /^2\s*followers$/ }));
 
 		expect(screen.getByRole('heading', { name: 'Followers' })).toBeInTheDocument();
 		expect(await screen.findByText('firstfollower')).toBeInTheDocument();
@@ -1451,7 +1451,7 @@ describe('ProfileView followers and following popup', () => {
 	it('opens the Following popup listing the users the profile follows when the following count is clicked', async () => {
 		await renderProfile();
 
-		await user.click(screen.getByRole('button', { name: '1following' }));
+		await user.click(screen.getByRole('button', { name: /^1\s*following$/ }));
 
 		expect(screen.getByRole('heading', { name: 'Following' })).toBeInTheDocument();
 		expect(await screen.findByText('followedone')).toBeInTheDocument();
@@ -1462,7 +1462,7 @@ describe('ProfileView followers and following popup', () => {
 	it('lets a guest open the popup', async () => {
 		await renderProfile({ loggedInUser: null });
 
-		await user.click(screen.getByRole('button', { name: '2followers' }));
+		await user.click(screen.getByRole('button', { name: /^2\s*followers$/ }));
 
 		expect(await screen.findByText('firstfollower')).toBeInTheDocument();
 	});
@@ -1470,14 +1470,14 @@ describe('ProfileView followers and following popup', () => {
 	it('does not open a popup for a zero count', async () => {
 		await renderProfile({ profileData: { ...profile, followers: [], following: [] } });
 
-		expect(screen.queryByRole('button', { name: '0followers' })).not.toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: '0following' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /^0\s*followers$/ })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /^0\s*following$/ })).not.toBeInTheDocument();
 	});
 
 	it('closes the popup with the close button', async () => {
 		await renderProfile();
 
-		await user.click(screen.getByRole('button', { name: '2followers' }));
+		await user.click(screen.getByRole('button', { name: /^2\s*followers$/ }));
 		await screen.findByText('firstfollower');
 		await user.click(screen.getByRole('button', { name: 'Close' }));
 
@@ -1487,7 +1487,7 @@ describe('ProfileView followers and following popup', () => {
 	it('closes the popup and opens that profile when a row is clicked', async () => {
 		await renderProfile();
 
-		await user.click(screen.getByRole('button', { name: '2followers' }));
+		await user.click(screen.getByRole('button', { name: /^2\s*followers$/ }));
 		await user.click(await screen.findByRole('link', { name: /secondfollower/ }));
 
 		expect(screen.queryByRole('heading', { name: 'Followers' })).not.toBeInTheDocument();
@@ -1499,7 +1499,7 @@ describe('ProfileView followers and following popup', () => {
 		await renderProfile({ loggedInUser: { _id: 'follower2', username: 'secondfollower', following: ['user2'] } });
 		getFollowers.mockResolvedValue([followerRows[1], followerRows[0]]);
 
-		await user.click(screen.getByRole('button', { name: '2followers' }));
+		await user.click(screen.getByRole('button', { name: /^2\s*followers$/ }));
 		await screen.findByText('firstfollower');
 
 		const usernames = Array.from(document.querySelectorAll('.user-list-results .search-result-username')).map((row) => row.textContent);
@@ -1512,7 +1512,7 @@ describe('ProfileView followers and following popup', () => {
 		await renderProfile();
 
 		await user.click(screen.getByRole('button', { name: 'Follow' }));
-		await user.click(screen.getByRole('button', { name: '3followers' }));
+		await user.click(screen.getByRole('button', { name: /^3\s*followers$/ }));
 
 		await screen.findByText('firstfollower');
 		expect(getFollowers).toHaveBeenCalledWith({ userId: 'user2' });
@@ -1522,7 +1522,7 @@ describe('ProfileView followers and following popup', () => {
 		await renderProfile();
 		getFollowers.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 
-		await user.click(screen.getByRole('button', { name: '2followers' }));
+		await user.click(screen.getByRole('button', { name: /^2\s*followers$/ }));
 
 		expect(await screen.findByText("Couldn't load this list")).toBeInTheDocument();
 		expect(screen.getByText('janedoe')).toBeInTheDocument();

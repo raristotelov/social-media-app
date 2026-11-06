@@ -126,6 +126,14 @@ const destroyImagesById = async (imageIdentifiers) => {
 	}
 };
 
+const countCommentsByPost = (comments) =>
+	comments.reduce((counts, comment) => {
+		const key = String(comment.userPostId);
+		counts.set(key, (counts.get(key) || 0) + 1);
+
+		return counts;
+	}, new Map());
+
 // Removes the given accounts and every trace of them, including marks they left on
 // other people's records.
 const removeUsersById = async (testUserIds) => {
@@ -154,19 +162,35 @@ const removeUsersById = async (testUserIds) => {
 	// which would otherwise be orphaned.
 	const commentsToDelete = await CommentModel.find({
 		$or: [{ userId: { $in: testUserIds } }, { userPostId: { $in: testUserPostIds } }],
-	}).select({ _id: 1 });
+	})
+		.select({ _id: 1, userPostId: 1 })
+		.lean();
 	const commentIdsToDelete = commentsToDelete.map((comment) => comment._id);
 
-	const deletedComments = await CommentModel.deleteMany({
-		$or: [{ _id: { $in: commentIdsToDelete } }, { parentCommentId: { $in: commentIdsToDelete } }],
-	});
+	const orphanedReplies = await CommentModel.find({
+		parentCommentId: { $in: commentIdsToDelete },
+		_id: { $nin: commentIdsToDelete },
+	})
+		.select({ _id: 1, userPostId: 1 })
+		.lean();
+	const allCommentsToDelete = [...commentsToDelete, ...orphanedReplies];
+	const testUserPostIdSet = new Set(testUserPostIds.map(String));
+
+	for (const [userPostId, count] of countCommentsByPost(allCommentsToDelete)) {
+		if (!testUserPostIdSet.has(userPostId)) {
+			await UserPostModel.updateOne({ _id: userPostId }, { $inc: { commentsCount: -count } });
+		}
+	}
+
+	const allCommentIdsToDelete = allCommentsToDelete.map((comment) => comment._id);
+	const deletedComments = await CommentModel.deleteMany({ _id: { $in: allCommentIdsToDelete } });
 
 	await NotificationModel.deleteMany({
 		$or: [
 			{ actorId: { $in: testUserIds } },
 			{ recipientId: { $in: testUserIds } },
 			{ userPostId: { $in: testUserPostIds } },
-			{ commentId: { $in: commentIdsToDelete } },
+			{ commentId: { $in: allCommentIdsToDelete } },
 		],
 	});
 
@@ -179,6 +203,7 @@ const removeUsersById = async (testUserIds) => {
 
 	await UserPostModel.updateMany({ likes: { $in: testUserIds } }, { $pull: { likes: { $in: testUserIds } } });
 	await CommentModel.updateMany({ likes: { $in: testUserIds } }, { $pull: { likes: { $in: testUserIds } } });
+	await CommentModel.updateMany({ mentionedUserId: { $in: testUserIds } }, { $set: { mentionedUserId: null } });
 	await UserModel.updateMany(
 		{ $or: [{ followers: { $in: testUserIds } }, { following: { $in: testUserIds } }] },
 		{ $pull: { followers: { $in: testUserIds }, following: { $in: testUserIds } } },

@@ -1,4 +1,51 @@
-import { validateChangePassword } from './validators';
+import { validateChangePassword, validateEditProfile } from './validators';
+
+describe('validateEditProfile', () => {
+	const validProfile = { email: 'user@example.com', username: 'johndoe' };
+
+	it('returns no errors for a valid email and username', () => {
+		expect(validateEditProfile(validProfile)).toEqual({ fields: {} });
+	});
+
+	it('requires the email when it is empty', () => {
+		const { fields } = validateEditProfile({ ...validProfile, email: '' });
+
+		expect(fields).toEqual({ email: ['Email is required'] });
+	});
+
+	it('requires the email when it is only whitespace', () => {
+		const { fields } = validateEditProfile({ ...validProfile, email: '   ' });
+
+		expect(fields).toEqual({ email: ['Email is required'] });
+	});
+
+	it.each([['not-an-email'], ['user@example'], ['@example.com'], ['user@.com'], ['user name@example.com']])(
+		'rejects the malformed email "%s"',
+		(email) => {
+			const { fields } = validateEditProfile({ ...validProfile, email });
+
+			expect(fields).toEqual({ email: ['Please provide a valid email address'] });
+		},
+	);
+
+	it('requires the username when it is empty', () => {
+		const { fields } = validateEditProfile({ ...validProfile, username: '' });
+
+		expect(fields).toEqual({ username: ['Username is required'] });
+	});
+
+	it('requires the username when it is only whitespace', () => {
+		const { fields } = validateEditProfile({ ...validProfile, username: '  ' });
+
+		expect(fields).toEqual({ username: ['Username is required'] });
+	});
+
+	it('reports the email and username errors together', () => {
+		const { fields } = validateEditProfile({ email: '', username: '' });
+
+		expect(Object.keys(fields)).toEqual(['email', 'username']);
+	});
+});
 
 const validValues = { currentPassword: 'oldPassword1', newPassword: 'newPassword1', confirmPassword: 'newPassword1' };
 

@@ -91,18 +91,19 @@ const getTileStatTexts = (tileIndex) => Array.from(getTiles()[tileIndex].querySe
 const getInlineError = () => document.querySelector('.load-more-error');
 
 describe('PopularPostsView', () => {
+	let mockScrollIntoView;
 	let user;
 
 	beforeEach(() => {
 		vi.resetAllMocks();
 		user = userEvent.setup();
-		window.HTMLElement.prototype.scrollIntoView = vi.fn();
+		mockScrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
 		getPopularPosts.mockResolvedValue(buildPage(['p3', 'p2', 'p1']));
 		getNextPopularPosts.mockResolvedValue(buildPage([]));
 	});
 
 	afterEach(() => {
-		delete window.HTMLElement.prototype.scrollIntoView;
+		mockScrollIntoView.mockRestore();
 	});
 
 	describe('the grid of posts from the server', () => {

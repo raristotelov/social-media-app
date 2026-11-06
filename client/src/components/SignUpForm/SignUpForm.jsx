@@ -22,7 +22,7 @@ const SignUpForm = ({ signUpHandler }) => {
 
 	return (
 		<section className='sign-up-section'>
-			<form id='sign-up-form' onSubmit={onSubmit} className='sign-up-form'>
+			<form id='sign-up-form' onSubmit={onSubmit} className='sign-up-form' noValidate>
 				<h1>Sign up</h1>
 
 				<div className='auth-input-wrapper'>

@@ -194,6 +194,11 @@ export const getSuggestionsViaApi = (session, placement) =>
 export const dismissSuggestionsCarouselViaApi = (session) =>
 	apiRequest({ method: 'POST', url: `${serverUrl}/suggestions/carousel/dismiss`, headers: authHeaders(session) });
 
+export const getUnreadNotificationCountViaApi = (session) =>
+	apiRequest({ method: 'GET', url: `${serverUrl}/notifications/unread-count`, headers: authHeaders(session) }).then(
+		(response) => response.body.count,
+	);
+
 export const setThemeViaApi = (session, theme) =>
 	apiRequest({
 		method: 'PATCH',

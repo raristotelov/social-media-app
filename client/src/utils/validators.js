@@ -76,6 +76,22 @@ export const validateSignUp = ({ email, username, password, repeatPassword }) =>
 	return { fields, formError };
 };
 
+export const validateEditProfile = ({ email, username }) => {
+	const fields = {};
+
+	const emailErrors = getEmailErrors(email);
+
+	if (emailErrors.length) {
+		fields.email = emailErrors;
+	}
+
+	if (!username?.trim()) {
+		fields.username = [ERROR_MESSAGES[ERROR_CODES.USERNAME_REQUIRED]];
+	}
+
+	return { fields };
+};
+
 export const validateChangePassword = ({ currentPassword, newPassword, confirmPassword }) => {
 	const fields = {};
 	let formError = '';

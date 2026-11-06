@@ -15,6 +15,20 @@ describe('sign up errors', () => {
 
 	const stubSignUp = (statusCode, body) => cy.intercept('POST', `${serverUrl}/users/sign-up`, { statusCode, body }).as('failingSignUp');
 
+	it('shows the app message for an email without an @ and never reaches the server', () => {
+		cy.intercept('POST', `${serverUrl}/users/sign-up`).as('signUpRequest');
+
+		cy.get('input#email').type('not-an-email');
+		cy.get('input#username').type('some_username');
+		cy.get('input#password').type('SomePassword1');
+		cy.get('input#repeatPassword').type('SomePassword1');
+		cy.contains('button', 'Submit').click();
+
+		cy.get('input#email').closest('.auth-input-wrapper').contains('.field-error', 'Please provide a valid email address').should('be.visible');
+		cy.location('pathname').should('eq', '/sign-up');
+		cy.get('@signUpRequest.all').should('have.length', 0);
+	});
+
 	it('shows USERNAME_TAKEN under the username field', () => {
 		stubSignUp(409, { code: 'USERNAME_TAKEN', message: 'username: USERNAME_TAKEN', fields: { username: 'USERNAME_TAKEN' } });
 

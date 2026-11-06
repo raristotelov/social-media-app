@@ -1,7 +1,15 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { validateEditProfile } from '../../utils/validators';
+
 import EditProfileForm from './EditProfileForm';
+
+vi.mock('../../utils/validators', async (importOriginal) => {
+	const actual = await importOriginal();
+
+	return { ...actual, validateEditProfile: vi.fn(actual.validateEditProfile) };
+});
 
 const userData = {
 	email: 'user@example.com',
@@ -43,6 +51,21 @@ describe('EditProfileForm', () => {
 
 		expect(await screen.findByText('Email is required')).toBeInTheDocument();
 		expect(editProfileData).not.toHaveBeenCalled();
+	});
+
+	it('shows the app validation error, not the browser one, for an email without an @, and sends nothing', async () => {
+		const editProfileData = vi.fn();
+		const onCancelClick = vi.fn();
+		const { container } = renderEditProfileForm(editProfileData, onCancelClick);
+
+		await user.clear(screen.getByPlaceholderText('Email'));
+		await user.type(screen.getByPlaceholderText('Email'), 'not-an-email');
+		await user.click(screen.getByRole('button', { name: 'Save' }));
+
+		expect(await screen.findByText('Please provide a valid email address')).toHaveClass('field-error');
+		expect(container.querySelector('form')).toHaveAttribute('novalidate');
+		expect(editProfileData).not.toHaveBeenCalled();
+		expect(onCancelClick).not.toHaveBeenCalled();
 	});
 
 	it('shows "Username is required" and does not call editProfileData when the username is cleared', async () => {
@@ -550,6 +573,98 @@ describe('EditProfileForm', () => {
 			await user.type(screen.getByPlaceholderText('Username'), 'x');
 
 			expect(screen.queryByText("Couldn't save your profile. Try again.")).not.toBeInTheDocument();
+		});
+	});
+
+	describe('field error accessibility', () => {
+		it('marks neither the email nor the username input invalid before any error', () => {
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'false');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'false');
+		});
+
+		it('marks only the email input invalid when the email fails validation', async () => {
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.clear(screen.getByPlaceholderText('Email'));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			await screen.findByText('Email is required');
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'true');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'false');
+		});
+
+		it('marks only the username input invalid when the username fails validation', async () => {
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.clear(screen.getByPlaceholderText('Username'));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			await screen.findByText('Username is required');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'true');
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'false');
+		});
+
+		it('marks the username input invalid when the server rejects the username', async () => {
+			const editProfileData = vi.fn().mockRejectedValue({ code: 'USERNAME_TAKEN', fields: { username: 'USERNAME_TAKEN' }, status: 400 });
+			renderEditProfileForm(editProfileData, vi.fn());
+
+			await user.clear(screen.getByPlaceholderText('Username'));
+			await user.type(screen.getByPlaceholderText('Username'), 'newname');
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			await screen.findByText('This username is taken');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'true');
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'false');
+		});
+
+		it('clears aria-invalid on a field once the user edits it again', async () => {
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.clear(screen.getByPlaceholderText('Email'));
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+			await screen.findByText('Email is required');
+
+			await user.type(screen.getByPlaceholderText('Email'), 'a');
+
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'false');
+		});
+	});
+
+	describe('several messages for one field', () => {
+		it('renders every email message, each as a field error', async () => {
+			validateEditProfile.mockReturnValue({ fields: { email: ['First email problem', 'Second email problem'] } });
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			expect(await screen.findByText('First email problem')).toHaveClass('field-error');
+			expect(screen.getByText('Second email problem')).toHaveClass('field-error');
+			expect(screen.getByPlaceholderText('Email')).toHaveAttribute('aria-invalid', 'true');
+		});
+
+		it('renders every username message, each as a field error', async () => {
+			validateEditProfile.mockReturnValue({ fields: { username: ['First username problem', 'Second username problem'] } });
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+
+			expect(await screen.findByText('First username problem')).toHaveClass('field-error');
+			expect(screen.getByText('Second username problem')).toHaveClass('field-error');
+			expect(screen.getByPlaceholderText('Username')).toHaveAttribute('aria-invalid', 'true');
+		});
+
+		it('keeps the messages of one field out of the other field', async () => {
+			validateEditProfile.mockReturnValue({ fields: { email: ['First email problem', 'Second email problem'] } });
+			renderEditProfileForm(vi.fn(), vi.fn());
+
+			await user.click(screen.getByRole('button', { name: 'Save' }));
+			await screen.findByText('First email problem');
+
+			const usernameWrapper = screen.getByPlaceholderText('Username').closest('.profile-form-input-wrapper');
+
+			expect(within(usernameWrapper).queryByText(/email problem/)).not.toBeInTheDocument();
 		});
 	});
 });

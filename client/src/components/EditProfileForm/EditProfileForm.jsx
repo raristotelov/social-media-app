@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 import { useForm } from '../../hooks/useForm';
 import { MAX_BIO_LENGTH, UPLOAD_FIELDS } from '../../constants/validation';
-import { ERROR_CODES } from '../../constants/errorCodes';
-import { ACTION_FALLBACK_MESSAGES, ERROR_MESSAGES } from '../../constants/errorMessages';
+import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
+import { validateEditProfile } from '../../utils/validators';
 
 import Button from '../Button/Button';
 import ImageInput from '../ImageInput/ImageInput';
@@ -50,20 +50,6 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 		return editProfileData(updatedUserValues);
 	};
 
-	const validate = (formValues) => {
-		const fields = {};
-
-		if (!formValues.email.trim()) {
-			fields.email = [ERROR_MESSAGES[ERROR_CODES.EMAIL_REQUIRED]];
-		}
-
-		if (!formValues.username.trim()) {
-			fields.username = [ERROR_MESSAGES[ERROR_CODES.USERNAME_REQUIRED]];
-		}
-
-		return { fields };
-	};
-
 	const { values, changeHandler, clearFieldError, onSubmit, isSubmitting, errors, formError } = useForm(
 		{
 			email: userData.email,
@@ -71,13 +57,13 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 			bio: userData.bio ? userData.bio : '',
 		},
 		editProfileDataHandler,
-		{ validate, fallbackMessage: ACTION_FALLBACK_MESSAGES.SAVE_PROFILE, extraFieldNames: [UPLOAD_FIELDS.PROFILE_PICTURE] },
+		{ validate: validateEditProfile, fallbackMessage: ACTION_FALLBACK_MESSAGES.SAVE_PROFILE, extraFieldNames: [UPLOAD_FIELDS.PROFILE_PICTURE] },
 	);
 
 	const pictureError = invalidPictureError || errors[UPLOAD_FIELDS.PROFILE_PICTURE]?.[0] || '';
 
 	return (
-		<form id='edit-user-profile-form' onSubmit={onSubmit} className='edit-user-profile-form'>
+		<form id='edit-user-profile-form' onSubmit={onSubmit} noValidate className='edit-user-profile-form'>
 			<div className='profile-form-profile-picture-wrapper'>
 				<ImageInput
 					initialValue={userData?.profilePicture?.imageUrl}
@@ -103,9 +89,14 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 					value={values.email}
 					onChange={changeHandler}
 					className={errors.email?.length ? 'has-error' : ''}
+					aria-invalid={Boolean(errors.email?.length)}
 				/>
 
-				{errors.email?.length ? <span className='field-error'>{errors.email[0]}</span> : null}
+				{errors.email?.map((message) => (
+					<span key={message} className='field-error'>
+						{message}
+					</span>
+				))}
 			</div>
 
 			<div className='profile-form-input-wrapper'>
@@ -117,9 +108,14 @@ const EditProfileForm = ({ userData, editProfileData, onCancelClick }) => {
 					value={values.username}
 					onChange={changeHandler}
 					className={errors.username?.length ? 'has-error' : ''}
+					aria-invalid={Boolean(errors.username?.length)}
 				/>
 
-				{errors.username?.length ? <span className='field-error'>{errors.username[0]}</span> : null}
+				{errors.username?.map((message) => (
+					<span key={message} className='field-error'>
+						{message}
+					</span>
+				))}
 			</div>
 
 			<div className='profile-form-input-wrapper'>

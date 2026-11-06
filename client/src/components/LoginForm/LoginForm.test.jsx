@@ -36,7 +36,20 @@ describe('LoginForm', () => {
 		expect(container.querySelector('.form-error')).not.toBeInTheDocument();
 	});
 
-	it('shows a validation error for a malformed email address', async () => {
+	it('shows the app validation error, not the browser one, for an email without an @', async () => {
+		const loginHandler = vi.fn();
+		const { container } = renderLoginForm(loginHandler);
+
+		await user.type(screen.getByPlaceholderText('Email'), 'not-an-email');
+		await user.type(screen.getByPlaceholderText('Password'), 'Password123');
+		await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+		expect(await screen.findByText('Please provide a valid email address')).toHaveClass('field-error');
+		expect(container.querySelector('form')).toHaveAttribute('novalidate');
+		expect(loginHandler).not.toHaveBeenCalled();
+	});
+
+	it('shows a validation error for an email with no top-level domain', async () => {
 		const loginHandler = vi.fn();
 		renderLoginForm(loginHandler);
 

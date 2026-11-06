@@ -102,13 +102,12 @@ describe('ProfilePostsView', () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
 		user = userEvent.setup();
-		mockScrollIntoView = vi.fn();
-		window.HTMLElement.prototype.scrollIntoView = mockScrollIntoView;
+		mockScrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
 		getUsersProfileData.mockResolvedValue([buildProfile()]);
 	});
 
 	afterEach(() => {
-		delete window.HTMLElement.prototype.scrollIntoView;
+		mockScrollIntoView.mockRestore();
 		window.history.replaceState(null, '');
 	});
 

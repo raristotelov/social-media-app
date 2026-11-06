@@ -42,6 +42,21 @@ describe('SignUpForm', () => {
 		expect(signUpHandler).not.toHaveBeenCalled();
 	});
 
+	it('shows the app validation error, not the browser one, for an email without an @, and sends nothing', async () => {
+		const signUpHandler = vi.fn();
+		const { container } = renderSignUpForm(signUpHandler);
+
+		await fillField('Email', 'not-an-email');
+		await fillField('Username', 'johndoe');
+		await fillField('Password', 'Password123');
+		await fillField('Repeat password', 'Password123');
+		await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+		expect(await screen.findByText('Please provide a valid email address')).toHaveClass('field-error');
+		expect(container.querySelector('form')).toHaveAttribute('novalidate');
+		expect(signUpHandler).not.toHaveBeenCalled();
+	});
+
 	it('shows the minimum-length message for a password under 8 characters', async () => {
 		const signUpHandler = vi.fn();
 		renderSignUpForm(signUpHandler);

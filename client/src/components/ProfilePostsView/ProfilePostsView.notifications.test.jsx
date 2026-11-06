@@ -68,8 +68,7 @@ describe('ProfilePostsView opened from a notification', () => {
 
 	beforeEach(() => {
 		vi.resetAllMocks();
-		mockScrollIntoView = vi.fn();
-		window.HTMLElement.prototype.scrollIntoView = mockScrollIntoView;
+		mockScrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
 		getUsersProfileData.mockResolvedValue([profile]);
 		getComments.mockResolvedValue([
 			{
@@ -84,7 +83,7 @@ describe('ProfilePostsView opened from a notification', () => {
 	});
 
 	afterEach(() => {
-		delete window.HTMLElement.prototype.scrollIntoView;
+		mockScrollIntoView.mockRestore();
 	});
 
 	describe('a like notification', () => {
