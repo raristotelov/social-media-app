@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -94,6 +95,62 @@ describe('AccountMenu', () => {
 				updatedProfileData: { theme: 'dark' },
 			}),
 		);
+	});
+
+	describe('closing on an outside press', () => {
+		const TriggerWithMenu = ({ onClose }) => {
+			const triggerRef = useRef(null);
+
+			return (
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn() }}>
+					<MemoryRouter>
+						<button type='button' ref={triggerRef}>
+							Trigger
+						</button>
+
+						<button type='button'>Elsewhere</button>
+
+						<AccountMenu isOpen onClose={onClose} triggerRef={triggerRef} logoutHandler={vi.fn()} />
+					</MemoryRouter>
+				</LoggedInUserContext.Provider>
+			);
+		};
+
+		it('does not call onClose when the press is inside the trigger element', async () => {
+			const onClose = vi.fn();
+			render(<TriggerWithMenu onClose={onClose} />);
+
+			await user.pointer({ keys: '[MouseLeft>]', target: screen.getByRole('button', { name: 'Trigger' }) });
+
+			expect(onClose).not.toHaveBeenCalled();
+		});
+
+		it('calls onClose when the press is elsewhere outside the menu and the trigger', async () => {
+			const onClose = vi.fn();
+			render(<TriggerWithMenu onClose={onClose} />);
+
+			await user.pointer({ keys: '[MouseLeft>]', target: screen.getByRole('button', { name: 'Elsewhere' }) });
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not call onClose when the press is inside the menu', async () => {
+			const onClose = vi.fn();
+			render(<TriggerWithMenu onClose={onClose} />);
+
+			await user.pointer({ keys: '[MouseLeft>]', target: screen.getByText('Profile') });
+
+			expect(onClose).not.toHaveBeenCalled();
+		});
+
+		it('still calls onClose for an outside press when no triggerRef is given', async () => {
+			const onClose = vi.fn();
+			renderAccountMenu(true, { onClose });
+
+			await user.pointer({ keys: '[MouseLeft>]', target: document.body });
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	describe('as a bottom sheet', () => {

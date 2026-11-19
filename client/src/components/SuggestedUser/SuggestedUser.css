@@ -17,6 +17,7 @@
 	gap: 12px;
 
 	text-decoration: none;
+	-webkit-tap-highlight-color: transparent;
 }
 
 .suggested-user-avatar {

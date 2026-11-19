@@ -45,6 +45,7 @@ const MobileTopBar = ({ logoutHandler }) => {
 	const [isSearching, setIsSearching] = useState(false);
 
 	const searchFieldRef = useRef(null);
+	const menuTriggerRef = useRef(null);
 
 	useEffect(() => {
 		if (isSearching) {
@@ -109,6 +110,7 @@ const MobileTopBar = ({ logoutHandler }) => {
 							className='mobile-top-bar-action'
 							aria-label='Account menu'
 							aria-expanded={isMenuOpen}
+							ref={menuTriggerRef}
 							onClick={() => setIsMenuOpen((state) => !state)}
 						>
 							<MenuIcon iconColorProp='currentColor' />
@@ -121,6 +123,7 @@ const MobileTopBar = ({ logoutHandler }) => {
 				<AccountMenu
 					isOpen={isMenuOpen}
 					onClose={() => setIsMenuOpen(false)}
+					triggerRef={menuTriggerRef}
 					logoutHandler={logoutHandler}
 					onChangePasswordClick={() => setIsChangePasswordOpen(true)}
 					onNotificationsClick={() => setIsNotificationsOpen(true)}

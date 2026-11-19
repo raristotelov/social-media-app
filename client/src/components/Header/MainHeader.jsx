@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useRef } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
@@ -23,6 +23,7 @@ const MainHeader = ({ logoutHandler }) => {
 	const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 	const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 	const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+	const accountMenuTriggerRef = useRef(null);
 
 	const location = useLocation();
 	const currentPath = location.pathname;
@@ -96,6 +97,7 @@ const MainHeader = ({ logoutHandler }) => {
 							<button
 								type='button'
 								className='logged-user-avatar'
+								ref={accountMenuTriggerRef}
 								onClick={() => setIsAccountMenuOpen((state) => !state)}
 								aria-expanded={isAccountMenuOpen}
 								aria-haspopup='menu'
@@ -112,6 +114,7 @@ const MainHeader = ({ logoutHandler }) => {
 							<AccountMenu
 								isOpen={isAccountMenuOpen}
 								onClose={() => setIsAccountMenuOpen(false)}
+								triggerRef={accountMenuTriggerRef}
 								logoutHandler={logoutHandler}
 								onChangePasswordClick={() => setIsChangePasswordOpen(true)}
 								onNotificationsClick={() => setIsNotificationsOpen(true)}

@@ -75,7 +75,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 - Same validation, 2048px resize, server upload and Submit disabled in flight as the Upload Picture popup (shared `ImageInput`). — Built (#15)
 - Has picture: hover "Change" overlay. — Built
 - Has picture: clicking the picture opens the file picker on every device. — Built
-- Has picture: small × button (24px, top-right of the picture, always visible) removes it. — Built
+- Has picture: small × button (24px, top-right of the picture, always visible) removes it. Hover flips its colours: `text/primary` circle and border, `background/surface` ×. — Built
 - Removal only takes effect on Save; Cancel leaves the picture untouched; no separate confirmation. After removal the form shows the empty input. — Built
 - Removing the picture also destroys its Cloudinary asset; the placeholder avatar then shows everywhere the picture appears. — Built
 
@@ -166,7 +166,7 @@ Desktop and tablet popups are components; each Profile section shows an instance
 
 Shared components:
 
-- [Remove Picture Button](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=526-2412) (526:2412)
+- [Remove Picture Button](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=760-4034) (760:4034, State=Default/Hover)
 - [Post Actions Button](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=491-2052) (491:2052)
 - [Profile Picture](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=169-441) (169:441, Type=Photo/Placeholder)
 - [User Row](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=580-2307) (580:2307, State=Default/Hover)

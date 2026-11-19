@@ -40,6 +40,7 @@
 }
 
 .preview-wrapper {
+	position: relative;
 	margin-bottom: 20px;
 	border: 1px solid var(--text-muted);
 }
@@ -47,11 +48,6 @@
 .preview-wrapper img {
 	object-fit: contain;
 	cursor: pointer;
-}
-
-.preview-wrapper.removable,
-.preview-wrapper.has-backdrop {
-	position: relative;
 }
 
 .preview-wrapper.has-backdrop > img {
@@ -90,8 +86,9 @@
 .image-change-button {
 	display: none;
 	position: absolute;
+	inset: 0;
+	border-radius: inherit;
 	background-color: var(--background-surface);
-	transform: translateY(-105%);
 	opacity: 80%;
 	outline: none;
 	border: none;
@@ -104,11 +101,7 @@
 	font-weight: bold;
 }
 
-.round-image .image-change-button {
-	border-radius: 50%;
-}
-
-.preview-wrapper:hover .image-change-button {
+.preview-wrapper:hover:not(:has(.image-remove-button:hover)) .image-change-button {
 	display: flex;
 	cursor: pointer;
 }
@@ -136,4 +129,12 @@
 
 .image-remove-button:hover {
 	cursor: pointer;
+}
+
+@media (hover: hover) {
+	.image-remove-button:hover {
+		border-color: var(--text-primary);
+		background-color: var(--text-primary);
+		color: var(--background-surface);
+	}
 }
