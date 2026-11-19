@@ -7,8 +7,9 @@ Liking posts and comments (#11) and the likes list (#5). Tokens: [style-guide.md
 ## Liking
 
 - Guests see the hearts; using one redirects to `/log-in` ([feed-page.md](./feed-page.md#guests)).
-- Like / unlike a post or a comment fails: toast, fallback "Couldn't update your like. Try again."
-- Comment like saved but the list fails to reload: keep the current list, apply the like locally, show no error.
+- Likes are optimistic: the post heart pop and the filled comment heart show at once, then the request is sent.
+- Like / unlike fails: nothing changes on screen and no error shows; the next load shows the server's state. An expired session still ends the session.
+- A comment like updates that comment in place, with no reload, so the open list keeps its order until the comments are next loaded.
 - Server: liking a post uses `$addToSet` (it used `$push`, so a double click recorded two likes).
 
 ## Likes list (#5)

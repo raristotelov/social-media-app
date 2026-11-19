@@ -7,12 +7,17 @@ cloudinary.config({
 	secure: true,
 });
 
+const REQUIRED_SETTINGS = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET', 'CLOUDINARY_FOLDER'];
+
 const isConfigured = () => Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
+
+const getMissingSettings = () => REQUIRED_SETTINGS.filter((name) => !process.env[name]);
 
 const getUploadFolder = () => process.env.CLOUDINARY_FOLDER;
 
 module.exports = {
 	cloudinary,
 	isConfigured,
+	getMissingSettings,
 	getUploadFolder,
 };

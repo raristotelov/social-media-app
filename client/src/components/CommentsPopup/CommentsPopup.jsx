@@ -65,36 +65,20 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 		setRetryCount((count) => count + 1);
 	};
 
-	const getLocallyUpdatedComments = (addedComment, likeChange) => {
-		if (addedComment) {
-			return addCommentLocally(commentsRef.current, addedComment);
-		}
-
-		if (likeChange) {
-			return applyLikeLocally(commentsRef.current, likeChange);
-		}
-
-		return null;
-	};
-
-	const reloadComments = async (addedComment, likeChange) => {
+	const reloadComments = async (addedComment) => {
 		try {
 			const result = await getComments({ userPostId });
 
 			setHasLoadFailed(false);
 			applyComments(result);
 		} catch {
-			const locallyUpdatedComments = getLocallyUpdatedComments(addedComment, likeChange);
-
-			if (!locallyUpdatedComments) {
-				setHasLoadFailed(true);
-
-				return;
-			}
-
 			setHasLoadFailed(false);
-			applyComments(locallyUpdatedComments);
+			applyComments(addCommentLocally(commentsRef.current, addedComment));
 		}
+	};
+
+	const updateCommentLike = (likeChange) => {
+		applyComments(applyLikeLocally(commentsRef.current, likeChange));
 	};
 
 	const submitComment = async (text) => {
@@ -129,7 +113,14 @@ const CommentsPopup = ({ userPostId, onClose, onCommentsLoaded }) => {
 		return (
 			<div className='comments-popup-list'>
 				{comments.map((comment) => (
-					<Comment key={comment._id} comment={comment} userPostId={userPostId} onReload={reloadComments} onCloseComments={onClose} />
+					<Comment
+						key={comment._id}
+						comment={comment}
+						userPostId={userPostId}
+						onReload={reloadComments}
+						onLikeChange={updateCommentLike}
+						onCloseComments={onClose}
+					/>
 				))}
 			</div>
 		);

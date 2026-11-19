@@ -489,7 +489,7 @@ describe('FeedView', () => {
 			expect(within(articles[1]).getByRole('button', { name: '0 comments' })).toBeInTheDocument();
 		});
 
-		it('shows the like failure as a toast without changing the post', async () => {
+		it('keeps the like and shows no toast when the like fails', async () => {
 			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			likeUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			renderFeed();
@@ -497,9 +497,12 @@ describe('FeedView', () => {
 			const articles = await screen.findAllByRole('article');
 
 			await user.click(within(articles[0]).getByRole('button', { name: 'Like post' }));
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(1));
 
-			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
-			expect(within(articles[0]).getByText('0 likes')).toBeInTheDocument();
+			expect(within(articles[0]).getByText('1 like')).toBeInTheDocument();
+			expect(within(articles[0]).getByRole('button', { name: 'Unlike post' })).toHaveAttribute('aria-pressed', 'true');
+			expect(within(articles[1]).getByText('0 likes')).toBeInTheDocument();
+			expect(screen.queryByText("Couldn't update your like. Try again.")).not.toBeInTheDocument();
 		});
 
 		it('shows no post actions on the feed posts', async () => {

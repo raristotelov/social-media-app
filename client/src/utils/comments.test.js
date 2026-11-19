@@ -289,7 +289,7 @@ describe('applyLikeLocally', () => {
 	});
 
 	describe('ordering', () => {
-		it('moves a comment above the others once the like gives it more likes', () => {
+		it('keeps a comment in place when the like gives it more likes than the comment above it', () => {
 			const comments = [
 				buildComment('newer', { createdAt: '2024-05-01T00:00:00.000Z' }),
 				buildComment('older', { createdAt: '2024-01-01T00:00:00.000Z' }),
@@ -297,10 +297,11 @@ describe('applyLikeLocally', () => {
 
 			const result = applyLikeLocally(comments, { commentId: 'older', userId: 'u1', isLiked: true });
 
-			expect(getIds(result)).toEqual(['older', 'newer']);
+			expect(getIds(result)).toEqual(['newer', 'older']);
+			expect(result[1].likes).toEqual(['u1']);
 		});
 
-		it('moves a comment back down once the unlike removes its lead', () => {
+		it('keeps a comment in place when the unlike removes its lead', () => {
 			const comments = [
 				buildComment('older', { likes: ['u1'], createdAt: '2024-01-01T00:00:00.000Z' }),
 				buildComment('newer', { createdAt: '2024-05-01T00:00:00.000Z' }),
@@ -308,7 +309,16 @@ describe('applyLikeLocally', () => {
 
 			const result = applyLikeLocally(comments, { commentId: 'older', userId: 'u1', isLiked: false });
 
-			expect(getIds(result)).toEqual(['newer', 'older']);
+			expect(getIds(result)).toEqual(['older', 'newer']);
+			expect(result[0].likes).toEqual([]);
+		});
+
+		it('keeps the given order of several comments whatever their like counts become', () => {
+			const comments = [buildComment('a'), buildComment('b', { likes: ['u2'] }), buildComment('c', { likes: ['u2', 'u3'] })];
+
+			const result = applyLikeLocally(comments, { commentId: 'a', userId: 'u1', isLiked: true });
+
+			expect(getIds(result)).toEqual(['a', 'b', 'c']);
 		});
 
 		it('does not reorder the replies', () => {

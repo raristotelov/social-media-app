@@ -43,7 +43,6 @@ export const ACTION_FALLBACK_MESSAGES = Object.freeze({
 	EDIT_CAPTION: "Couldn't save the caption. Try again.",
 	UPLOAD_PICTURE: "Couldn't upload the picture. Try again.",
 	DELETE_POST: "Couldn't delete the post. Try again.",
-	UPDATE_LIKE: "Couldn't update your like. Try again.",
 	ADD_COMMENT: "Couldn't post your comment. Try again.",
 	ADD_REPLY: "Couldn't post your reply. Try again.",
 	LOAD_STORIES: "Couldn't load stories. Try again.",

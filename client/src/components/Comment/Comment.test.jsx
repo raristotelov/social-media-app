@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -42,25 +43,67 @@ const buildDeferred = () => {
 	return deferred;
 };
 
+const applyLikeChange = (comment, { commentId, userId, isLiked }) => {
+	const otherLikes = (comment.likes || []).filter((likeUserId) => likeUserId !== userId);
+
+	return {
+		...comment,
+		likes: comment._id === commentId ? (isLiked ? [...otherLikes, userId] : otherLikes) : comment.likes,
+		replies: (comment.replies || []).map((reply) => applyLikeChange(reply, { commentId, userId, isLiked })),
+	};
+};
+
+const StatefulComment = ({ initialComment, onLikeChange, ...props }) => {
+	const [comment, setComment] = useState(initialComment);
+
+	const applyChange = useCallback(
+		(change) => {
+			setComment((currentComment) => applyLikeChange(currentComment, change));
+			onLikeChange(change);
+		},
+		[onLikeChange],
+	);
+
+	return <Comment comment={comment} onLikeChange={applyChange} {...props} />;
+};
+
 const renderComment = ({
 	comment = baseComment,
 	user = loggedInUser,
 	onReload = vi.fn().mockResolvedValue(undefined),
+	onLikeChange = vi.fn(),
 	onCloseComments = vi.fn(),
 	entry = '/user/user2/posts#post1',
 	endSession = vi.fn(),
+	isStateful = false,
 } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={[entry]}>
-					<Comment comment={comment} userPostId='post1' onReload={onReload} onCloseComments={onCloseComments} />
+					{isStateful ? (
+						<StatefulComment
+							initialComment={comment}
+							userPostId='post1'
+							onReload={onReload}
+							onLikeChange={onLikeChange}
+							onCloseComments={onCloseComments}
+						/>
+					) : (
+						<Comment
+							comment={comment}
+							userPostId='post1'
+							onReload={onReload}
+							onLikeChange={onLikeChange}
+							onCloseComments={onCloseComments}
+						/>
+					)}
 				</MemoryRouter>
 			</ToastProvider>
 		</LoggedInUserContext.Provider>,
 	);
 
-	return { ...rendered, onReload, onCloseComments, endSession };
+	return { ...rendered, onReload, onLikeChange, onCloseComments, endSession };
 };
 
 const getReplyTexts = (container) => Array.from(container.querySelectorAll('.comment-reply .comment-text')).map((element) => element.textContent);
@@ -232,7 +275,7 @@ describe('Comment', () => {
 			const reply = { _id: 'r1', text: 'a liked reply', likes: ['user9'], userId: { _id: 'user4', username: 'bob' } };
 			const { onCloseComments } = renderComment({ comment: { ...baseComment, replies: [reply] } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (1)' }));
 			await user.click(screen.getByRole('button', { name: '1 like' }));
 			await user.click(await screen.findByRole('link', { name: /newestliker/ }));
 
@@ -267,13 +310,32 @@ describe('Comment', () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
 			expect(getReplyTexts(container)).toEqual([]);
-			expect(screen.getByRole('button', { name: 'View replies' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'View replies (2)' })).toBeInTheDocument();
 		});
 
-		it('shows the replies in the order given, oldest first, after "View replies" is clicked', async () => {
+		it('shows "View replies (1)" for a comment with one reply', () => {
+			renderComment({ comment: { ...baseComment, replies: [replies[0]] } });
+
+			expect(screen.getByRole('button', { name: 'View replies (1)' })).toBeInTheDocument();
+		});
+
+		it('shows "View replies (N)" with N equal to the number of replies', () => {
+			const fiveReplies = Array.from({ length: 5 }, (_, index) => ({
+				_id: `r${index}`,
+				text: `reply ${index}`,
+				likes: [],
+				userId: { _id: `user${index + 10}`, username: `replier${index}` },
+			}));
+
+			renderComment({ comment: { ...baseComment, replies: fiveReplies } });
+
+			expect(screen.getByRole('button', { name: 'View replies (5)' })).toBeInTheDocument();
+		});
+
+		it('shows the replies in the order given, oldest first, after "View replies (2)" is clicked', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 
 			expect(getReplyTexts(container)).toEqual(['first reply', 'second reply']);
 		});
@@ -281,16 +343,16 @@ describe('Comment', () => {
 		it('swaps "View replies" for "Hide replies" once the replies are shown', async () => {
 			renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 
-			expect(screen.queryByRole('button', { name: 'View replies' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /View replies/ })).not.toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Hide replies' })).toBeInTheDocument();
 		});
 
 		it('hides the replies again when "Hide replies" is clicked', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(screen.getByRole('button', { name: 'Hide replies' }));
 
 			expect(getReplyTexts(container)).toEqual([]);
@@ -299,22 +361,22 @@ describe('Comment', () => {
 		it('offers no "View replies" for a comment without replies', () => {
 			renderComment();
 
-			expect(screen.queryByRole('button', { name: 'View replies' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /View replies/ })).not.toBeInTheDocument();
 		});
 
 		it('offers Reply on the comment and on each of its replies, and "View replies" only on the comment', async () => {
 			renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 
 			expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(3);
-			expect(screen.queryByRole('button', { name: 'View replies' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /View replies/ })).not.toBeInTheDocument();
 		});
 
 		it('offers no "View replies" or "Hide replies" on a reply', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 
 			expect(container.querySelectorAll('.comment-reply .comment-replies')).toHaveLength(0);
 			expect(screen.getAllByRole('button', { name: 'Hide replies' })).toHaveLength(1);
@@ -329,7 +391,7 @@ describe('Comment', () => {
 				comment: { ...baseComment, replies: [{ _id: 'r1', likes: [], userId: { _id: 'user4', username: 'bob' }, ...reply }] },
 			});
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (1)' }));
 
 			return rendered;
 		};
@@ -403,7 +465,7 @@ describe('Comment', () => {
 				},
 			});
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (1)' }));
 
 			expect(container.querySelector('.comment-mention')).toHaveAttribute('href', '/user/user3');
 			expect(mockNavigate).not.toHaveBeenCalled();
@@ -411,65 +473,96 @@ describe('Comment', () => {
 	});
 
 	describe('liking a comment', () => {
-		it('likes the comment and then reloads the comments', async () => {
+		it('likes the comment and reports the like change', async () => {
 			likeComment.mockResolvedValue({});
-			const { onReload } = renderComment();
+			const { onLikeChange } = renderComment();
 
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
 			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1' });
 			expect(unlikeComment).not.toHaveBeenCalled();
 		});
 
-		it('reloads without a comment and describes the like it just made', async () => {
+		it('describes the like it just made with the comment id, the user id and isLiked true', async () => {
 			likeComment.mockResolvedValue({ _id: 'c1', likes: ['user1'] });
-			const { onReload } = renderComment();
+			const { onLikeChange } = renderComment();
 
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
-			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'c1', userId: 'user1', isLiked: true });
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
+			expect(onLikeChange).toHaveBeenCalledWith({ commentId: 'c1', userId: 'user1', isLiked: true });
 		});
 
 		it('describes the unlike it just made with isLiked false', async () => {
 			unlikeComment.mockResolvedValue({});
-			const { onReload } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
+			const { onLikeChange } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
 
 			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
 
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
-			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'c1', userId: 'user1', isLiked: false });
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
+			expect(onLikeChange).toHaveBeenCalledWith({ commentId: 'c1', userId: 'user1', isLiked: false });
 		});
 
 		it('describes a like on a reply with the id of the reply', async () => {
 			likeComment.mockResolvedValue({});
-			const { onReload } = renderComment({ comment: { ...baseComment, replies } });
+			const { onLikeChange } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
-			expect(onReload).toHaveBeenCalledWith(undefined, { commentId: 'r1', userId: 'user1', isLiked: true });
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
+			expect(onLikeChange).toHaveBeenCalledWith({ commentId: 'r1', userId: 'user1', isLiked: true });
 		});
 
-		it('shows no toast when the like was saved and the reload that follows is handled by the parent', async () => {
+		it('does not reload the comments after a like', async () => {
 			likeComment.mockResolvedValue({});
-			const { onReload } = renderComment();
+			const { onReload, onLikeChange } = renderComment();
 
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
+			expect(onReload).not.toHaveBeenCalled();
+		});
+
+		it('does not reload the comments after an unlike', async () => {
+			unlikeComment.mockResolvedValue({});
+			const { onReload, onLikeChange } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
+
+			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
+
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
+			expect(onReload).not.toHaveBeenCalled();
+		});
+
+		it('does not reload the comments after a like on a reply', async () => {
+			likeComment.mockResolvedValue({});
+			const { onReload, onLikeChange } = renderComment({ comment: { ...baseComment, replies } });
+
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
+			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
+			expect(onReload).not.toHaveBeenCalled();
+		});
+
+		it('shows no toast when the like was saved', async () => {
+			likeComment.mockResolvedValue({});
+			const { onLikeChange } = renderComment();
+
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
+
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
 			expect(screen.queryByText("Couldn't update your like. Try again.")).not.toBeInTheDocument();
 		});
 
 		it('unlikes a comment the user already liked', async () => {
 			unlikeComment.mockResolvedValue({});
-			const { onReload } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
+			const { onLikeChange } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
 
 			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
 
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
 			expect(unlikeComment).toHaveBeenCalledWith({ commentId: 'c1' });
 			expect(likeComment).not.toHaveBeenCalled();
 		});
@@ -490,62 +583,154 @@ describe('Comment', () => {
 			const request = buildDeferred();
 
 			likeComment.mockReturnValue(request.promise);
-			const { onReload } = renderComment();
+			const { onLikeChange } = renderComment();
 
 			await user.dblClick(screen.getByRole('button', { name: 'Like comment' }));
 
 			expect(likeComment).toHaveBeenCalledTimes(1);
+			expect(onLikeChange).toHaveBeenCalledTimes(1);
 
 			request.resolve({});
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
+			expect(onLikeChange).toHaveBeenCalledTimes(1);
+		});
+
+		it('ignores clicks on the heart while a request is pending, so the like is not undone', async () => {
+			const request = buildDeferred();
+
+			likeComment.mockReturnValue(request.promise);
+			renderComment({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
+			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
+
+			expect(unlikeComment).not.toHaveBeenCalled();
+			expect(screen.getByRole('button', { name: 'Unlike comment' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+
+			request.resolve({});
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
+		});
+
+		it('shows the heart pressed and the new like count before the like request resolves', async () => {
+			const request = buildDeferred();
+
+			likeComment.mockReturnValue(request.promise);
+			renderComment({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
+
+			expect(screen.getByRole('button', { name: 'Unlike comment' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+
+			request.resolve({});
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
+		});
+
+		it('reports the like change before the like request resolves', async () => {
+			const request = buildDeferred();
+
+			likeComment.mockReturnValue(request.promise);
+			const { onLikeChange } = renderComment();
+
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
+
+			expect(onLikeChange).toHaveBeenCalledWith({ commentId: 'c1', userId: 'user1', isLiked: true });
+			expect(likeComment).toHaveBeenCalledWith({ commentId: 'c1' });
+
+			request.resolve({});
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
+		});
+
+		it('shows the heart unpressed and the new like count before the unlike request resolves', async () => {
+			const request = buildDeferred();
+
+			unlikeComment.mockReturnValue(request.promise);
+			renderComment({ comment: { ...baseComment, likes: ['user1', 'user9'] }, isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
+
+			expect(screen.getByRole('button', { name: 'Like comment' })).toHaveAttribute('aria-pressed', 'false');
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+
+			request.resolve({});
+			await waitFor(() => expect(unlikeComment).toHaveBeenCalledTimes(1));
+		});
+
+		it('shows a reply heart pressed before the like request resolves, leaving the parent comment unchanged', async () => {
+			const request = buildDeferred();
+
+			likeComment.mockReturnValue(request.promise);
+			renderComment({ comment: { ...baseComment, replies }, isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
+			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
+
+			const [parentHeart, repliedHeart, otherReplyHeart] = screen.getAllByRole('button', { name: /like comment/i });
+
+			expect(parentHeart).toHaveAttribute('aria-pressed', 'false');
+			expect(repliedHeart).toHaveAttribute('aria-pressed', 'true');
+			expect(otherReplyHeart).toHaveAttribute('aria-pressed', 'false');
+
+			request.resolve({});
+			await waitFor(() => expect(likeComment).toHaveBeenCalledWith({ commentId: 'r1' }));
 		});
 
 		it('allows liking again after the previous request finished', async () => {
 			likeComment.mockResolvedValue({});
-			const { onReload } = renderComment();
+			const { onLikeChange } = renderComment();
 
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(2));
 		});
 
-		it('shows the like fallback copy as a toast when the request fails', async () => {
-			likeComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			const { onReload } = renderComment();
+		it.each([
+			['a request error', { code: 'INTERNAL_ERROR', status: 500 }],
+			['a comment that no longer exists', { code: 'COMMENT_NOT_FOUND', status: 404 }],
+			['a failure that is not a request error', new Error('network down')],
+		])('keeps the like and shows no toast when the like fails with %s', async (_description, failure) => {
+			likeComment.mockRejectedValue(failure);
+			const { onReload, endSession } = renderComment({ isStateful: true });
 
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
 
-			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Unlike comment' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
 			expect(onReload).not.toHaveBeenCalled();
+			expect(endSession).not.toHaveBeenCalled();
 		});
 
-		it('shows the like fallback copy as a toast when the failure is not a request error', async () => {
-			likeComment.mockRejectedValue(new Error('network down'));
-			renderComment();
-
-			await user.click(screen.getByRole('button', { name: 'Like comment' }));
-
-			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
-		});
-
-		it('shows the COMMENT_NOT_FOUND copy as a toast when the comment no longer exists', async () => {
-			likeComment.mockRejectedValue({ code: 'COMMENT_NOT_FOUND', status: 404 });
-			renderComment();
-
-			await user.click(screen.getByRole('button', { name: 'Like comment' }));
-
-			expect(await screen.findByText('This comment no longer exists')).toBeInTheDocument();
-		});
-
-		it('shows the like fallback copy as a toast when unliking fails', async () => {
-			unlikeComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			renderComment({ comment: { ...baseComment, likes: ['user1'] } });
+		it.each([
+			['a request error', { code: 'INTERNAL_ERROR', status: 500 }],
+			['a comment that no longer exists', { code: 'COMMENT_NOT_FOUND', status: 404 }],
+			['a failure that is not a request error', new Error('network down')],
+		])('keeps the unlike and shows no toast when the unlike fails with %s', async (_description, failure) => {
+			unlikeComment.mockRejectedValue(failure);
+			const { endSession } = renderComment({ comment: { ...baseComment, likes: ['user1'] }, isStateful: true });
 
 			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
+			await waitFor(() => expect(unlikeComment).toHaveBeenCalledTimes(1));
 
-			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Like comment' })).toHaveAttribute('aria-pressed', 'false');
+			expect(screen.getByText('0 likes')).toBeInTheDocument();
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			expect(endSession).not.toHaveBeenCalled();
+		});
+
+		it('reports the like change once when the like request fails', async () => {
+			likeComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			const { onLikeChange } = renderComment();
+
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
+
+			expect(onLikeChange).toHaveBeenCalledTimes(1);
+			expect(onLikeChange).toHaveBeenCalledWith({ commentId: 'c1', userId: 'user1', isLiked: true });
 		});
 
 		it('ends the session and shows no toast when the like fails with UNAUTHENTICATED', async () => {
@@ -555,28 +740,52 @@ describe('Comment', () => {
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
-			expect(screen.queryByText("Couldn't update your like. Try again.")).not.toBeInTheDocument();
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+		});
+
+		it('ends the session and shows no toast when the unlike fails with UNAUTHENTICATED', async () => {
+			unlikeComment.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			const { endSession } = renderComment({ comment: { ...baseComment, likes: ['user1'] } });
+
+			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
+
+			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
 		});
 
 		it('allows liking again after a failure', async () => {
 			likeComment.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce({});
-			renderComment();
+			const { onLikeChange } = renderComment();
 
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
-			await screen.findByText("Couldn't update your like. Try again.");
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
 			await user.click(screen.getByRole('button', { name: 'Like comment' }));
 
 			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(2));
+			expect(onLikeChange).toHaveBeenCalledTimes(2);
+		});
+
+		it('unlikes on the next click after a like failed, since the heart kept the like', async () => {
+			likeComment.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			unlikeComment.mockResolvedValue({});
+			renderComment({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like comment' }));
+			await waitFor(() => expect(likeComment).toHaveBeenCalledTimes(1));
+			await user.click(screen.getByRole('button', { name: 'Unlike comment' }));
+
+			await waitFor(() => expect(unlikeComment).toHaveBeenCalledWith({ commentId: 'c1' }));
+			expect(await screen.findByRole('button', { name: 'Like comment' })).toHaveAttribute('aria-pressed', 'false');
 		});
 
 		it('likes a reply the same way', async () => {
 			likeComment.mockResolvedValue({});
-			const { onReload } = renderComment({ comment: { ...baseComment, replies } });
+			const { onLikeChange } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
-			await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
+			await waitFor(() => expect(onLikeChange).toHaveBeenCalledTimes(1));
 			expect(likeComment).toHaveBeenCalledWith({ commentId: 'r1' });
 		});
 	});
@@ -609,7 +818,7 @@ describe('Comment', () => {
 		it('focuses the reply box opened under a reply', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveFocus();
@@ -643,7 +852,7 @@ describe('Comment', () => {
 		it('prefills the reply box of a reply with the @username of the author of that reply', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 
 			expect(screen.getByPlaceholderText('Write a reply...')).toHaveValue('@bob ');
@@ -652,7 +861,7 @@ describe('Comment', () => {
 		it('opens the reply box under the reply that was clicked', async () => {
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(within(container.querySelectorAll('.comment-reply')[1]).getByRole('button', { name: 'Reply' }));
 
 			expect(within(container.querySelectorAll('.comment-reply')[1]).getByPlaceholderText('Write a reply...')).toHaveValue('@carol ');
@@ -699,7 +908,7 @@ describe('Comment', () => {
 			addComment.mockResolvedValue({ _id: 'r9' });
 			const { container } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
 			await user.click(screen.getByRole('button', { name: 'Post' }));
@@ -720,7 +929,7 @@ describe('Comment', () => {
 			addComment.mockResolvedValue(savedReply);
 			const { container, onReload } = renderComment({ comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 			await user.type(screen.getByPlaceholderText('Write a reply...'), 'Agreed');
 			await user.click(screen.getByRole('button', { name: 'Post' }));
@@ -891,7 +1100,7 @@ describe('Comment', () => {
 		it('sends the guest to /log-in when Reply on a reply is clicked, opening no reply box', async () => {
 			const { container } = renderComment({ user: null, comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(within(container.querySelectorAll('.comment-reply')[0]).getByRole('button', { name: 'Reply' }));
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
@@ -901,7 +1110,7 @@ describe('Comment', () => {
 		it('sends the guest to /log-in when the heart of a reply is clicked', async () => {
 			renderComment({ user: null, comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 			await user.click(screen.getAllByRole('button', { name: 'Like comment' })[1]);
 
 			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2/posts#post1' } });
@@ -911,7 +1120,7 @@ describe('Comment', () => {
 		it('still lets the guest view the replies', async () => {
 			const { container } = renderComment({ user: null, comment: { ...baseComment, replies } });
 
-			await user.click(screen.getByRole('button', { name: 'View replies' }));
+			await user.click(screen.getByRole('button', { name: 'View replies (2)' }));
 
 			expect(getReplyTexts(container)).toEqual(['first reply', 'second reply']);
 			expect(mockNavigate).not.toHaveBeenCalled();
