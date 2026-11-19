@@ -5,7 +5,6 @@ jest.mock('../services', () => ({
 	storyService: {
 		addStory: jest.fn(),
 		getStoryTray: jest.fn(),
-		getUserStories: jest.fn(),
 		recordStoryView: jest.fn(),
 		getStoryViewers: jest.fn(),
 		deleteStory: jest.fn(),
@@ -82,7 +81,6 @@ describe('story routes', () => {
 		consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 		storyService.addStory.mockResolvedValue({ _id: STORY_ID });
 		storyService.getStoryTray.mockResolvedValue([{ isOwn: true }]);
-		storyService.getUserStories.mockResolvedValue({ user: { _id: AUTHOR_ID }, stories: [] });
 		storyService.recordStoryView.mockResolvedValue(undefined);
 		storyService.getStoryViewers.mockResolvedValue([{ _id: AUTHOR_ID, username: 'viewer' }]);
 		storyService.deleteStory.mockResolvedValue(undefined);
@@ -96,7 +94,6 @@ describe('story routes', () => {
 		it.each([
 			['POST', '/stories'],
 			['GET', '/stories/tray'],
-			['GET', `/stories/user/${AUTHOR_ID}`],
 			['POST', `/stories/${STORY_ID}/view`],
 			['GET', `/stories/${STORY_ID}/viewers`],
 			['DELETE', `/stories/${STORY_ID}`],
@@ -162,27 +159,7 @@ describe('story routes', () => {
 		it('is not mistaken for a story id', async () => {
 			await fetch(`${baseUrl}/stories/tray`, { headers: authHeaders() });
 
-			expect(storyService.getUserStories).not.toHaveBeenCalled();
 			expect(storyService.deleteStory).not.toHaveBeenCalled();
-		});
-	});
-
-	describe('GET /stories/user/:userId', () => {
-		it("asks for the author's stories on behalf of the signed-in user", async () => {
-			const response = await fetch(`${baseUrl}/stories/user/${AUTHOR_ID}`, { headers: authHeaders() });
-
-			expect(response.status).toBe(200);
-			expect(storyService.getUserStories).toHaveBeenCalledWith({ authorId: AUTHOR_ID, requesterId: USER_ID });
-		});
-
-		it('answers 404 USER_NOT_FOUND when the service says so', async () => {
-			storyService.getUserStories.mockRejectedValue(new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND }));
-
-			const response = await fetch(`${baseUrl}/stories/user/${AUTHOR_ID}`, { headers: authHeaders() });
-			const body = await response.json();
-
-			expect(response.status).toBe(404);
-			expect(body.code).toBe(ERROR_CODES.USER_NOT_FOUND);
 		});
 	});
 

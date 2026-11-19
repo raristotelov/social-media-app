@@ -723,9 +723,10 @@ describe('visitor visibility against a real database', () => {
 		});
 
 		it('should leave visitors out of the viewer count of the own stories', async () => {
-			const { stories } = await getJson(`/stories/user/${world.r1._id}`, { as: world.r1 });
+			const tray = await getJson('/stories/tray', { as: world.r1 });
+			const ownEntry = tray.find((entry) => entry.isOwn);
 
-			expect(stories[0].viewersCount).toBe(1);
+			expect(ownEntry.stories[0].viewersCount).toBe(1);
 		});
 
 		it('should leave other visitors out of the viewers of a visitor story', async () => {
@@ -735,9 +736,10 @@ describe('visitor visibility against a real database', () => {
 		});
 
 		it('should leave other visitors out of the viewer count of the own stories of a visitor', async () => {
-			const { stories } = await getJson(`/stories/user/${world.v1._id}`, { as: world.v1 });
+			const tray = await getJson('/stories/tray', { as: world.v1 });
+			const ownEntry = tray.find((entry) => entry.isOwn);
 
-			expect(stories[0].viewersCount).toBe(2);
+			expect(ownEntry.stories[0].viewersCount).toBe(2);
 		});
 	});
 
@@ -773,7 +775,6 @@ describe('visitor visibility against a real database', () => {
 			['liking a comment of a visitor', () => [`/comments/${world.cV1._id}/like`, 'POST'], NOT_FOUND.comment],
 			['unliking a comment of a visitor', () => [`/comments/${world.cV1._id}/unlike`, 'POST'], NOT_FOUND.comment],
 			['liking a comment on the post of a visitor', async () => [`/comments/${(await visitorComment())._id}/like`, 'POST'], NOT_FOUND.comment],
-			['opening the stories of a visitor', () => [`/stories/user/${world.v1._id}`, 'GET'], NOT_FOUND.user],
 			['viewing a story of a visitor', () => [`/stories/${world.v1Story._id}/view`, 'POST'], ERROR_CODES.STORY_NOT_FOUND],
 			['listing the viewers of a story of a visitor', () => [`/stories/${world.v1Story._id}/viewers`, 'GET'], ERROR_CODES.STORY_NOT_FOUND],
 			['deleting a story of a visitor', () => [`/stories/${world.v1Story._id}`, 'DELETE'], ERROR_CODES.STORY_NOT_FOUND],
@@ -908,7 +909,10 @@ describe('visitor visibility against a real database', () => {
 			});
 
 			it('should open their own stories, their viewers and record no view of their own', async () => {
-				expect((await send(`/stories/user/${world.v1._id}`, world.v1)).status).toBe(200);
+				const tray = await getJson('/stories/tray', { as: world.v1 });
+				const ownEntry = tray.find((entry) => entry.isOwn);
+
+				expect(ownEntry.stories.map((story) => story._id)).toEqual([String(world.v1Story._id)]);
 				expect((await send(`/stories/${world.v1Story._id}/viewers`, world.v1)).status).toBe(200);
 				expect((await send(`/stories/${world.v1Story._id}/view`, world.v1, 'POST')).status).toBe(204);
 			});
@@ -958,8 +962,12 @@ describe('visitor visibility against a real database', () => {
 				expect((await send(`/users/${world.r2._id}/follow/${world.r1._id}`, world.r2, 'POST')).status).toBe(200);
 				expect((await send(`/user-posts/like/${world.p3Post._id}`, world.r1, 'POST')).status).toBe(200);
 				expect((await send('/comments', world.r1, 'POST', { userPostId: String(world.p3Post._id), text: 'hi' })).status).toBe(200);
-				expect((await send(`/stories/user/${world.r1._id}`, world.r2)).status).toBe(200);
 				expect((await send(`/comments/${world.cR1._id}/likes`)).status).toBe(200);
+
+				const tray = await getJson('/stories/tray', { as: world.r2 });
+				const regularEntry = tray.find((entry) => entry.user._id === String(world.r1._id));
+
+				expect(regularEntry.stories.map((story) => story._id)).toEqual([String(world.r1Story._id)]);
 			});
 
 			it('should still let a visitor reply to a comment of a regular user', async () => {

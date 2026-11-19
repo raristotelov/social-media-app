@@ -174,8 +174,8 @@ export const publicIdFromImageUrl = (imageUrl) => new URL(imageUrl).pathname.rep
 export const getStoryTrayViaApi = (session) =>
 	apiRequest({ method: 'GET', url: `${serverUrl}/stories/tray`, headers: authHeaders(session) }).then((response) => response.body);
 
-export const getUserStoriesViaApi = (session, userId) =>
-	apiRequest({ method: 'GET', url: `${serverUrl}/stories/user/${userId}`, headers: authHeaders(session) }).then((response) => response.body);
+export const getTrayStoriesViaApi = (session, userId) =>
+	getStoryTrayViaApi(session).then((tray) => tray.find((entry) => entry.user._id === userId)?.stories ?? []);
 
 export const recordStoryViewViaApi = (session, storyId) =>
 	apiRequest({ method: 'POST', url: `${serverUrl}/stories/${storyId}/view`, headers: authHeaders(session) });

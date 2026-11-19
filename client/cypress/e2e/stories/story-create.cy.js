@@ -5,7 +5,7 @@ import {
 	visitAsUser,
 	userIdFromSession,
 	uploadStoryViaApi,
-	getUserStoriesViaApi,
+	getTrayStoriesViaApi,
 	getProfileViaApi,
 } from '../../support/api';
 
@@ -69,7 +69,7 @@ describe('creating a story', () => {
 		cy.get('button[aria-label="View your story"]').should('be.visible');
 		cy.get('button[aria-label="Add to your story"]').should('be.visible');
 
-		cy.then(() => getUserStoriesViaApi(session, userId)).then(({ stories }) => {
+		cy.then(() => getTrayStoriesViaApi(session, userId)).then((stories) => {
 			expect(stories).to.have.length(1);
 			expect(stories[0].imageUrl).to.match(/^https:\/\/res\.cloudinary\.com\//);
 		});

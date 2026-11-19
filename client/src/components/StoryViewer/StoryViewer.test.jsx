@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { deleteStory, getStoryViewers, getUserStories, markStoryViewed } from '../../services/storyService';
+import { deleteStory, getStoryTray, getStoryViewers, markStoryViewed } from '../../services/storyService';
 import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBottomSheetEnvironment } from '../../testUtils/bottomSheet';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
@@ -12,7 +12,6 @@ import StoryViewer from './StoryViewer';
 
 vi.mock('../../services/storyService');
 
-const LOAD_ERROR_TOAST = "Couldn't load stories. Try again.";
 const DELETE_ERROR_TOAST = "Couldn't delete your story. Try again.";
 
 const minutesAgoIso = (minutes) => new Date(Date.now() - minutes * 60 * 1000 - 1000).toISOString();
@@ -33,9 +32,14 @@ const buildStoriesByUser = () => ({
 });
 
 const buildQueue = () => [
-	{ user: { _id: 'me', username: 'me' }, isOwn: true, isWatched: true },
-	{ user: { _id: 'alice', username: 'alice', profilePicture: { imageUrl: 'https://example.com/alice.jpg' } }, isOwn: false, isWatched: false },
-	{ user: { _id: 'bob', username: 'bob' }, isOwn: false, isWatched: false },
+	{ user: { _id: 'me', username: 'me' }, isOwn: true, isWatched: true, stories: storiesByUser.me },
+	{
+		user: { _id: 'alice', username: 'alice', profilePicture: { imageUrl: 'https://example.com/alice.jpg' } },
+		isOwn: false,
+		isWatched: false,
+		stories: storiesByUser.alice,
+	},
+	{ user: { _id: 'bob', username: 'bob' }, isOwn: false, isWatched: false, stories: storiesByUser.bob },
 ];
 
 const buildDeferred = () => {
@@ -89,7 +93,6 @@ describe('StoryViewer', () => {
 		vi.resetAllMocks();
 		user = userEvent.setup();
 		storiesByUser = buildStoriesByUser();
-		getUserStories.mockImplementation(({ userId }) => Promise.resolve({ user: { _id: userId }, stories: storiesByUser[userId] }));
 		markStoryViewed.mockResolvedValue({});
 		getStoryViewers.mockResolvedValue([]);
 		deleteStory.mockResolvedValue({});
@@ -102,20 +105,31 @@ describe('StoryViewer', () => {
 			expect(getViewer()).toHaveAttribute('aria-modal', 'true');
 		});
 
-		it("requests the stories of the user it starts on, with the token, and nobody else's", async () => {
+		it('sends no request when it opens, because the queue already carries the stories', async () => {
+			const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
 			await openViewer({ startIndex: 1 });
 
-			expect(getUserStories).toHaveBeenCalledTimes(1);
-			expect(getUserStories).toHaveBeenCalledWith({ userId: 'alice' });
+			expect(fetchSpy).not.toHaveBeenCalled();
+			expect(getStoryTray).not.toHaveBeenCalled();
+			expect(markStoryViewed).not.toHaveBeenCalled();
+			expect(getStoryViewers).not.toHaveBeenCalled();
+			expect(deleteStory).not.toHaveBeenCalled();
+
+			fetchSpy.mockRestore();
 		});
 
-		it('shows a spinner and no photo while the stories load', () => {
-			getUserStories.mockReturnValue(new Promise(() => {}));
-
+		it('shows the first photo straight away, with no spinner', () => {
 			renderViewer();
 
-			expect(document.querySelector('.loading-spinner')).toBeInTheDocument();
-			expect(screen.queryByAltText(/^Story by/)).not.toBeInTheDocument();
+			expect(screen.getByAltText('Story by alice')).toBeInTheDocument();
+			expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
+		});
+
+		it('shows no toast on open', async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(getToastText()).toBe('');
 		});
 
 		it("opens on the user's first unwatched story", async () => {
@@ -311,7 +325,6 @@ describe('StoryViewer', () => {
 			finishSegment();
 
 			expect(await screen.findByAltText('Story by bob')).toBeInTheDocument();
-			expect(getUserStories).toHaveBeenCalledWith({ userId: 'bob' });
 		});
 
 		it('starts the next user on their first unwatched story, not their first story', async () => {
@@ -432,17 +445,6 @@ describe('StoryViewer', () => {
 			await tapNext();
 
 			expect(onClose).toHaveBeenCalledTimes(1);
-		});
-
-		it('does not move a story that is still loading its user', async () => {
-			getUserStories.mockReturnValue(new Promise(() => {}));
-			const { onClose } = renderViewer({ startIndex: 1 });
-
-			await tapNext();
-			await tapPrevious();
-
-			expect(onClose).not.toHaveBeenCalled();
-			expect(getUserStories).toHaveBeenCalledTimes(1);
 		});
 
 		it('moves with a keyboard activation of the side buttons', async () => {
@@ -797,67 +799,6 @@ describe('StoryViewer', () => {
 			loadPhoto();
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
-		});
-	});
-
-	describe('when the stories cannot be loaded', () => {
-		it('closes the viewer and shows the load error toast', async () => {
-			getUserStories.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-
-			const { onClose } = renderViewer({ startIndex: 1 });
-
-			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
-		});
-
-		it('shows the same toast for a network failure', async () => {
-			getUserStories.mockRejectedValue(new Error('network down'));
-
-			const { onClose } = renderViewer({ startIndex: 1 });
-
-			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
-		});
-
-		it('shows the same toast when the user no longer exists', async () => {
-			getUserStories.mockRejectedValue({ code: 'USER_NOT_FOUND', status: 404 });
-
-			const { onClose } = renderViewer({ startIndex: 1 });
-
-			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
-		});
-
-		it('ends the session, with no toast, when the token is no longer valid', async () => {
-			getUserStories.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
-
-			const { onClose, endSession } = renderViewer({ startIndex: 1 });
-
-			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
-			expect(onClose).toHaveBeenCalledTimes(1);
-			expect(getToastText()).toBe('');
-		});
-
-		it('closes with the toast when the next user fails to load', async () => {
-			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
-			getUserStories.mockImplementation(({ userId }) =>
-				userId === 'bob'
-					? Promise.reject({ code: 'INTERNAL_ERROR', status: 500 })
-					: Promise.resolve({ user: { _id: userId }, stories: storiesByUser[userId] }),
-			);
-
-			const { onClose } = await openViewer({ startIndex: 1 });
-
-			await tapNext();
-
-			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
-		});
-
-		it('shows no toast when everything loads', async () => {
-			await openViewer({ startIndex: 1 });
-
-			expect(getToastText()).toBe('');
 		});
 	});
 

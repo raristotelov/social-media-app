@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { addStory, getStoryTray, getUserStories, markStoryViewed } from '../../services/storyService';
+import { addStory, getStoryTray, markStoryViewed } from '../../services/storyService';
 import { resizeImage } from '../../utils/images';
 import useStoryTray from '../../hooks/useStoryTray';
 
@@ -20,16 +20,6 @@ vi.mock('../../utils/images', async () => ({
 
 const loggedInUser = { _id: 'me', username: 'me', profilePicture: { imageUrl: 'https://example.com/me.jpg' } };
 
-const trayEntry = (id, overrides = {}) => ({
-	user: { _id: id, username: id, profilePicture: { imageUrl: `https://example.com/${id}.jpg` } },
-	isOwn: false,
-	isWatched: false,
-	latestStoryAt: '2026-10-22T10:00:00.000Z',
-	...overrides,
-});
-
-const ownEntry = trayEntry('me', { isOwn: true, isWatched: true });
-
 const buildStory = (id, overrides = {}) => ({
 	_id: id,
 	imageUrl: `https://example.com/${id}.jpg`,
@@ -38,6 +28,21 @@ const buildStory = (id, overrides = {}) => ({
 	createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
 	...overrides,
 });
+
+const trayEntry = (id, overrides = {}) => {
+	const isOwn = overrides.isOwn ?? false;
+
+	return {
+		user: { _id: id, username: id, profilePicture: { imageUrl: `https://example.com/${id}.jpg` } },
+		isOwn,
+		isWatched: false,
+		latestStoryAt: '2026-10-22T10:00:00.000Z',
+		stories: [buildStory(`${id}-1`, isOwn ? { viewersCount: 0 } : { isWatched: false })],
+		...overrides,
+	};
+};
+
+const ownEntry = trayEntry('me', { isOwn: true, isWatched: true });
 
 const TrayHost = () => {
 	const { entries, isLoaded, reload } = useStoryTray();
@@ -87,12 +92,6 @@ describe('StoriesTray', () => {
 		globalThis.URL.revokeObjectURL = vi.fn();
 		getStoryTray.mockResolvedValue([]);
 		markStoryViewed.mockResolvedValue({});
-		getUserStories.mockImplementation(({ userId }) =>
-			Promise.resolve({
-				user: { _id: userId, username: userId },
-				stories: [buildStory(`${userId}-1`, userId === 'me' ? { viewersCount: 0 } : { isWatched: false })],
-			}),
-		);
 	});
 
 	describe('given its entries as props', () => {
@@ -269,7 +268,6 @@ describe('StoriesTray', () => {
 			await user.click(await screen.findByRole('button', { name: 'Add to your story' }));
 
 			expect(screen.queryByRole('dialog', { name: 'Story viewer' })).not.toBeInTheDocument();
-			expect(getUserStories).not.toHaveBeenCalled();
 		});
 	});
 
@@ -284,7 +282,7 @@ describe('StoriesTray', () => {
 			await user.click(await screen.findByRole('button', { name: 'View your story' }));
 
 			expect(await screen.findByRole('dialog', { name: 'Story viewer' })).toBeInTheDocument();
-			expect(getUserStories).toHaveBeenCalledWith({ userId: 'me' });
+			expect(screen.getByAltText('Story by me')).toHaveAttribute('src', 'https://example.com/me-1.jpg');
 		});
 
 		it('opens Create on the Story tab, not the viewer, when the plus is tapped', async () => {
@@ -313,8 +311,8 @@ describe('StoriesTray', () => {
 			await user.click(await screen.findByRole('button', { name: "View bob's story" }));
 
 			expect(await screen.findByLabelText('Story viewer')).toBeInTheDocument();
-			await waitFor(() => expect(getUserStories).toHaveBeenCalledWith({ userId: 'bob' }));
-			expect(getUserStories).not.toHaveBeenCalledWith(expect.objectContaining({ userId: 'alice' }));
+			expect(screen.getByAltText('Story by bob')).toHaveAttribute('src', 'https://example.com/bob-1.jpg');
+			expect(screen.queryByAltText('Story by alice')).not.toBeInTheDocument();
 		});
 
 		it('opens the right user when your own circle also has a story', async () => {

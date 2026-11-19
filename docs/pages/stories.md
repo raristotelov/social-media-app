@@ -28,11 +28,11 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 - Your own circle always has the grey ring (design).
 - The tray also shows on the empty feed (design), so a user who follows nobody can still post a story.
 - Loading: an empty tray card of the same height. Load failure: stays empty, no error.
+- The tray response carries each user's active stories, so opening the viewer sends no request.
 - The tray loads in parallel with the feed and shows straight away; while the posts load, a spinner sits under the tray (no full-page spinner). A feed load error still replaces the whole page, tray included.
 
 ## Errors
 
-- Opening a user's stories fails: close the viewer, error toast "Couldn't load stories. Try again."
 - Deleting a story fails: close the confirmation, resume, error toast "Couldn't delete your story. Try again."
 - Recording a view fails: silent.
 

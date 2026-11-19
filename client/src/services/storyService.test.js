@@ -1,5 +1,5 @@
 import { requestFactory } from './requester';
-import { addStory, deleteStory, getStoryTray, getStoryViewers, getUserStories, markStoryViewed } from './storyService';
+import { addStory, deleteStory, getStoryTray, getStoryViewers, markStoryViewed } from './storyService';
 
 vi.mock('./requester');
 
@@ -45,19 +45,6 @@ describe('storyService', () => {
 
 			expect(requestFactory).toHaveBeenCalledWith();
 			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/stories\/tray$/));
-		});
-	});
-
-	describe('getUserStories', () => {
-		it("gets that user's stories endpoint", async () => {
-			const get = vi.fn().mockResolvedValue({ user: {}, stories: [] });
-
-			requestFactory.mockReturnValue({ get });
-
-			await expect(getUserStories({ userId: 'user7' })).resolves.toEqual({ user: {}, stories: [] });
-
-			expect(requestFactory).toHaveBeenCalledWith();
-			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/stories\/user\/user7$/));
 		});
 	});
 
