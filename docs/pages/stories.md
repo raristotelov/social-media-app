@@ -40,6 +40,7 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 
 - Opens on the user's first unwatched story (their first story if all are watched). Moving on to the next user uses the same rule.
 - A story whose photo fails to load is skipped straight away.
+- Once a story's photo has loaded, the next story's photo and the next user's starting photo are preloaded.
 - A story counts as watched once its photo has loaded on screen, even if you tap past it before 5 seconds. A story whose photo never loaded does not count.
 - Each story shows for 5 seconds from when its photo has loaded; its progress segment fills, then it advances. The unwatched part of a segment is white at 35%.
 - After a user's last story it continues to the next user in the tray; after the last user it closes.

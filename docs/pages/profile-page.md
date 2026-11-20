@@ -73,7 +73,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 
 - No picture: empty round input with add-profile-picture icon; click opens the file picker. — Built
 - Same validation, 2048px resize, server upload and Submit disabled in flight as the Upload Picture popup (shared `ImageInput`). — Built (#15)
-- Has picture: hover "Change" overlay. — Built
+- Has picture: hover "Change" overlay, mouse only (none on touch screens). — Built
 - Has picture: clicking the picture opens the file picker on every device. — Built
 - Has picture: small × button (24px, top-right of the picture, always visible) removes it. Hover flips its colours: `text/primary` circle and border, `background/surface` ×. — Built
 - Removal only takes effect on Save; Cancel leaves the picture untouched; no separate confirmation. After removal the form shows the empty input. — Built

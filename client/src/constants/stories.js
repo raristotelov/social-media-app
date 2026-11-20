@@ -27,7 +27,6 @@ export const STORY_VIEWER_OVERLAYS = Object.freeze({
 
 export const STORY_START_TARGETS = Object.freeze({
 	FIRST_UNWATCHED: 'first-unwatched',
-	FIRST: 'first',
 	LAST: 'last',
 });
 

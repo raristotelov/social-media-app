@@ -348,6 +348,45 @@ describe('StoryViewer', () => {
 			expect(getPhotoName()).toBe('b1');
 		});
 
+		it('restarts the next user on their first story not yet watched in this session after going back and forward again', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: false }), buildStory('b2', { isWatched: false })];
+
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			await tapNext();
+			await screen.findByAltText('Story by bob');
+			expect(getPhotoName()).toBe('b1');
+			loadPhoto();
+			await tapNext();
+			expect(getPhotoName()).toBe('b2');
+			await tapPrevious();
+			await tapPrevious();
+			await screen.findByAltText('Story by alice');
+
+			await tapNext();
+
+			await screen.findByAltText('Story by bob');
+			expect(getPhotoName()).toBe('b2');
+		});
+
+		it('keeps starting the next user on their first story when its photo never loaded in this session', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: false }), buildStory('b2', { isWatched: false })];
+
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			await tapNext();
+			await screen.findByAltText('Story by bob');
+			await tapPrevious();
+			await screen.findByAltText('Story by alice');
+
+			await tapNext();
+
+			await screen.findByAltText('Story by bob');
+			expect(getPhotoName()).toBe('b1');
+		});
+
 		it('closes after the last story of the last user', async () => {
 			const { onClose } = await openViewer({ startIndex: 2 });
 
@@ -647,6 +686,131 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 1 });
 
 			expect(document.querySelector('.story-viewer-media-blur')).toBeInTheDocument();
+		});
+	});
+
+	describe('preloading the upcoming photos', () => {
+		let preloadedUrls;
+
+		const url = (id) => `https://example.com/${id}.jpg`;
+
+		beforeEach(() => {
+			preloadedUrls = [];
+
+			class FakeImage {
+				set src(value) {
+					preloadedUrls.push(value);
+				}
+			}
+
+			vi.stubGlobal('Image', FakeImage);
+		});
+
+		afterEach(() => {
+			vi.unstubAllGlobals();
+		});
+
+		it('preloads nothing before the current photo has loaded', async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(preloadedUrls).toEqual([]);
+		});
+
+		it("preloads the next story and the next user's starting story once the photo has loaded", async () => {
+			await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('a3'), url('b2')]);
+		});
+
+		it("preloads only the next user's starting story on the last story of a user", async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('b2')]);
+		});
+
+		it("preloads the next user's first story when all of theirs are watched", async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: true }), buildStory('b2', { isWatched: true })];
+			await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('b1')]);
+		});
+
+		it("preloads the next user's first story not yet watched in this session after going back and forward again", async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: false }), buildStory('b2', { isWatched: false })];
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			expect(preloadedUrls).toEqual([url('b1')]);
+			await tapNext();
+			await screen.findByAltText('Story by bob');
+			loadPhoto();
+			await tapPrevious();
+			await screen.findByAltText('Story by alice');
+			preloadedUrls.length = 0;
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('b2')]);
+		});
+
+		it('preloads nothing on the last story of the last user', async () => {
+			await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([]);
+		});
+
+		it('preloads the new upcoming photos after moving on and loading the next photo', async () => {
+			storiesByUser.alice = [
+				buildStory('a1', { isWatched: false }),
+				buildStory('a2', { isWatched: false }),
+				buildStory('a3', { isWatched: false }),
+			];
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			preloadedUrls.length = 0;
+
+			await tapNext();
+			expect(preloadedUrls).toEqual([]);
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('a3'), url('b2')]);
+		});
+
+		it("preloads the next user's starting story after moving on to the next user", async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: false }), buildStory('b2', { isWatched: false })];
+			storiesByUser.carol = [buildStory('c1', { isWatched: false })];
+			const queue = [
+				...buildQueue(),
+				{ user: { _id: 'carol', username: 'carol' }, isOwn: false, isWatched: false, stories: storiesByUser.carol },
+			];
+			await openViewer({ queue, startIndex: 1 });
+			loadPhoto();
+			preloadedUrls.length = 0;
+
+			finishSegment();
+			await screen.findByAltText('Story by bob');
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('b2'), url('c1')]);
+		});
+
+		it('preloads nothing for a photo that fails to load', async () => {
+			await openViewer({ startIndex: 1 });
+
+			fireEvent.error(getPhoto());
+
+			expect(preloadedUrls).toEqual([]);
 		});
 	});
 

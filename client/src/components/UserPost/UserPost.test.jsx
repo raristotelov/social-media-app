@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
@@ -452,6 +452,47 @@ describe('UserPost', () => {
 
 			request.resolve({ _id: 'post1', likes: [] });
 			await waitFor(() => expect(unlikeUserPost).toHaveBeenCalledTimes(1));
+		});
+
+		describe('when the heart is liked again within the pulse duration', () => {
+			const HEART_PULSE_DURATION_MS = 500;
+
+			beforeEach(() => {
+				vi.useFakeTimers();
+			});
+
+			afterEach(() => {
+				vi.useRealTimers();
+			});
+
+			const clickHeart = async (name) => {
+				await act(async () => {
+					fireEvent.click(screen.getByRole('button', { name }));
+				});
+			};
+
+			const advance = (ms) =>
+				act(async () => {
+					await vi.advanceTimersByTimeAsync(ms);
+				});
+
+			it('keeps the pulse for the full duration after the last like', async () => {
+				likeUserPost.mockResolvedValue({ _id: 'post1', likes: ['user1'] });
+				unlikeUserPost.mockResolvedValue({ _id: 'post1', likes: [] });
+				renderPost({ isStateful: true });
+
+				await clickHeart('Like post');
+				await advance(200);
+				await clickHeart('Unlike post');
+				await advance(200);
+				await clickHeart('Like post');
+
+				await advance(HEART_PULSE_DURATION_MS - 1);
+				expect(screen.getByRole('button', { name: 'Unlike post' })).toHaveClass('user-post-like-button-pulse');
+
+				await advance(1);
+				expect(screen.getByRole('button', { name: 'Unlike post' })).not.toHaveClass('user-post-like-button-pulse');
+			});
 		});
 
 		it('applies the likes returned by the server, including likes from other people', async () => {

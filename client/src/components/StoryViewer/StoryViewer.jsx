@@ -13,7 +13,8 @@ import {
 	STORY_VIEWER_OVERLAYS,
 } from '../../constants/stories';
 import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
-import { formatStoryAge, getStartStoryIndex, isStoryAspectRatio } from '../../utils/stories';
+import { preloadImage } from '../../utils/images';
+import { formatStoryAge, getStartStoryIndex, getUpcomingStories, isStoryAspectRatio } from '../../utils/stories';
 
 import DeletePostConfirm from '../DeletePostConfirm/DeletePostConfirm';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
@@ -100,6 +101,14 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		}
 	}, [userStories, storyIndex, advanceToNextUser]);
 
+	useEffect(() => {
+		if (!isPhotoLoaded) {
+			return;
+		}
+
+		getUpcomingStories({ queue, storiesByUserId, userIndex, storyIndex }).forEach((story) => preloadImage(story.imageUrl));
+	}, [isPhotoLoaded, queue, storiesByUserId, userIndex, storyIndex]);
+
 	const handlePhotoLoad = () => {
 		setLoadedPhotoStoryId(currentStoryId);
 
@@ -108,6 +117,11 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		}
 
 		viewedStoryIdsRef.current.add(currentStoryId);
+
+		setStoriesByUserId((state) => ({
+			...state,
+			[userId]: state[userId].map((story) => (story._id === currentStoryId ? { ...story, isWatched: true } : story)),
+		}));
 
 		markStoryViewed({ storyId: currentStoryId }).catch(endSessionIfUnauthenticated);
 	};

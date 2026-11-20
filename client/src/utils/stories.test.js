@@ -1,4 +1,4 @@
-import { formatStoryAge, getStartStoryIndex, isStoryAspectRatio } from './stories';
+import { formatStoryAge, getStartStoryIndex, getUpcomingStories, isStoryAspectRatio } from './stories';
 
 const NOW = new Date('2026-10-22T12:00:00.000Z').getTime();
 const minutesAgo = (minutes) => new Date(NOW - minutes * 60 * 1000).toISOString();
@@ -67,10 +67,6 @@ describe('getStartStoryIndex', () => {
 		expect(getStartStoryIndex([], 'first-unwatched')).toBe(0);
 	});
 
-	it('starts on the first story for the "first" target even when it is watched', () => {
-		expect(getStartStoryIndex(stories, 'first')).toBe(0);
-	});
-
 	it('starts on the last story for the "last" target', () => {
 		expect(getStartStoryIndex(stories, 'last')).toBe(3);
 	});
@@ -79,8 +75,89 @@ describe('getStartStoryIndex', () => {
 		expect(getStartStoryIndex([], 'last')).toBe(0);
 	});
 
-	it('starts on the first story for an unknown target', () => {
-		expect(getStartStoryIndex(stories, 'something-else')).toBe(0);
+	it('starts on the first unwatched story for an unknown target', () => {
+		expect(getStartStoryIndex(stories, 'something-else')).toBe(2);
+	});
+
+	it('starts on the first unwatched story when no target is given', () => {
+		expect(getStartStoryIndex(stories)).toBe(2);
+	});
+});
+
+describe('getUpcomingStories', () => {
+	const story = (id, isWatched) => ({ _id: id, isWatched });
+
+	const buildQueue = (storiesByUserId) => Object.keys(storiesByUserId).map((id) => ({ user: { _id: id } }));
+
+	const getIds = (stories) => stories.map((entry) => entry._id);
+
+	const storiesByUserId = {
+		alice: [story('a1', true), story('a2', false), story('a3', false)],
+		bob: [story('b1', true), story('b2', false), story('b3', false)],
+	};
+
+	it("returns the user's next story and the next user's first unwatched story from the middle of a user", () => {
+		const result = getUpcomingStories({ queue: buildQueue(storiesByUserId), storiesByUserId, userIndex: 0, storyIndex: 0 });
+
+		expect(getIds(result)).toEqual(['a2', 'b2']);
+	});
+
+	it("returns only the next user's start story from the last story of a user", () => {
+		const result = getUpcomingStories({ queue: buildQueue(storiesByUserId), storiesByUserId, userIndex: 0, storyIndex: 2 });
+
+		expect(getIds(result)).toEqual(['b2']);
+	});
+
+	it('starts the next user on their first story when they are all watched', () => {
+		const watched = { ...storiesByUserId, bob: [story('b1', true), story('b2', true)] };
+
+		const result = getUpcomingStories({ queue: buildQueue(watched), storiesByUserId: watched, userIndex: 0, storyIndex: 2 });
+
+		expect(getIds(result)).toEqual(['b1']);
+	});
+
+	it('starts the next user on their first story when none are watched', () => {
+		const unwatched = { ...storiesByUserId, bob: [story('b1', false), story('b2', false)] };
+
+		const result = getUpcomingStories({ queue: buildQueue(unwatched), storiesByUserId: unwatched, userIndex: 0, storyIndex: 2 });
+
+		expect(getIds(result)).toEqual(['b1']);
+	});
+
+	it('returns only the next story of the user from the middle of the last user', () => {
+		const result = getUpcomingStories({ queue: buildQueue(storiesByUserId), storiesByUserId, userIndex: 1, storyIndex: 0 });
+
+		expect(getIds(result)).toEqual(['b2']);
+	});
+
+	it('returns nothing from the last story of the last user', () => {
+		const result = getUpcomingStories({ queue: buildQueue(storiesByUserId), storiesByUserId, userIndex: 1, storyIndex: 2 });
+
+		expect(result).toEqual([]);
+	});
+
+	it('skips a next user who has no stories', () => {
+		const withEmpty = { ...storiesByUserId, bob: [] };
+
+		const result = getUpcomingStories({ queue: buildQueue(withEmpty), storiesByUserId: withEmpty, userIndex: 0, storyIndex: 0 });
+
+		expect(getIds(result)).toEqual(['a2']);
+	});
+
+	it('returns nothing from the last story of a user when the next user has no stories', () => {
+		const withEmpty = { ...storiesByUserId, bob: [] };
+
+		const result = getUpcomingStories({ queue: buildQueue(withEmpty), storiesByUserId: withEmpty, userIndex: 0, storyIndex: 2 });
+
+		expect(result).toEqual([]);
+	});
+
+	it('looks at the user after the current one only, not further ahead', () => {
+		const three = { ...storiesByUserId, carol: [story('c1', false)] };
+
+		const result = getUpcomingStories({ queue: buildQueue(three), storiesByUserId: three, userIndex: 0, storyIndex: 2 });
+
+		expect(getIds(result)).toEqual(['b2']);
 	});
 });
 

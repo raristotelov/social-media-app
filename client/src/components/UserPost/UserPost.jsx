@@ -59,6 +59,8 @@ const UserPost = ({ userPostData, author, showActions = false, commentsOpenReque
 	const triggerHeartPulse = () => {
 		setIsHeartPulsing(true);
 
+		clearTimeout(heartPulseTimeoutRef.current);
+
 		heartPulseTimeoutRef.current = setTimeout(() => setIsHeartPulsing(false), HEART_PULSE_DURATION_MS);
 	};
 

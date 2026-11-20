@@ -377,10 +377,12 @@ describe('watching stories', () => {
 			cy.get('.stories-tray .story-circle-label').should('have.length', 3);
 			cy.wait('@storyReads');
 
-			openCircle(posterB.username);
-			waitForPhotoLoad();
+			cy.get('@storyReads.all').then((requestsBeforeOpening) => {
+				openCircle(posterB.username);
+				waitForPhotoLoad();
 
-			cy.get('@storyReads.all').should('have.length', 1);
+				cy.get('@storyReads.all').should('have.length', requestsBeforeOpening.length);
+			});
 		});
 	});
 

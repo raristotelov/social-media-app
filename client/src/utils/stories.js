@@ -17,14 +17,19 @@ export const getStartStoryIndex = (stories, target) => {
 		return Math.max(0, stories.length - 1);
 	}
 
-	if (target === STORY_START_TARGETS.FIRST_UNWATCHED) {
-		return Math.max(
-			0,
-			stories.findIndex((story) => story.isWatched === false),
-		);
-	}
+	return Math.max(
+		0,
+		stories.findIndex((story) => story.isWatched === false),
+	);
+};
 
-	return 0;
+export const getUpcomingStories = ({ queue, storiesByUserId, userIndex, storyIndex }) => {
+	const nextStoryOfUser = storiesByUserId[queue[userIndex].user._id][storyIndex + 1];
+	const nextUser = queue[userIndex + 1];
+	const nextUserStories = nextUser ? storiesByUserId[nextUser.user._id] : [];
+	const nextUserStartStory = nextUserStories[getStartStoryIndex(nextUserStories, STORY_START_TARGETS.FIRST_UNWATCHED)];
+
+	return [nextStoryOfUser, nextUserStartStory].filter(Boolean);
 };
 
 export const isStoryAspectRatio = ({ imageWidth, imageHeight }) =>
