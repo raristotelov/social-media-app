@@ -271,6 +271,17 @@ describe('watching stories', () => {
 			cy.get('.story-viewer').should('not.exist');
 			cy.get('.stories-tray').should('be.visible');
 		});
+
+		it('closes and opens the poster profile when their username is clicked', () => {
+			visitAsUser('/user-feed', viewerSession);
+			openCircle(posterB.username);
+			waitForPhotoLoad();
+
+			username().click();
+
+			cy.get('.story-viewer').should('not.exist');
+			cy.location('pathname').should('eq', `/user/${userIdFromSession(posterBSession)}`);
+		});
 	});
 
 	describe('watching all the way through', () => {

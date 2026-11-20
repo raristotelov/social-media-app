@@ -195,6 +195,19 @@
 	gap: 10px;
 }
 
+.story-viewer-poster-link {
+	min-width: 0;
+
+	display: flex;
+	align-items: center;
+	gap: 10px;
+
+	color: inherit;
+	text-decoration: none;
+
+	pointer-events: auto;
+}
+
 .story-viewer-avatar {
 	flex-shrink: 0;
 
@@ -231,7 +244,12 @@
 
 .story-viewer-icon-button:hover {
 	cursor: pointer;
-	opacity: 0.8;
+}
+
+@media (hover: hover) {
+	.story-viewer-icon-button:hover {
+		opacity: 0.8;
+	}
 }
 
 .story-viewer-header .story-viewer-icon-button svg {
@@ -278,7 +296,12 @@
 
 .story-viewer-seen-by:hover {
 	cursor: pointer;
-	opacity: 0.8;
+}
+
+@media (hover: hover) {
+	.story-viewer-seen-by:hover {
+		opacity: 0.8;
+	}
 }
 
 .story-viewer-arrow {
@@ -348,7 +371,12 @@
 
 	.story-viewer-arrow:hover {
 		cursor: pointer;
-		opacity: 0.8;
+	}
+
+	@media (hover: hover) {
+		.story-viewer-arrow:hover {
+			opacity: 0.8;
+		}
 	}
 
 	.story-viewer-arrow svg {

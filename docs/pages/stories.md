@@ -47,6 +47,7 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 - Each story shows for 5 seconds from when its photo has loaded; its progress segment fills, then it advances. The unwatched part of a segment is white at 35%.
 - After a user's last story it continues to the next user in the tray; after the last user it closes.
 - Tap left goes back, tap right goes forward; hold pauses. Back from a user's first story goes to the previous user's last story; on the very first story it does nothing. Desktop also has the side arrows (design).
+- The poster's picture and username link to their profile and close the viewer.
 - Time label next to the poster: "Nm" under an hour (minimum "1m"), then "Nh".
 - Stories are public to any logged-in user; the tray shows only followed users.
 - No reply input.

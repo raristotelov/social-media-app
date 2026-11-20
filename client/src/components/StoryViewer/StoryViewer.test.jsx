@@ -256,6 +256,87 @@ describe('StoryViewer', () => {
 		});
 	});
 
+	describe('the poster link', () => {
+		const getPosterLink = () => document.querySelector('.story-viewer-poster-link');
+
+		it("links to the current poster's profile", async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(getPosterLink()).toHaveAttribute('href', '/user/alice');
+		});
+
+		it('wraps the profile picture and the username', async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(getPosterLink()).toContainElement(document.querySelector('.story-viewer-avatar'));
+			expect(getPosterLink()).toContainElement(screen.getByText('alice'));
+		});
+
+		it('keeps the age label outside the link', async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(getPosterLink()).not.toContainElement(document.querySelector('.story-viewer-age'));
+		});
+
+		it('points at the next user once the viewer moves on to them', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			await openViewer({ startIndex: 1 });
+
+			await tapNext();
+
+			await screen.findByAltText('Story by bob');
+			expect(getPosterLink()).toHaveAttribute('href', '/user/bob');
+		});
+
+		it('points back at the previous user when moving back to them', async () => {
+			await openViewer({ startIndex: 2 });
+
+			await tapPrevious();
+			await tapPrevious();
+
+			await screen.findByAltText('Story by alice');
+			expect(getPosterLink()).toHaveAttribute('href', '/user/alice');
+		});
+
+		it('closes the viewer when clicked', async () => {
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			await user.click(getPosterLink());
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('closes the viewer when the username is clicked', async () => {
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			await user.click(screen.getByText('alice'));
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not move to another story when clicked', async () => {
+			await openViewer({ startIndex: 1 });
+
+			await user.click(getPosterLink());
+
+			expect(getPhotoName()).toBe('a2');
+		});
+
+		it('links to your own profile on your own story', async () => {
+			await openViewer({ startIndex: 0 });
+
+			expect(getPosterLink()).toHaveAttribute('href', '/user/me');
+		});
+
+		it('closes the viewer when clicked on your own story', async () => {
+			const { onClose } = await openViewer({ startIndex: 0 });
+
+			await user.click(getPosterLink());
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	describe('the time label', () => {
 		it.each([
 			['a few seconds old', 0.1, '1m'],

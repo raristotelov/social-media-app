@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 
 import ToastContext from '../../contexts/ToastContext';
 import useSessionGuard from '../../hooks/useSessionGuard';
@@ -280,9 +281,11 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 
 					<header className='story-viewer-header'>
 						<div className='story-viewer-poster'>
-							<ProfilePicture imageUrl={user.profilePicture?.imageUrl} className='story-viewer-avatar' />
+							<Link to={`/user/${userId}`} className='story-viewer-poster-link' onClick={onClose}>
+								<ProfilePicture imageUrl={user.profilePicture?.imageUrl} className='story-viewer-avatar' />
 
-							<span className='story-viewer-username'>{user.username}</span>
+								<span className='story-viewer-username'>{user.username}</span>
+							</Link>
 
 							{currentStory ? <span className='story-viewer-age'>{formatStoryAge(currentStory.createdAt)}</span> : null}
 						</div>
