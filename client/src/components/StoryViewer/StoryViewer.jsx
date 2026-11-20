@@ -235,12 +235,14 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 								onLoad={handlePhotoLoad}
 								onError={goToNext}
 							/>
+
+							{isPhotoLoaded ? null : (
+								<div className='story-viewer-loading'>
+									<LoadingSpinner />
+								</div>
+							)}
 						</div>
-					) : (
-						<div className='story-viewer-loading'>
-							<LoadingSpinner />
-						</div>
-					)}
+					) : null}
 
 					<div className='story-viewer-scrim story-viewer-scrim-top' />
 

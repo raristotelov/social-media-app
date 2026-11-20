@@ -51,6 +51,8 @@ const buildPost = (id, username, overrides = {}) => ({
 	...overrides,
 });
 
+const buildStory = (id, overrides = {}) => ({ _id: id, imageUrl: `https://example.com/${id}.jpg`, ...overrides });
+
 const feedPosts = [buildPost('post3', 'janedoe'), buildPost('post2', 'alice'), buildPost('post1', 'janedoe')];
 
 const feedPage = (posts) => ({ posts, hasMore: false, nextCursor: null });
@@ -108,8 +110,8 @@ describe('FeedView', () => {
 
 	describe('the stories tray', () => {
 		const trayEntries = [
-			{ user: { _id: 'user1', username: 'johndoe' }, isOwn: true, isWatched: true },
-			{ user: { _id: 'user2', username: 'alice' }, isOwn: false, isWatched: false },
+			{ user: { _id: 'user1', username: 'johndoe' }, isOwn: true, isWatched: true, stories: [buildStory('own1')] },
+			{ user: { _id: 'user2', username: 'alice' }, isOwn: false, isWatched: false, stories: [buildStory('a1', { isWatched: false })] },
 		];
 
 		it('is shown above the posts', async () => {
@@ -240,6 +242,132 @@ describe('FeedView', () => {
 
 			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
 			expect(screen.queryByRole('button', { name: 'Add to your story' })).not.toBeInTheDocument();
+		});
+	});
+
+	describe('preloading the story photos of the tray', () => {
+		let preloadedUrls;
+
+		const url = (id) => `https://example.com/${id}.jpg`;
+
+		const buildTrayEntry = (userId, stories) => ({ user: { _id: userId, username: userId }, isOwn: false, isWatched: false, stories });
+
+		const trayOfFive = [
+			buildTrayEntry('alice', [buildStory('a1', { isWatched: true }), buildStory('a2', { isWatched: false })]),
+			buildTrayEntry('bob', [buildStory('b1', { isWatched: true }), buildStory('b2', { isWatched: true })]),
+			buildTrayEntry('carol', [buildStory('c1', { isWatched: false })]),
+			buildTrayEntry('dave', [buildStory('d1', { isWatched: false })]),
+			buildTrayEntry('erin', [buildStory('e1', { isWatched: false })]),
+		];
+
+		beforeEach(() => {
+			preloadedUrls = [];
+
+			class FakeImage {
+				set src(value) {
+					preloadedUrls.push(value);
+				}
+			}
+
+			vi.stubGlobal('Image', FakeImage);
+		});
+
+		afterEach(() => {
+			vi.unstubAllGlobals();
+		});
+
+		it('preloads the starting photo of the first 3 users once the posts and the tray have loaded', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
+			getStoryTray.mockResolvedValue(trayOfFive);
+			renderFeed();
+
+			await screen.findAllByRole('article');
+
+			await waitFor(() => expect(preloadedUrls).toEqual([url('a2'), url('b1'), url('c1')]));
+		});
+
+		it('preloads nothing while the posts are still loading, even though the tray has loaded', async () => {
+			getFollowedUsersPosts.mockReturnValue(new Promise(() => {}));
+			getStoryTray.mockResolvedValue(trayOfFive);
+			renderFeed();
+
+			await screen.findByRole('button', { name: "View alice's story" });
+
+			expect(preloadedUrls).toEqual([]);
+		});
+
+		it('preloads nothing while the tray is still loading, even though the posts have loaded', async () => {
+			const trayRequest = buildDeferred();
+
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
+			getStoryTray.mockReturnValue(trayRequest.promise);
+			renderFeed();
+
+			await screen.findAllByRole('article');
+
+			expect(preloadedUrls).toEqual([]);
+
+			trayRequest.resolve(trayOfFive);
+
+			await waitFor(() => expect(preloadedUrls).toEqual([url('a2'), url('b1'), url('c1')]));
+		});
+
+		it('preloads once the posts arrive after the tray has already loaded', async () => {
+			const postsRequest = buildDeferred();
+
+			getFollowedUsersPosts.mockReturnValue(postsRequest.promise);
+			getStoryTray.mockResolvedValue(trayOfFive);
+			renderFeed();
+
+			await screen.findByRole('button', { name: "View alice's story" });
+
+			expect(preloadedUrls).toEqual([]);
+
+			postsRequest.resolve(feedPage(feedPosts));
+
+			await waitFor(() => expect(preloadedUrls).toEqual([url('a2'), url('b1'), url('c1')]));
+		});
+
+		it('preloads when the feed is empty too', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPage([]));
+			getStoryTray.mockResolvedValue(trayOfFive);
+			renderFeed();
+
+			await screen.findByRole('heading', { name: 'Your feed is empty' });
+
+			await waitFor(() => expect(preloadedUrls).toEqual([url('a2'), url('b1'), url('c1')]));
+		});
+
+		it('preloads the photos of the users there are when the tray has fewer than 3', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
+			getStoryTray.mockResolvedValue(trayOfFive.slice(0, 2));
+			renderFeed();
+
+			await screen.findAllByRole('article');
+
+			await waitFor(() => expect(preloadedUrls).toEqual([url('a2'), url('b1')]));
+		});
+
+		it('preloads nothing when the tray is empty', async () => {
+			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
+			getStoryTray.mockResolvedValue([]);
+			renderFeed();
+
+			await screen.findAllByRole('article');
+			await waitFor(() => expect(getStoryTray).toHaveBeenCalled());
+
+			expect(preloadedUrls).toEqual([]);
+		});
+
+		it('preloads nothing when the feed fails to load, even though the tray loaded', async () => {
+			getFollowedUsersPosts.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			getStoryTray.mockResolvedValue(trayOfFive);
+			renderFeed();
+
+			await screen.findByText("Couldn't load your feed");
+			await waitFor(() => expect(getStoryTray).toHaveBeenCalled());
+
+			expect(preloadedUrls).toEqual([]);
 		});
 	});
 
@@ -770,7 +898,9 @@ describe('FeedView', () => {
 		});
 
 		it('shows only "Your story" in the tray when following nobody', async () => {
-			getStoryTray.mockResolvedValue([{ user: { _id: 'user1', username: 'johndoe' }, isOwn: true, isWatched: true }]);
+			getStoryTray.mockResolvedValue([
+				{ user: { _id: 'user1', username: 'johndoe' }, isOwn: true, isWatched: true, stories: [buildStory('own1')] },
+			]);
 			renderFeed({ user: { ...loggedInUser, following: [] } });
 
 			await screen.findByRole('button', { name: 'View your story' });

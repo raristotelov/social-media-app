@@ -119,11 +119,79 @@ describe('StoryViewer', () => {
 			fetchSpy.mockRestore();
 		});
 
-		it('shows the first photo straight away, with no spinner', () => {
+		it('shows the first photo straight away', () => {
 			renderViewer();
 
 			expect(screen.getByAltText('Story by alice')).toBeInTheDocument();
-			expect(document.querySelector('.loading-spinner')).not.toBeInTheDocument();
+		});
+
+		describe('the photo loader', () => {
+			const getLoader = () => document.querySelector('.story-viewer-loading');
+
+			it('is in the DOM, with a spinner, until the photo has loaded', async () => {
+				await openViewer({ startIndex: 1 });
+
+				expect(getLoader()).toBeInTheDocument();
+				expect(getLoader().querySelector('.loading-spinner')).toBeInTheDocument();
+			});
+
+			it('sits inside the media wrapper of the current story', async () => {
+				await openViewer({ startIndex: 1 });
+
+				expect(getLoader().parentElement).toHaveClass('story-viewer-media');
+			});
+
+			it('is removed once the photo has loaded', async () => {
+				await openViewer({ startIndex: 1 });
+
+				loadPhoto();
+
+				expect(getLoader()).not.toBeInTheDocument();
+			});
+
+			it('comes back as a fresh loader when moving to the next story, until that photo loads', async () => {
+				await openViewer({ startIndex: 1 });
+				const firstLoader = getLoader();
+				loadPhoto();
+
+				await tapNext();
+
+				expect(firstLoader).not.toBeInTheDocument();
+				expect(getPhotoName()).toBe('a3');
+				expect(getLoader()).toBeInTheDocument();
+				expect(getLoader()).not.toBe(firstLoader);
+
+				loadPhoto();
+
+				expect(getLoader()).not.toBeInTheDocument();
+			});
+
+			it('comes back when moving to the previous story, until that photo loads', async () => {
+				await openViewer({ startIndex: 1 });
+				loadPhoto();
+
+				await tapPrevious();
+
+				expect(getPhotoName()).toBe('a1');
+				expect(getLoader()).toBeInTheDocument();
+
+				loadPhoto();
+
+				expect(getLoader()).not.toBeInTheDocument();
+			});
+
+			it('is removed after a failed photo skips ahead and the next photo loads', async () => {
+				await openViewer({ startIndex: 1 });
+
+				fireEvent.error(getPhoto());
+
+				expect(getPhotoName()).toBe('a3');
+				expect(getLoader()).toBeInTheDocument();
+
+				loadPhoto();
+
+				expect(getLoader()).not.toBeInTheDocument();
+			});
 		});
 
 		it('shows no toast on open', async () => {

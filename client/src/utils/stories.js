@@ -32,5 +32,11 @@ export const getUpcomingStories = ({ queue, storiesByUserId, userIndex, storyInd
 	return [nextStoryOfUser, nextUserStartStory].filter(Boolean);
 };
 
+export const getTrayStartStories = (entries, userCount) =>
+	entries
+		.slice(0, userCount)
+		.map((entry) => entry.stories[getStartStoryIndex(entry.stories, STORY_START_TARGETS.FIRST_UNWATCHED)])
+		.filter(Boolean);
+
 export const isStoryAspectRatio = ({ imageWidth, imageHeight }) =>
 	Math.abs(imageWidth / imageHeight - STORY_ASPECT_RATIO) <= STORY_ASPECT_RATIO_TOLERANCE;

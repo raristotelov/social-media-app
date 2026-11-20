@@ -29,6 +29,7 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 - The tray also shows on the empty feed (design), so a user who follows nobody can still post a story.
 - Loading: an empty tray card of the same height. Load failure: stays empty, no error.
 - The tray response carries each user's active stories, so opening the viewer sends no request.
+- Once the feed's posts have shown, the starting photo of the first 3 users in the tray is preloaded.
 - The tray loads in parallel with the feed and shows straight away; while the posts load, a spinner sits under the tray (no full-page spinner). A feed load error still replaces the whole page, tray included.
 
 ## Errors
@@ -39,6 +40,7 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 ## Viewer
 
 - Opens on the user's first unwatched story (their first story if all are watched). Moving on to the next user uses the same rule.
+- While a story's photo loads, the loader appears only after 200ms, so fast loads never flash it.
 - A story whose photo fails to load is skipped straight away.
 - Once a story's photo has loaded, the next story's photo and the next user's starting photo are preloaded.
 - A story counts as watched once its photo has loaded on screen, even if you tap past it before 5 seconds. A story whose photo never loaded does not count.

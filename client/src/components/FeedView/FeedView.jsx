@@ -6,7 +6,10 @@ import useMediaQuery from '../../hooks/useMediaQuery';
 import useStoryTray from '../../hooks/useStoryTray';
 import { LOAD_ERROR_MESSAGES } from '../../constants/errorMessages';
 import { DESKTOP_MEDIA_QUERY } from '../../constants/layout';
+import { TRAY_PRELOAD_USER_COUNT } from '../../constants/stories';
 import { CAROUSEL_POSTS_BEFORE } from '../../constants/suggestions';
+import { preloadImage } from '../../utils/images';
+import { getTrayStartStories } from '../../utils/stories';
 
 import EmptyFeedSuggestions from '../EmptyFeedSuggestions/EmptyFeedSuggestions';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
@@ -45,6 +48,14 @@ const FeedView = () => {
 			setIsEmptyFeedVisit(true);
 		}
 	}, [isLoading, hasLoadFailed, posts.length]);
+
+	useEffect(() => {
+		if (isLoading || hasLoadFailed || !isTrayLoaded) {
+			return;
+		}
+
+		getTrayStartStories(trayEntries, TRAY_PRELOAD_USER_COUNT).forEach((story) => preloadImage(story.imageUrl));
+	}, [isLoading, hasLoadFailed, isTrayLoaded, trayEntries]);
 
 	if (hasLoadFailed) {
 		return <PageLoadError onActionClick={reloadPosts} isRetrying={isLoading} messages={LOAD_ERROR_MESSAGES.FEED} />;
