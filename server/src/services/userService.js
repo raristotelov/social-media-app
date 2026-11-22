@@ -14,6 +14,7 @@ const { reactToSignUp } = require('../demo/userReactions');
 const commentService = require('./commentService');
 const imageStorageService = require('./imageStorageService');
 const notificationService = require('./notificationService');
+const storyService = require('./storyService');
 const { USER_ROW_PROJECTION, getUserRowsInOrder } = require('./userRowService');
 const { assertUserNotHidden, createPostVisibility, getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
 
@@ -296,7 +297,7 @@ const getUsersProfileDataBySearchWord = async ({ searchWord, requesterId }) => {
 			: SEARCH_ROW_PROJECTION;
 		const users = await UserModel.aggregate([{ $match: match }, { $project: projection }]);
 
-		return users;
+		return await storyService.withStorySummaries({ users, viewerId: requesterId });
 	} catch (error) {
 		throw new AppError('Could not search users', 500, { cause: error });
 	}

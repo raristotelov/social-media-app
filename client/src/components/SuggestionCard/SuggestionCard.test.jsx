@@ -47,6 +47,43 @@ describe('SuggestionCard', () => {
 		expect(screen.getByRole('link').querySelector('svg')).toBeInTheDocument();
 	});
 
+	describe('story ring', () => {
+		const getAvatar = () => screen.getByRole('link').querySelector('.suggestion-card-avatar');
+
+		it('rings the photo red when the user has a story that is not fully watched', () => {
+			renderCard({ story: { isWatched: false } });
+
+			expect(getAvatar()).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+
+		it('rings the photo grey when the user has a story that is fully watched', () => {
+			renderCard({ story: { isWatched: true } });
+
+			expect(getAvatar()).toHaveClass('story-ring');
+			expect(getAvatar()).not.toHaveClass('story-ring-unwatched');
+		});
+
+		it('rings the placeholder avatar too', () => {
+			renderCard({ profilePicture: undefined, story: { isWatched: false } });
+
+			expect(getAvatar()).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+
+		it.each([[null], [undefined]])('draws no ring when the story is %p', (story) => {
+			renderCard({ story });
+
+			expect(getAvatar()).not.toHaveClass('story-ring');
+		});
+
+		it('is an indicator only: the one link still opens the profile and nothing else is added', () => {
+			renderCard({ story: { isWatched: false } });
+
+			expect(screen.getAllByRole('link')).toHaveLength(1);
+			expect(screen.getByRole('link')).toHaveAttribute('href', '/user/user2');
+			expect(screen.getAllByRole('button')).toHaveLength(1);
+		});
+	});
+
 	it('says "Popular on {APP_NAME}" for the most-followed group', () => {
 		renderCard();
 

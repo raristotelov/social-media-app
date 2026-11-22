@@ -54,6 +54,10 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 	const isPaused = isHolding || openOverlay !== null || !isPhotoLoaded;
 	const hasPreviousStory = userIndex > 0 || storyIndex > 0;
 
+	const close = useCallback(() => {
+		onClose(storiesByUserId);
+	}, [onClose, storiesByUserId]);
+
 	const advanceToNextUser = useCallback(() => {
 		if (userIndex + 1 < queue.length) {
 			const nextStories = storiesByUserId[queue[userIndex + 1].user._id];
@@ -65,8 +69,8 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 			return;
 		}
 
-		onClose();
-	}, [userIndex, queue, storiesByUserId, onClose]);
+		close();
+	}, [userIndex, queue, storiesByUserId, close]);
 
 	const goToNext = useCallback(() => {
 		if (storyIndex + 1 < userStories.length) {
@@ -134,7 +138,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 			}
 
 			if (event.key === 'Escape') {
-				onClose();
+				close();
 			} else if (event.key === 'ArrowLeft') {
 				goToPrevious();
 			} else if (event.key === 'ArrowRight') {
@@ -147,7 +151,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		return () => {
 			document.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [openOverlay, onClose, goToPrevious, goToNext]);
+	}, [openOverlay, close, goToPrevious, goToNext]);
 
 	const startHold = () => {
 		holdStartedAtRef.current = Date.now();
@@ -281,7 +285,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 
 					<header className='story-viewer-header'>
 						<div className='story-viewer-poster'>
-							<Link to={`/user/${userId}`} className='story-viewer-poster-link' onClick={onClose}>
+							<Link to={`/user/${userId}`} className='story-viewer-poster-link' onClick={close}>
 								<ProfilePicture imageUrl={user.profilePicture?.imageUrl} className='story-viewer-avatar' />
 
 								<span className='story-viewer-username'>{user.username}</span>
@@ -290,7 +294,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 							{currentStory ? <span className='story-viewer-age'>{formatStoryAge(currentStory.createdAt)}</span> : null}
 						</div>
 
-						<button type='button' className='story-viewer-icon-button' aria-label='Close' onClick={onClose}>
+						<button type='button' className='story-viewer-icon-button' aria-label='Close' onClick={close}>
 							<CloseIcon iconColorProp='currentColor' />
 						</button>
 					</header>

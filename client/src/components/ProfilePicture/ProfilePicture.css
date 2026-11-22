@@ -6,3 +6,14 @@
 	border-radius: 50%;
 	object-fit: cover;
 }
+
+:is(img, svg).profile-picture.story-ring {
+	box-sizing: border-box;
+	padding: var(--story-ring-gap, 2px);
+
+	border: var(--story-ring-width, 2px) solid var(--border-divider);
+}
+
+:is(img, svg).profile-picture.story-ring-unwatched {
+	border-color: var(--brand-red);
+}

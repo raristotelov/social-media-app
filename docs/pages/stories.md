@@ -32,6 +32,16 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 - Once the feed's posts have shown, the starting photo of the first 3 users in the tray is preloaded.
 - The tray loads in parallel with the feed and shows straight away; while the posts load, a spinner sits under the tray (no full-page spinner). A feed load error still replaces the whole page, tray included.
 
+## Rings outside the tray (#54)
+
+- A user with an active story gets a ring around their picture on their profile page, in search results and in suggestions (sidebar rows, carousel cards). No active story: no ring.
+- Same colours as the tray: red until you've watched all their active stories, grey after; your own profile is always grey.
+- Ring sits inside the picture's usual size, with a gap before the photo: 3px ring + 3px gap on the 190px profile picture, 2px + 2px everywhere else.
+- Profile page: tapping the ringed picture opens that user's stories in the viewer; after their last story it closes. Without a ring the picture does nothing, as before.
+- Search results and suggestions: the ring is an indicator only; tapping the row still opens the profile.
+- Guests: stories stay logged-in only. Guests see the rings, always red (no watched history); tapping a ringed profile picture sends them to `/log-in`.
+- Figma: profile `Story Ring` in the Other User frames (desktop 111:153 / 350:1128, tablet 277:891 / 354:3033, mobile 231:503 / 355:2658); search, first result in 266:463 / 350:1265, 275:672 / 354:2872, 264:463 / 355:2482; components `Suggested User` (325:1084) and `Suggestion Card` (778:13926), `Story=Ring` variants.
+
 ## Errors
 
 - Deleting a story fails: close the confirmation, resume, error toast "Couldn't delete your story. Try again."

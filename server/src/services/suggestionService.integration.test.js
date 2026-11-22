@@ -443,7 +443,7 @@ describe('suggestionService against a real database', () => {
 	});
 
 	describe('the shape of a suggestion', () => {
-		it('carries id, username, group and the profile picture url only, never the email or password', async () => {
+		it('carries id, username, group, the profile picture url and the story summary only, never the email or password', async () => {
 			const me = await createUser('me');
 			const other = await createUser('other');
 
@@ -455,7 +455,13 @@ describe('suggestionService against a real database', () => {
 			const { suggestions } = await fetchSuggestions(me, 'sidebar');
 
 			expect(suggestions).toEqual([
-				{ _id: other._id, username: 'other', profilePicture: { imageUrl: 'https://cdn.example.com/other.jpg' }, group: 'popular' },
+				{
+					_id: other._id,
+					username: 'other',
+					profilePicture: { imageUrl: 'https://cdn.example.com/other.jpg' },
+					group: 'popular',
+					story: null,
+				},
 			]);
 		});
 	});

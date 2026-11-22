@@ -32,6 +32,11 @@ export const STORY_START_TARGETS = Object.freeze({
 	LAST: 'last',
 });
 
+export const STORY_RING_STATES = Object.freeze({
+	UNWATCHED: 'unwatched',
+	WATCHED: 'watched',
+});
+
 export const OWN_STORY_LABEL = 'Your story';
 
 export const DELETE_STORY_MESSAGE = 'This story will be permanently deleted. This cannot be undone.';

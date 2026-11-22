@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
@@ -121,6 +121,26 @@ describe('StoriesTray', () => {
 			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(reload).toHaveBeenCalledTimes(1);
+		});
+
+		it('calls reload once when the viewer closes after photos were watched', async () => {
+			const { reload } = renderTrayWithProps({ entries: [trayEntry('alice')] });
+
+			await user.click(screen.getByRole('button', { name: "View alice's story" }));
+			fireEvent.load(await screen.findByAltText('Story by alice'));
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(reload).toHaveBeenCalledTimes(1);
+		});
+
+		it('leaves the ring to the reloaded entries, not to what the viewer reported', async () => {
+			renderTrayWithProps({ entries: [trayEntry('alice', { isWatched: false })] });
+
+			await user.click(screen.getByRole('button', { name: "View alice's story" }));
+			fireEvent.load(await screen.findByAltText('Story by alice'));
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getCircleButton('alice').querySelector('.story-circle-ring')).toHaveClass('story-circle-ring-unwatched');
 		});
 
 		it('does not call reload when the Create popup is only cancelled', async () => {

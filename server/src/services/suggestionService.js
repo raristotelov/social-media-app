@@ -10,6 +10,7 @@ const {
 const AppError = require('../utils/AppError');
 const objectIdFromDate = require('../utils/objectIdFromDate');
 const { selectSuggestions } = require('../utils/suggestionSelection');
+const storyService = require('./storyService');
 const { getHiddenVisitorIds } = require('./visitorVisibilityService');
 
 const FOLLOWERS_COUNT = { $size: { $ifNull: ['$followers', []] } };
@@ -170,9 +171,13 @@ const getSuggestions = async ({ userId, placement }) => {
 			reserveSize,
 		});
 
+		const suggestionsData = suggestions.map(toSuggestionData);
+		const reserveData = reserve.map(toSuggestionData);
+		const withStories = await storyService.withStorySummaries({ users: [...suggestionsData, ...reserveData], viewerId: userId });
+
 		return {
-			suggestions: suggestions.map(toSuggestionData),
-			reserve: reserve.map(toSuggestionData),
+			suggestions: withStories.slice(0, suggestionsData.length),
+			reserve: withStories.slice(suggestionsData.length),
 			isCarouselDismissed: false,
 		};
 	} catch (error) {

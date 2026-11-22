@@ -1,5 +1,6 @@
 jest.mock('../models/userModel');
 jest.mock('./visitorVisibilityService');
+jest.mock('./storyService');
 
 const mongoose = require('mongoose');
 
@@ -8,6 +9,7 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { getSuggestions, dismissCarousel } = require('./suggestionService');
 const { getHiddenVisitorIds } = require('./visitorVisibilityService');
+const storyService = require('./storyService');
 
 const NOW = new Date('2026-10-22T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -74,6 +76,7 @@ describe('suggestionService', () => {
 		UserModel.findById.mockImplementation(() => buildLeanQuery(currentUser));
 		UserModel.aggregate.mockImplementation(async (pipeline) => pools[getPoolName(pipeline)]);
 		getHiddenVisitorIds.mockResolvedValue([]);
+		storyService.withStorySummaries.mockImplementation(async ({ users }) => users);
 	});
 
 	afterEach(() => {
@@ -81,6 +84,50 @@ describe('suggestionService', () => {
 	});
 
 	describe('getSuggestions', () => {
+		describe('story rings', () => {
+			beforeEach(() => {
+				pools.popular = buildCandidates(10, 8);
+			});
+
+			it('asks for the story summaries of the suggestions and the reserve in one call, for the signed-in user', async () => {
+				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				expect(storyService.withStorySummaries).toHaveBeenCalledTimes(1);
+				expect(storyService.withStorySummaries).toHaveBeenCalledWith({ users: [...suggestions, ...reserve], viewerId: ME });
+			});
+
+			it('puts the story summary of each user on their own row, in the suggestions and in the reserve', async () => {
+				storyService.withStorySummaries.mockImplementation(async ({ users }) =>
+					users.map((user) => ({ ...user, story: { isWatched: user.username === 'user10' } })),
+				);
+
+				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				expect(suggestions.length).toBeGreaterThan(0);
+				expect(reserve.length).toBeGreaterThan(0);
+				expect(suggestions.every((row) => row.story !== undefined)).toBe(true);
+				expect(reserve.every((row) => row.story !== undefined)).toBe(true);
+				expect(suggestions.find((row) => row.username === 'user10').story).toEqual({ isWatched: true });
+			});
+
+			it('keeps every suggestion and reserve row in its own list after the summaries are added', async () => {
+				const { suggestions: before, reserve: reserveBefore } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				storyService.withStorySummaries.mockImplementation(async ({ users }) => users.map((user) => ({ ...user, story: null })));
+
+				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				expect(getListedIds(suggestions)).toEqual(getListedIds(before));
+				expect(getListedIds(reserve)).toEqual(getListedIds(reserveBefore));
+			});
+
+			it('answers 500 when the story summaries cannot be loaded', async () => {
+				storyService.withStorySummaries.mockRejectedValue(new AppError('Could not load the stories', 500));
+
+				await expect(getSuggestions({ userId: ME, placement: 'sidebar' })).rejects.toMatchObject({ statusCode: 500 });
+			});
+		});
+
 		describe('validating the request', () => {
 			it.each([['nowhere'], [undefined], [''], ['SIDEBAR'], ['toString'], ['__proto__']])(
 				'answers 400 BAD_REQUEST for the placement %p, without touching the database',

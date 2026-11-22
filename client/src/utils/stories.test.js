@@ -1,4 +1,6 @@
-import { formatStoryAge, getStartStoryIndex, getTrayStartStories, getUpcomingStories, isStoryAspectRatio } from './stories';
+import { STORY_RING_STATES } from '../constants/stories';
+
+import { formatStoryAge, getStartStoryIndex, getStoryRingState, getTrayStartStories, getUpcomingStories, isStoryAspectRatio } from './stories';
 
 const NOW = new Date('2026-10-22T12:00:00.000Z').getTime();
 const minutesAgo = (minutes) => new Date(NOW - minutes * 60 * 1000).toISOString();
@@ -228,6 +230,24 @@ describe('getTrayStartStories', () => {
 
 	it('returns nothing for an empty tray', () => {
 		expect(getTrayStartStories([], 3)).toEqual([]);
+	});
+});
+
+describe('getStoryRingState', () => {
+	it.each([[null], [undefined]])('returns no ring state when the story is %p', (story) => {
+		expect(getStoryRingState(story)).toBeUndefined();
+	});
+
+	it('returns the unwatched state for a story that is not watched', () => {
+		expect(getStoryRingState({ isWatched: false })).toBe(STORY_RING_STATES.UNWATCHED);
+	});
+
+	it('returns the watched state for a story that is watched', () => {
+		expect(getStoryRingState({ isWatched: true })).toBe(STORY_RING_STATES.WATCHED);
+	});
+
+	it('treats a story without isWatched as not watched', () => {
+		expect(getStoryRingState({})).toBe(STORY_RING_STATES.UNWATCHED);
 	});
 });
 

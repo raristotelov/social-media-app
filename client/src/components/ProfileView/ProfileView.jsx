@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { useParams, useOutletContext } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
@@ -18,6 +18,7 @@ import Popup from '../Popup/Popup';
 import CreatePopup from '../CreatePopup/CreatePopup';
 import EditProfileForm from '../EditProfileForm/EditProfileForm';
 import UserListPopup from '../UserListPopup/UserListPopup';
+import StoryViewer from '../StoryViewer/StoryViewer';
 import PlusIcon from '../icons/Plus';
 
 import './ProfileView.css';
@@ -33,10 +34,21 @@ const ProfileView = () => {
 	const [isEditProfileFormOpen, setIsEditProfileFormOpen] = useState(false);
 	const [openUserList, setOpenUserList] = useState(null);
 	const [optimisticIsFollowed, setOptimisticIsFollowed] = useState(null);
+	const [openStoryQueue, setOpenStoryQueue] = useState(null);
 	const latestFollowRequestId = useRef(0);
 
-	const { userData, setUserData, userPosts, setUserPosts, isLoggedInUserProfile, profileRequestCount, onEditPostClick, onDeletePostClick } =
-		useOutletContext();
+	const {
+		userData,
+		setUserData,
+		userPosts,
+		setUserPosts,
+		isLoggedInUserProfile,
+		profileRequestCount,
+		userStory,
+		replaceUserStories,
+		onEditPostClick,
+		onDeletePostClick,
+	} = useOutletContext();
 	const { loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
 	const { showToast } = useContext(ToastContext);
 	const { endSessionIfUnauthenticated, runWithSessionGuard } = useSessionGuard();
@@ -158,6 +170,35 @@ const ProfileView = () => {
 		setOpenUserList(null);
 	};
 
+	const openStoryViewer = () => {
+		if (!loggedInUser) {
+			redirectToLogin();
+
+			return;
+		}
+
+		if (!userStory?.stories.length) {
+			return;
+		}
+
+		setOpenStoryQueue([
+			{
+				user: { _id: userData._id, username: userData.username, profilePicture: userData.profilePicture },
+				isOwn: isLoggedInUserProfile,
+				isWatched: userStory.story.isWatched,
+				stories: userStory.stories,
+			},
+		]);
+	};
+
+	const closeStoryViewer = useCallback(
+		(storiesByUserId) => {
+			setOpenStoryQueue(null);
+			replaceUserStories(storiesByUserId[userId]);
+		},
+		[replaceUserStories, userId],
+	);
+
 	const headerLoggedInUser =
 		optimisticIsFollowed === null ? loggedInUser : { ...loggedInUser, following: withId(loggedInUser?.following, userId, optimisticIsFollowed) };
 
@@ -167,6 +208,8 @@ const ProfileView = () => {
 				userData={userData}
 				loggedInUserData={headerLoggedInUser}
 				isLoggedInUserProfile={isLoggedInUserProfile}
+				story={userStory?.story}
+				onStoryClick={openStoryViewer}
 				onEditProfileClick={openEditProfileForm}
 				onFollowUserClick={followUserHandler}
 				onUnfollowUserClick={onUnfollowUserHandler}
@@ -196,6 +239,8 @@ const ProfileView = () => {
 			</section>
 
 			{openUserList ? <UserListPopup userId={userId} listType={openUserList} onClose={closeUserList} /> : null}
+
+			{openStoryQueue ? <StoryViewer queue={openStoryQueue} startIndex={0} onClose={closeStoryViewer} /> : null}
 
 			{isCreatePopupOpen ? <CreatePopup initialMode={CREATE_MODES.POST} onClose={closeCreatePopup} onPostAdded={addPostToProfile} /> : null}
 

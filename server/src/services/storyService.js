@@ -6,10 +6,10 @@ const UserModel = require('../models/userModel');
 const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
-const { createStoryNotFoundError } = require('../utils/notFoundErrors');
+const { createStoryNotFoundError, createUserNotFoundError } = require('../utils/notFoundErrors');
 const { asFieldError } = require('../utils/fieldErrors');
 const imageStorageService = require('./imageStorageService');
-const { getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
+const { assertUserNotHidden, getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
 
 const STORY_AUTHOR_SELECT = { username: 1, 'profilePicture.imageUrl': 1 };
 
@@ -118,6 +118,87 @@ const getWatchedStoryIds = async ({ storyIds, viewerId }) => {
 		.lean();
 
 	return new Set(views.map((view) => String(view.storyId)));
+};
+
+const getStorySummariesByUserId = async ({ userIds, viewerId }) => {
+	if (!userIds.length) {
+		return new Map();
+	}
+
+	const activeStories = await StoryModel.find({ userId: { $in: userIds }, ...getActiveStoriesFilter() })
+		.select({ _id: 1, userId: 1 })
+		.lean();
+
+	const othersStoryIds = activeStories.filter((story) => String(story.userId) !== String(viewerId)).map((story) => story._id);
+	const watchedStoryIds = viewerId && othersStoryIds.length ? await getWatchedStoryIds({ storyIds: othersStoryIds, viewerId }) : new Set();
+
+	const summariesByUserId = new Map();
+
+	activeStories.forEach((story) => {
+		const authorKey = String(story.userId);
+		const isStoryWatched = authorKey === String(viewerId) || watchedStoryIds.has(String(story._id));
+		const summary = summariesByUserId.get(authorKey);
+
+		summariesByUserId.set(authorKey, { isWatched: (summary ? summary.isWatched : true) && isStoryWatched });
+	});
+
+	return summariesByUserId;
+};
+
+const withStorySummaries = async ({ users, viewerId }) => {
+	try {
+		const summariesByUserId = await getStorySummariesByUserId({ userIds: users.map((user) => user._id), viewerId });
+
+		return users.map((user) => ({ ...user, story: summariesByUserId.get(String(user._id)) ?? null }));
+	} catch (error) {
+		throw new AppError('Could not load the stories', 500, { cause: error });
+	}
+};
+
+const getUserStory = async ({ userId, viewerId }) => {
+	try {
+		if (!mongoose.isObjectIdOrHexString(userId)) {
+			throw createUserNotFoundError();
+		}
+
+		const hiddenVisitorIds = await getHiddenVisitorIds(viewerId);
+
+		assertUserNotHidden(userId, hiddenVisitorIds);
+
+		const activeStories = await StoryModel.find({ userId, ...getActiveStoriesFilter() })
+			.sort({ createdAt: 1, _id: 1 })
+			.lean();
+
+		if (!activeStories.length) {
+			return { story: null, stories: [] };
+		}
+
+		if (!viewerId) {
+			return { story: { isWatched: false }, stories: [] };
+		}
+
+		const storyIds = activeStories.map((story) => story._id);
+
+		if (String(userId) === String(viewerId)) {
+			const viewersCounts = await getViewersCountsByStoryId(storyIds, hiddenVisitorIds);
+
+			return {
+				story: { isWatched: true },
+				stories: activeStories.map((story) => toStoryData(story, { viewersCount: viewersCounts.get(String(story._id)) || 0 })),
+			};
+		}
+
+		const watchedStoryIds = await getWatchedStoryIds({ storyIds, viewerId });
+		const stories = activeStories.map((story) => toStoryData(story, { isWatched: watchedStoryIds.has(String(story._id)) }));
+
+		return { story: { isWatched: stories.every((story) => story.isWatched) }, stories };
+	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
+		throw new AppError('Could not load the user story', 500, { cause: error });
+	}
 };
 
 const compareTrayEntries = (a, b) =>
@@ -278,6 +359,8 @@ const deleteExpiredStories = async () => {
 module.exports = {
 	addStory,
 	getStoryTray,
+	getUserStory,
+	withStorySummaries,
 	recordStoryView,
 	getStoryViewers,
 	deleteStory,

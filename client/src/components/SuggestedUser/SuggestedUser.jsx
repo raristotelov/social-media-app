@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 
 import { SUGGESTED_USER_ACTION_STYLES } from '../../constants/suggestions';
+import { getStoryRingState } from '../../utils/stories';
 import { getSuggestionReason } from '../../utils/suggestions';
 
 import Button from '../Button/Button';
@@ -9,7 +10,7 @@ import ProfilePicture from '../ProfilePicture/ProfilePicture';
 import './SuggestedUser.css';
 
 const SuggestedUser = ({ suggestion, actionStyle, isFollowed = false, onFollowClick, onUnfollowClick }) => {
-	const { _id: userId, username, profilePicture } = suggestion;
+	const { _id: userId, username, profilePicture, story } = suggestion;
 
 	const actionLabel = isFollowed ? 'Unfollow' : 'Follow';
 	const handleActionClick = () => (isFollowed ? onUnfollowClick(userId) : onFollowClick(userId));
@@ -17,7 +18,7 @@ const SuggestedUser = ({ suggestion, actionStyle, isFollowed = false, onFollowCl
 	return (
 		<div className='suggested-user'>
 			<Link to={`/user/${userId}`} className='suggested-user-link'>
-				<ProfilePicture imageUrl={profilePicture?.imageUrl} className='suggested-user-avatar' />
+				<ProfilePicture imageUrl={profilePicture?.imageUrl} ringState={getStoryRingState(story)} className='suggested-user-avatar' />
 
 				<span className='suggested-user-text'>
 					<span className='suggested-user-username'>{username}</span>

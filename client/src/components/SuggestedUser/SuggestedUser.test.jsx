@@ -102,6 +102,51 @@ describe('SuggestedUser', () => {
 		});
 	});
 
+	describe('story ring', () => {
+		const getAvatar = () => screen.getByRole('link').querySelector('.suggested-user-avatar');
+
+		it('rings the photo red when the user has a story that is not fully watched', () => {
+			renderSuggestedUser({ suggestion: { ...popularSuggestion, story: { isWatched: false } } });
+
+			expect(getAvatar()).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+
+		it('rings the photo grey when the user has a story that is fully watched', () => {
+			renderSuggestedUser({ suggestion: { ...popularSuggestion, story: { isWatched: true } } });
+
+			expect(getAvatar()).toHaveClass('story-ring');
+			expect(getAvatar()).not.toHaveClass('story-ring-unwatched');
+		});
+
+		it('rings the placeholder avatar too', () => {
+			renderSuggestedUser({ suggestion: { ...popularSuggestion, profilePicture: undefined, story: { isWatched: false } } });
+
+			expect(getAvatar()).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+
+		it.each([[null], [undefined]])('draws no ring when the story is %p', (story) => {
+			renderSuggestedUser({ suggestion: { ...popularSuggestion, story } });
+
+			expect(getAvatar()).not.toHaveClass('story-ring');
+		});
+
+		it('is an indicator only: the one link still opens the profile and nothing else is added', () => {
+			renderSuggestedUser({ suggestion: { ...popularSuggestion, story: { isWatched: false } } });
+
+			expect(screen.getAllByRole('link')).toHaveLength(1);
+			expect(screen.getByRole('link')).toHaveAttribute('href', '/user/user2');
+			expect(screen.getAllByRole('button')).toHaveLength(1);
+		});
+
+		it('keeps the follow action working on a ringed row', async () => {
+			const { onFollowClick } = renderSuggestedUser({ suggestion: { ...popularSuggestion, story: { isWatched: false } } });
+
+			await user.click(screen.getByRole('button', { name: /follow/i }));
+
+			expect(onFollowClick).toHaveBeenCalledWith('user2');
+		});
+	});
+
 	describe('as a button (empty feed)', () => {
 		it('shows a primary Follow button', () => {
 			renderSuggestedUser();

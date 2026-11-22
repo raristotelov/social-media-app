@@ -11,13 +11,16 @@ jest.mock('../services', () => ({
 	},
 	userPostService: {},
 	commentService: {},
+	storyService: {
+		getUserStory: jest.fn(),
+	},
 }));
 
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const JWT = require('jsonwebtoken');
 
-const { userService } = require('../services');
+const { userService, storyService } = require('../services');
 const userController = require('./userController');
 const errorHandler = require('../middlewares/errorHandler');
 const AppError = require('../utils/AppError');
@@ -75,6 +78,7 @@ describe('user routes', () => {
 		userService.getUsersProfileDataBySearchWord.mockResolvedValue([]);
 		userService.getFollowers.mockResolvedValue([]);
 		userService.getFollowing.mockResolvedValue([]);
+		storyService.getUserStory.mockResolvedValue({ story: null, stories: [] });
 	});
 
 	afterEach(() => {
@@ -231,6 +235,59 @@ describe('user routes', () => {
 			await fetch(`${baseUrl}/users?searchWord=jan`);
 
 			expect(userService.getUsersProfileDataBySearchWord).toHaveBeenCalledWith({ searchWord: 'jan' });
+		});
+	});
+
+	describe('GET /users/:userId/story', () => {
+		const userStory = { story: { isWatched: false }, stories: [{ _id: 'story1', isWatched: false }] };
+
+		const getUserStory = (headers, userId = OTHER_USER_ID) => fetch(`${baseUrl}/users/${userId}/story`, { headers });
+
+		it('is public: a guest gets the answer and no viewer is passed', async () => {
+			storyService.getUserStory.mockResolvedValue(userStory);
+
+			const response = await getUserStory({});
+
+			expect(response.status).toBe(200);
+			await expect(response.json()).resolves.toEqual(userStory);
+			expect(storyService.getUserStory).toHaveBeenCalledWith({ userId: OTHER_USER_ID, viewerId: undefined });
+		});
+
+		it('passes the token user as the viewer', async () => {
+			await getUserStory(authHeaders(USER_ID));
+
+			expect(storyService.getUserStory).toHaveBeenCalledWith({ userId: OTHER_USER_ID, viewerId: USER_ID });
+		});
+
+		it('treats an invalid token as a guest instead of rejecting the request', async () => {
+			const response = await getUserStory(sessionCookie('not.a.valid.token'));
+
+			expect(response.status).toBe(200);
+			expect(storyService.getUserStory).toHaveBeenCalledWith({ userId: OTHER_USER_ID, viewerId: undefined });
+		});
+
+		it('is not mistaken for the followers or following list', async () => {
+			await getUserStory({});
+
+			expect(userService.getFollowers).not.toHaveBeenCalled();
+			expect(userService.getFollowing).not.toHaveBeenCalled();
+		});
+
+		it('relays a 404 USER_NOT_FOUND from the service', async () => {
+			storyService.getUserStory.mockRejectedValue(new AppError('User not found', 404, { code: ERROR_CODES.USER_NOT_FOUND }));
+
+			const response = await getUserStory({});
+
+			expect(response.status).toBe(404);
+			await expect(response.json()).resolves.toMatchObject({ code: ERROR_CODES.USER_NOT_FOUND });
+		});
+
+		it('relays a 500 from the service', async () => {
+			storyService.getUserStory.mockRejectedValue(new AppError('Could not load the user story', 500));
+
+			const response = await getUserStory({});
+
+			expect(response.status).toBe(500);
 		});
 	});
 

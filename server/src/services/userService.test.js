@@ -3,6 +3,7 @@ jest.mock('../models/userPostModel');
 jest.mock('./commentService');
 jest.mock('./imageStorageService');
 jest.mock('./notificationService');
+jest.mock('./storyService');
 jest.mock('bcrypt');
 jest.mock('jsonwebtoken');
 jest.mock('../demo/createDemoVisitor');
@@ -22,6 +23,7 @@ const { createDemoVisitor } = require('../demo/createDemoVisitor');
 const { reactToSignUp } = require('../demo/userReactions');
 const imageStorageService = require('./imageStorageService');
 const commentService = require('./commentService');
+const storyService = require('./storyService');
 const { createPostVisibility, getHiddenVisitorIds } = require('./visitorVisibilityService');
 const constants = require('../config/constants');
 const AppError = require('../utils/AppError');
@@ -45,6 +47,7 @@ describe('userService', () => {
 		jest.resetAllMocks();
 		getHiddenVisitorIds.mockResolvedValue([]);
 		createPostVisibility.mockResolvedValue((post) => post);
+		storyService.withStorySummaries.mockImplementation(async ({ users }) => users.map((user) => ({ ...user, story: null })));
 	});
 
 	const givenProfileLookup = (userId, overrides = {}) => {
@@ -1663,7 +1666,35 @@ describe('userService', () => {
 
 			givenSearchResolves(users);
 
-			await expect(getUsersProfileDataBySearchWord({ searchWord: 'jan' })).resolves.toBe(users);
+			await expect(getUsersProfileDataBySearchWord({ searchWord: 'jan' })).resolves.toEqual([
+				{ _id: 'user1', username: 'janedoe', followersCount: 2, story: null },
+			]);
+		});
+
+		it('adds the story summary of every row found, computed for the searching user', async () => {
+			const users = [
+				{ _id: 'user1', username: 'janedoe', followersCount: 2 },
+				{ _id: 'user2', username: 'janet', followersCount: 0 },
+			];
+
+			givenSearchResolves(users);
+			storyService.withStorySummaries.mockImplementation(async ({ users: rows }) =>
+				rows.map((row) => ({ ...row, story: row._id === 'user1' ? { isWatched: false } : null })),
+			);
+
+			const result = await getUsersProfileDataBySearchWord({ searchWord: 'jan', requesterId: 'viewer1' });
+
+			expect(storyService.withStorySummaries).toHaveBeenCalledWith({ users, viewerId: 'viewer1' });
+			expect(result.map((row) => row.story)).toEqual([{ isWatched: false }, null]);
+		});
+
+		it('wraps a failure while loading the story summaries in a 500', async () => {
+			const storyError = new AppError('Could not load the stories', 500);
+
+			givenSearchResolves([{ _id: 'user1', username: 'janedoe', followersCount: 2 }]);
+			storyService.withStorySummaries.mockRejectedValue(storyError);
+
+			await expect(getUsersProfileDataBySearchWord({ searchWord: 'jan' })).rejects.toMatchObject({ statusCode: 500 });
 		});
 
 		it('wraps an unexpected database failure in a 500 AppError', async () => {

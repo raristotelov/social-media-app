@@ -15,6 +15,12 @@ export const getStoryTray = () => {
 	return request.get(`${serverUrl}/stories/tray`);
 };
 
+export const getUserStory = ({ userId }) => {
+	const request = requestFactory();
+
+	return request.get(`${serverUrl}/users/${userId}/story`);
+};
+
 export const markStoryViewed = ({ storyId }) => {
 	const request = requestFactory();
 

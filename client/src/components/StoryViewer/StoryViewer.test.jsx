@@ -762,6 +762,27 @@ describe('StoryViewer', () => {
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
+		it('reports the stories that were watched when it closes', async () => {
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			const [reportedStoriesByUserId] = onClose.mock.calls[0];
+
+			expect(reportedStoriesByUserId.alice.map((story) => story.isWatched)).toEqual([true, true, false]);
+		});
+
+		it('does not report a story whose photo never loaded as watched', async () => {
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			const [reportedStoriesByUserId] = onClose.mock.calls[0];
+
+			expect(reportedStoriesByUserId.alice.map((story) => story.isWatched)).toEqual([true, false, false]);
+		});
+
 		it('has a next arrow that goes forward', async () => {
 			await openViewer({ startIndex: 1 });
 
@@ -806,6 +827,164 @@ describe('StoryViewer', () => {
 			await user.click(screen.getByRole('button', { name: 'Close' }));
 
 			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('reporting the watched state when it closes', () => {
+		const closePaths = [
+			['Escape', () => fireEvent.keyDown(document, { key: 'Escape' })],
+			['the close button', () => user.click(screen.getByRole('button', { name: 'Close' }))],
+			['the poster link', () => user.click(document.querySelector('.story-viewer-poster-link'))],
+			['tapping past the last story', () => tapNext()],
+			['the next arrow on the last story', () => user.click(document.querySelector('.story-viewer-arrow-next'))],
+			['the right arrow key on the last story', () => fireEvent.keyDown(document, { key: 'ArrowRight' })],
+			['the last segment filling', () => finishSegment()],
+		];
+
+		const getWatchedFlags = (onClose, userId) => onClose.mock.calls[0][0][userId].map((story) => story.isWatched);
+
+		it.each(closePaths)('reports once, for every user in the queue, when closed by %s', async (name, close) => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			await close();
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+			expect(Object.keys(onClose.mock.calls[0][0]).sort()).toEqual(['alice', 'bob', 'me']);
+		});
+
+		it.each(closePaths)('reports the story as watched when its photo had loaded and it is closed by %s', async (name, close) => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			await close();
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, true]);
+		});
+
+		it.each(closePaths)('reports the story as unwatched when its photo never loaded and it is closed by %s', async (name, close) => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			await close();
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, false]);
+		});
+
+		it('reports a story whose photo failed to load, on the last story, as unwatched', async () => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			fireEvent.error(getPhoto());
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, false]);
+		});
+
+		it('reports the stories of every user watched on the way, not just the last one', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+			finishSegment();
+			await screen.findByAltText('Story by bob');
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'alice')).toEqual([true]);
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, false]);
+		});
+
+		it('reports only the stories whose photos loaded, when some were tapped past', async () => {
+			storiesByUser.alice = [
+				buildStory('a1', { isWatched: false }),
+				buildStory('a2', { isWatched: false }),
+				buildStory('a3', { isWatched: false }),
+			];
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+			await tapNext();
+			await tapNext();
+			loadPhoto();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'alice')).toEqual([true, false, true]);
+		});
+
+		it('reports the story as watched without waiting for the view to be recorded', async () => {
+			markStoryViewed.mockReturnValue(new Promise(() => {}));
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, true]);
+		});
+
+		it('still reports the story as watched when recording the view fails', async () => {
+			markStoryViewed.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			await waitFor(() => expect(markStoryViewed).toHaveBeenCalled());
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, true]);
+		});
+
+		it('leaves your own stories without a watched flag, even when their photos loaded', async () => {
+			const { onClose } = await openViewer({ startIndex: 0 });
+
+			loadPhoto();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'me')).toEqual([undefined, undefined]);
+		});
+
+		it('keeps a story reported as watched after going back and forward over it', async () => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			await tapPrevious();
+			await tapNext();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, true]);
+		});
+
+		it('reports the remaining stories after your own last story is deleted, so the ring can go', async () => {
+			storiesByUser.me = [buildStory('m1', { viewersCount: 0 })];
+			const queue = [buildQueue()[0]];
+			const { onClose } = await openViewer({ queue, startIndex: 0 });
+
+			await user.click(screen.getByRole('button', { name: 'Delete story' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+			expect(onClose.mock.calls[0][0]).toEqual({ me: [] });
+		});
+
+		it('reports your remaining story, not the deleted one, when you close after deleting one of two', async () => {
+			const { onClose } = await openViewer({ startIndex: 0 });
+
+			await user.click(screen.getByRole('button', { name: 'Delete story' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
+			await waitFor(() => expect(getPhotoName()).toBe('m2'));
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(onClose.mock.calls[0][0].me.map((story) => story._id)).toEqual(['m2']);
+		});
+
+		it('sends no request to the server when it closes', async () => {
+			const fetchSpy = vi.spyOn(globalThis, 'fetch');
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			markStoryViewed.mockClear();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+			expect(fetchSpy).not.toHaveBeenCalled();
+			expect(getStoryTray).not.toHaveBeenCalled();
+			expect(markStoryViewed).not.toHaveBeenCalled();
+
+			fetchSpy.mockRestore();
 		});
 	});
 
@@ -1334,6 +1513,8 @@ describe('StoryViewer', () => {
 			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+
+			expect(onClose).toHaveBeenCalledWith(expect.objectContaining({ me: [] }));
 		});
 
 		it('disables Delete while the request is in flight and sends one request', async () => {

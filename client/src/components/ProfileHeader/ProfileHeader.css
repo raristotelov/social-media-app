@@ -16,7 +16,25 @@
 }
 
 .profile-picture-wrapper {
+	--story-ring-width: 3px;
+	--story-ring-gap: 3px;
+
 	grid-area: avatar;
+}
+
+.profile-picture-button {
+	display: block;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: none;
+
+	line-height: 0;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.profile-picture-button:hover {
+	cursor: pointer;
 }
 
 .profile-picture-wrapper .profile-picture {
@@ -102,6 +120,11 @@
 			'avatar stats'
 			'username username'
 			'action action';
+	}
+
+	.profile-picture-wrapper {
+		--story-ring-width: 2px;
+		--story-ring-gap: 2px;
 	}
 
 	.profile-picture-wrapper .profile-picture {

@@ -1,5 +1,5 @@
 import { requestFactory } from './requester';
-import { addStory, deleteStory, getStoryTray, getStoryViewers, markStoryViewed } from './storyService';
+import { addStory, deleteStory, getStoryTray, getStoryViewers, getUserStory, markStoryViewed } from './storyService';
 
 vi.mock('./requester');
 
@@ -45,6 +45,27 @@ describe('storyService', () => {
 
 			expect(requestFactory).toHaveBeenCalledWith();
 			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/stories\/tray$/));
+		});
+	});
+
+	describe('getUserStory', () => {
+		it("gets that user's story endpoint", async () => {
+			const get = vi.fn().mockResolvedValue({ story: { isWatched: false }, stories: [] });
+
+			requestFactory.mockReturnValue({ get });
+
+			await expect(getUserStory({ userId: 'user1' })).resolves.toEqual({ story: { isWatched: false }, stories: [] });
+
+			expect(requestFactory).toHaveBeenCalledWith();
+			expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/users\/user1\/story$/));
+		});
+
+		it('passes a request failure through', async () => {
+			const failure = { code: 'USER_NOT_FOUND', status: 404 };
+
+			requestFactory.mockReturnValue({ get: vi.fn().mockRejectedValue(failure) });
+
+			await expect(getUserStory({ userId: 'user1' })).rejects.toBe(failure);
 		});
 	});
 
