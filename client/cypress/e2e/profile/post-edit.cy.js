@@ -69,6 +69,35 @@ describe('post edit', () => {
 		cy.get('#edit-post-form').contains('button', 'Cancel').should('be.visible');
 	});
 
+	it('shows the image in a 210 by 280 frame on desktop, whole photo contained', () => {
+		cy.viewport(1440, 900);
+		visitAsUser(profilePath, session);
+
+		openEditPopup();
+
+		cy.get('.popup-body img.edit-post-image').should(($image) => {
+			const { width, height } = $image[0].getBoundingClientRect();
+
+			expect(Math.round(width), 'frame width').to.equal(210);
+			expect(Math.round(height), 'frame height').to.equal(280);
+		});
+		cy.get('.popup-body img.edit-post-image').should('have.css', 'object-fit', 'contain');
+	});
+
+	it('shows the image in a 240 by 320 frame on mobile', () => {
+		cy.viewport(390, 844);
+		visitAsUser(profilePath, session);
+
+		openEditPopup();
+
+		cy.get('.popup-body img.edit-post-image').should(($image) => {
+			const { width, height } = $image[0].getBoundingClientRect();
+
+			expect(Math.round(width), 'frame width').to.equal(240);
+			expect(Math.round(height), 'frame height').to.equal(320);
+		});
+	});
+
 	it('closes without saving when nothing was changed', () => {
 		visitAsUser(profilePath, session);
 

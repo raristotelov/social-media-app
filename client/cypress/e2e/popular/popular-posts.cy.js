@@ -325,7 +325,7 @@ describe('popular posts', () => {
 
 	describe('the layout', () => {
 		Cypress._.each([300, 390, 768, 1440], (width) => {
-			it(`shows a square 3-column grid with no horizontal scroll at ${width}`, () => {
+			it(`shows a 3:4 portrait 3-column grid with no horizontal scroll at ${width}`, () => {
 				cy.viewport(width, 900);
 				cy.visit(GRID_PATH);
 
@@ -336,8 +336,10 @@ describe('popular posts', () => {
 
 					expect(Math.abs(first.top - second.top)).to.be.lessThan(1);
 					expect(Math.abs(first.top - third.top)).to.be.lessThan(1);
-					expect(Math.abs(first.width - first.height)).to.be.lessThan(1);
+					expect(Math.abs(first.height - (first.width * 4) / 3)).to.be.lessThan(1);
 				});
+
+				cy.get('.profile-post img').first().should('have.css', 'object-fit', 'contain');
 
 				cy.document().then((doc) => {
 					expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);

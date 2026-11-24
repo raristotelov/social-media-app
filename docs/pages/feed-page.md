@@ -27,7 +27,7 @@ Routes `/user-feed` and `/user/:userId/posts` (`client/src/Router.jsx`). Liking 
 
 ## Post card
 
-- Image: full card width, height from the image's own ratio, limited to 4:5 (portrait) and 1.91:1 (landscape); beyond those limits it is cropped to the limit, centred. The Figma frames show one example ratio.
+- Image: full card width, height from the image's own ratio, limited to 4:5 (portrait) and 1.91:1 (landscape); beyond those limits the frame stops at the limit and the whole photo shows inside it, centred, with `background/surface` bars; never cropped (#54). The Figma frames show one example ratio.
 - Caption: cut at 2 lines at the card's width; "… more" shows only when it overflows. Clicking "more" expands the full caption on the card, which grows taller.
 - Captions are limited to 1000 characters, enforced on the server like the bio.
 - Two top-level comments preview under the caption. Replies never preview; they show only in the comments popup.

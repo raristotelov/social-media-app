@@ -23,7 +23,7 @@
 
 .add-post-button {
 	width: calc((100% - 24px) / 3);
-	aspect-ratio: 1;
+	aspect-ratio: 3 / 4;
 	box-sizing: border-box;
 
 	display: flex;

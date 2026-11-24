@@ -11,6 +11,8 @@ import {
 	getCommentsViaApi,
 	deletePostViaApi,
 	getProfileViaApi,
+	uploadSizedPostViaApi,
+	setThemeViaApi,
 } from '../../support/api';
 
 describe('profile posts view', () => {
@@ -156,6 +158,164 @@ describe('profile posts view', () => {
 
 			cy.get('.user-post').should('have.length', 3);
 			cy.contains('.posts-bar .posts-bar-subtitle', gridAuthor.username).should('be.visible');
+		});
+	});
+
+	describe('how the photo fits', () => {
+		const expectActionsCircleSize = (size) =>
+			cy
+				.get('.profile-post .post-actions-button')
+				.first()
+				.should(($button) => {
+					const circle = $button[0].ownerDocument.defaultView.getComputedStyle($button[0], '::before');
+					const { width, height } = $button[0].getBoundingClientRect();
+
+					expect(circle.width).to.equal(`${size}px`);
+					expect(circle.height).to.equal(`${size}px`);
+					expect(width, 'tap area width').to.equal(32);
+					expect(height, 'tap area height').to.equal(32);
+				});
+
+		it('shows grid tiles 3:4 with the whole photo contained', () => {
+			cy.visit(gridPath());
+
+			cy.get('.profile-post').should('have.length', 3);
+
+			cy.get('.profile-post').should(($tiles) => {
+				$tiles.each((index, tile) => {
+					const { width, height } = tile.getBoundingClientRect();
+
+					expect(Math.abs(height - (width * 4) / 3), `tile ${index} height`).to.be.lessThan(1);
+				});
+			});
+
+			cy.get('.profile-post img').each(($image) => {
+				cy.wrap($image).should('have.css', 'object-fit', 'contain');
+			});
+		});
+
+		it('shows the feed image with the whole photo contained', () => {
+			cy.visit(`${gridPath()}/posts`);
+
+			cy.get('.user-post-image img').should('have.length', 3);
+
+			cy.get('.user-post-image img').each(($image) => {
+				cy.wrap($image).should('have.css', 'object-fit', 'contain');
+			});
+		});
+
+		it('fills the empty bars of the tile and the feed image with the surface colour in light mode', () => {
+			setThemeViaApi(gridAuthorSession, 'light');
+			visitAsUser(gridPath(), gridAuthorSession);
+
+			cy.get('html').should('have.attr', 'data-theme', 'light');
+			cy.get('.profile-post img').first().should('have.css', 'background-color', 'rgb(255, 255, 255)');
+
+			cy.visit(`${gridPath()}/posts`);
+
+			cy.get('.user-post-image img').first().should('have.css', 'background-color', 'rgb(255, 255, 255)');
+		});
+
+		it('fills the empty bars of the tile and the feed image with the surface colour in dark mode', () => {
+			setThemeViaApi(gridAuthorSession, 'dark');
+			visitAsUser(gridPath(), gridAuthorSession);
+
+			cy.get('html').should('have.attr', 'data-theme', 'dark');
+			cy.get('.profile-post img').first().should('have.css', 'background-color', 'rgb(22, 22, 22)');
+
+			cy.visit(`${gridPath()}/posts`);
+
+			cy.get('.user-post-image img').first().should('have.css', 'background-color', 'rgb(22, 22, 22)');
+
+			setThemeViaApi(gridAuthorSession, 'light');
+		});
+
+		it('draws the three-dots circle at 32px on desktop', () => {
+			cy.viewport(1440, 900);
+			visitAsUser(gridPath(), gridAuthorSession);
+
+			expectActionsCircleSize(32);
+		});
+
+		it('draws the three-dots circle at 24px inside a 32px tap area on mobile', () => {
+			cy.viewport(390, 844);
+			visitAsUser(gridPath(), gridAuthorSession);
+
+			expectActionsCircleSize(24);
+		});
+	});
+
+	describe('the feed image limits', () => {
+		const shapeAuthor = buildTestUser();
+		const TOLERANCE = 1;
+
+		let shapeAuthorSession;
+		let shapeAuthorId;
+
+		const readImage = (caption) =>
+			cy
+				.contains('.user-post', caption)
+				.find('.user-post-image img')
+				.should(($image) => {
+					expect($image[0].complete && $image[0].naturalWidth > 0, 'image loaded').to.eq(true);
+				});
+
+		const measure = ($image) => {
+			const box = $image[0].getBoundingClientRect();
+			const naturalRatio = $image[0].naturalWidth / $image[0].naturalHeight;
+
+			return {
+				boxWidth: box.width,
+				boxHeight: box.height,
+				naturalRatio,
+				drawnWidth: Math.min(box.width, box.height * naturalRatio),
+				drawnHeight: Math.min(box.height, box.width / naturalRatio),
+			};
+		};
+
+		before(() => {
+			createUserViaApi(shapeAuthor);
+
+			loginViaApi(shapeAuthor).then((session) => {
+				shapeAuthorSession = session;
+				shapeAuthorId = userIdFromSession(session);
+			});
+
+			cy.then(() => uploadSizedPostViaApi(shapeAuthorSession, 'very tall', 1000, 3000));
+			cy.then(() => uploadSizedPostViaApi(shapeAuthorSession, 'very wide', 3000, 1000));
+		});
+
+		after(() => {
+			cy.task('deleteTestUser', shapeAuthor.email);
+		});
+
+		beforeEach(() => {
+			cy.visit(`/user/${shapeAuthorId}/posts`);
+			cy.get('.user-post').should('have.length', 2);
+		});
+
+		it('clamps a very tall photo to a 4:5 box and shows all of it', () => {
+			readImage('very tall').then(($image) => {
+				const { boxWidth, boxHeight, naturalRatio, drawnWidth, drawnHeight } = measure($image);
+
+				expect(naturalRatio).to.be.lessThan(0.5);
+				expect(Math.abs(boxHeight - (boxWidth * 5) / 4)).to.be.lessThan(TOLERANCE);
+				expect(drawnWidth).to.be.lessThan(boxWidth - TOLERANCE);
+				expect(Math.abs(drawnHeight - boxHeight)).to.be.lessThan(TOLERANCE);
+				expect(Math.abs(drawnWidth - boxHeight * naturalRatio)).to.be.lessThan(TOLERANCE);
+			});
+		});
+
+		it('clamps a very wide photo to a 1.91:1 box and shows all of it', () => {
+			readImage('very wide').then(($image) => {
+				const { boxWidth, boxHeight, naturalRatio, drawnWidth, drawnHeight } = measure($image);
+
+				expect(naturalRatio).to.be.greaterThan(2);
+				expect(Math.abs(boxWidth - boxHeight * 1.91)).to.be.lessThan(TOLERANCE);
+				expect(drawnHeight).to.be.lessThan(boxHeight - TOLERANCE);
+				expect(Math.abs(drawnWidth - boxWidth)).to.be.lessThan(TOLERANCE);
+				expect(Math.abs(drawnHeight - boxWidth / naturalRatio)).to.be.lessThan(TOLERANCE);
+			});
 		});
 	});
 

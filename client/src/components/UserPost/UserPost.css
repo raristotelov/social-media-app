@@ -78,7 +78,8 @@
 .user-post-image img {
 	display: block;
 	width: 100%;
-	object-fit: cover;
+	object-fit: contain;
+	background-color: var(--background-surface);
 }
 
 .user-post-footer {

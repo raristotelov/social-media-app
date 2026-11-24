@@ -67,8 +67,26 @@ const loadFixtureImage = () =>
 
 const decodeJsonBody = (body) => JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body));
 
-const uploadImageViaApi = ({ method, url, session, imageField, fields = {} }) =>
-	loadFixtureImage()
+const buildSolidPngFile = (width, height) =>
+	cy.window().then(
+		(win) =>
+			new Cypress.Promise((resolve) => {
+				const canvas = win.document.createElement('canvas');
+
+				canvas.width = width;
+				canvas.height = height;
+
+				const context = canvas.getContext('2d');
+
+				context.fillStyle = '#3366cc';
+				context.fillRect(0, 0, width, height);
+
+				canvas.toBlob((blob) => resolve(new File([blob], `${width}x${height}.png`, { type: 'image/png' })), 'image/png');
+			}),
+	);
+
+const uploadImageViaApi = ({ method, url, session, imageField, fields = {}, loadImage = loadFixtureImage }) =>
+	loadImage()
 		.then((image) => {
 			const body = new FormData();
 
@@ -81,6 +99,16 @@ const uploadImageViaApi = ({ method, url, session, imageField, fields = {} }) =>
 
 export const uploadPostViaApi = (session, caption) =>
 	uploadImageViaApi({ method: 'POST', url: `${serverUrl}/user-posts`, session, imageField: 'image', fields: { caption } });
+
+export const uploadSizedPostViaApi = (session, caption, width, height) =>
+	uploadImageViaApi({
+		method: 'POST',
+		url: `${serverUrl}/user-posts`,
+		session,
+		imageField: 'image',
+		fields: { caption },
+		loadImage: () => buildSolidPngFile(width, height),
+	});
 
 export const uploadProfilePictureViaApi = (session) =>
 	uploadImageViaApi({

@@ -142,6 +142,37 @@ describe('creating a story', () => {
 		cy.get('#add-image-post-form textarea.caption-input').should('have.value', 'Kept caption');
 	});
 
+	it('keeps the Story-tab frame at 214 by 380 on desktop', () => {
+		cy.viewport(1440, 900);
+		visitAsUser(`/user/${userId}`, session);
+
+		cy.get('.add-post-button').click();
+		cy.contains('.create-popup [role="tab"]', 'Story').click();
+		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
+
+		cy.get('#add-image-post-form .preview-wrapper:not(.hidden)').should(($frame) => {
+			const { width, height } = $frame[0].getBoundingClientRect();
+
+			expect(Math.round(width), 'frame width').to.equal(214);
+			expect(Math.round(height), 'frame height').to.equal(380);
+		});
+	});
+
+	it('keeps the Story-tab frame 9:16 on mobile', () => {
+		cy.viewport(390, 844);
+		visitAsUser(`/user/${userId}`, session);
+
+		cy.get('.add-post-button').click();
+		cy.contains('.create-popup [role="tab"]', 'Story').click();
+		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
+
+		cy.get('#add-image-post-form .preview-wrapper:not(.hidden)').should(($frame) => {
+			const { width, height } = $frame[0].getBoundingClientRect();
+
+			expect(Math.abs(width - (height * 9) / 16)).to.be.lessThan(1);
+		});
+	});
+
 	it('shares a story from the profile popup after switching to the Story tab, and adds no post tile', () => {
 		visitAsUser(`/user/${userId}`, session);
 

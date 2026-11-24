@@ -25,7 +25,8 @@ Colours live as a Figma **variable collection (`Colours`) with Light and Dark mo
 | `static/white` | `#FFFFFF` | `#FFFFFF` | Content **on** a colour or photo — button labels, tile hover counts |
 | `avatar/placeholder-disc` | `#E8E8E8` | `#2A2A2A` | No-profile-picture disc |
 | `avatar/placeholder-figure` | `#9A9A9A` | `#5A5A5A` | No-profile-picture silhouette |
-| `overlay/button-hover` | `#000000` at 40% | `#000000` at 40% | Hover circle behind round buttons sitting on a photo (post actions) |
+| `overlay/button-hover` | `#000000` at 40% | `#000000` at 40% | Circle behind round buttons sitting on a photo (post actions) |
+| `overlay/button-hover-strong` | `#000000` at 60% | `#000000` at 60% | That circle on hover |
 
 **Rule:** brand red is reserved for identity and interactive/active accents — never body text.
 
@@ -100,7 +101,7 @@ Raw `itemSpacing` differs from these where items carry internal padding — alwa
 
 **Content widths:** desktop grids 900 · desktop feed column 500 · tablet grids 720 · mobile grids full-bleed.
 
-**Post grids:** 292px square tiles with 12px gaps (desktop) · 232/12 (tablet) · 128.67/2 full-bleed (mobile).
+**Post grids:** 3:4 tiles, 292px wide with 12px gaps (desktop) · 232/12 (tablet) · 128.67/2 full-bleed (mobile).
 
 **Figma canvas:** 200px between frames in a column · 400px between sections · 80px section padding.
 
