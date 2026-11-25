@@ -65,6 +65,10 @@
 	color: var(--brand-red);
 }
 
+.suggested-user-follow-link.is-followed {
+	color: var(--text-primary);
+}
+
 .suggested-user-follow-link:hover {
 	cursor: pointer;
 }

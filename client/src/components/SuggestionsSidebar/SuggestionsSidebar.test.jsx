@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getSuggestions } from '../../services/suggestionService';
-import { followUser } from '../../services/userService';
+import { followUser, unfollowUser } from '../../services/userService';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -25,7 +25,7 @@ const suggestions = [
 	buildSuggestion('n1', 'new'),
 ];
 
-const renderSidebar = ({ result = { suggestions, reserve: [], isCarouselDismissed: false } } = {}) => {
+const renderSidebar = ({ result = { suggestions, isCarouselDismissed: false } } = {}) => {
 	getSuggestions.mockResolvedValue(result);
 
 	return render(
@@ -43,6 +43,7 @@ describe('SuggestionsSidebar', () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
 		followUser.mockResolvedValue({ user: loggedInUser });
+		unfollowUser.mockResolvedValue({ user: loggedInUser });
 	});
 
 	it('requests the sidebar placement', async () => {
@@ -121,47 +122,156 @@ describe('SuggestionsSidebar', () => {
 	});
 
 	it('is hidden when there are no suggestions', async () => {
-		renderSidebar({ result: { suggestions: [], reserve: [], isCarouselDismissed: false } });
+		renderSidebar({ result: { suggestions: [], isCarouselDismissed: false } });
 
 		await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
 
 		expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 	});
 
-	it('removes a followed user at once and fills the gap from the spares', async () => {
-		const user = userEvent.setup();
+	const getActionButtons = (sidebar) => within(sidebar).getAllByRole('button');
 
-		followUser.mockReturnValue(new Promise(() => {}));
-		renderSidebar({ result: { suggestions, reserve: [buildSuggestion('p3', 'popular')], isCarouselDismissed: false } });
+	describe('following', () => {
+		it('keeps the followed user in place and switches their button to Unfollow at once', async () => {
+			const user = userEvent.setup();
 
-		await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			followUser.mockReturnValue(new Promise(() => {}));
+			renderSidebar();
 
-		expect(screen.queryByRole('button', { name: 'Follow name-p1' })).not.toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Follow name-p3' })).toBeInTheDocument();
-		expect(screen.getAllByRole('button', { name: /^Follow / })).toHaveLength(5);
-	});
+			const sidebar = await screen.findByRole('complementary', { name: 'Suggested for you' });
 
-	it('shows the list one shorter when no spare is left', async () => {
-		const user = userEvent.setup();
+			await user.click(screen.getByRole('button', { name: 'Follow name-p1' }));
 
-		renderSidebar();
+			expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Follow name-p1' })).not.toBeInTheDocument();
+			expect(getActionButtons(sidebar).map((button) => button.getAttribute('aria-label'))).toEqual([
+				'Follow name-m1',
+				'Follow name-m2',
+				'Unfollow name-p1',
+				'Follow name-p2',
+				'Follow name-n1',
+			]);
+		});
 
-		await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+		it('keeps the same rows in the same order after the follow succeeds', async () => {
+			const user = userEvent.setup();
 
-		await waitFor(() => expect(screen.getAllByRole('button', { name: /^Follow / })).toHaveLength(4));
-	});
+			renderSidebar();
 
-	it('puts the user back and shows the follow toast when the request fails', async () => {
-		const user = userEvent.setup();
+			const sidebar = await screen.findByRole('complementary', { name: 'Suggested for you' });
 
-		followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-		renderSidebar();
+			await user.click(screen.getByRole('button', { name: 'Follow name-p1' }));
 
-		await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await screen.findByRole('button', { name: 'Unfollow name-p1' });
 
-		expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();
-		expect(screen.getAllByRole('button', { name: /^Follow / })).toHaveLength(5);
+			expect(
+				within(sidebar)
+					.getAllByRole('link')
+					.map((link) => link.getAttribute('href')),
+			).toEqual(['/user/m1', '/user/m2', '/user/p1', '/user/p2', '/user/n1']);
+		});
+
+		it('styles Unfollow as the followed text link', async () => {
+			const user = userEvent.setup();
+
+			renderSidebar();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+
+			expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toHaveClass('suggested-user-follow-link', 'is-followed');
+			expect(screen.getByRole('button', { name: 'Follow name-p2' })).not.toHaveClass('is-followed');
+		});
+
+		it('turns Unfollow back into Follow when clicked, and sends the unfollow request', async () => {
+			const user = userEvent.setup();
+
+			renderSidebar();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Unfollow name-p1' }));
+
+			expect(await screen.findByRole('button', { name: 'Follow name-p1' })).not.toHaveClass('is-followed');
+			expect(unfollowUser).toHaveBeenCalledTimes(1);
+			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'me', userIdToUnfollow: 'p1' });
+			expect(screen.getAllByRole('button')).toHaveLength(5);
+		});
+
+		it('turns back to Follow and shows the follow toast when the request fails', async () => {
+			const user = userEvent.setup();
+
+			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			renderSidebar();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+
+			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /^Unfollow / })).not.toBeInTheDocument();
+			expect(screen.getAllByRole('button', { name: /^Follow / })).toHaveLength(5);
+		});
+
+		it('turns back to Unfollow and shows the unfollow toast when the unfollow fails', async () => {
+			const user = userEvent.setup();
+
+			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			renderSidebar();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Unfollow name-p1' }));
+
+			expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
+			expect(await screen.findByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+		});
+
+		it('follows two users at once, each keeping their own button', async () => {
+			const user = userEvent.setup();
+
+			followUser.mockReturnValue(new Promise(() => {}));
+			renderSidebar();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(screen.getByRole('button', { name: 'Follow name-n1' }));
+
+			expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Unfollow name-n1' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Follow name-m1' })).toBeInTheDocument();
+			expect(followUser).toHaveBeenCalledTimes(2);
+		});
+
+		it('sends one request when the button is clicked again before the follow returns', async () => {
+			const user = userEvent.setup();
+
+			followUser.mockReturnValue(new Promise(() => {}));
+			renderSidebar();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+
+			expect(followUser).toHaveBeenCalledTimes(1);
+			expect(unfollowUser).not.toHaveBeenCalled();
+		});
+
+		it('ends the session without a toast when the follow fails with UNAUTHENTICATED', async () => {
+			const user = userEvent.setup();
+			const endSession = vi.fn();
+
+			followUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			getSuggestions.mockResolvedValue({ suggestions, isCarouselDismissed: false });
+			render(
+				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession }}>
+					<ToastProvider>
+						<MemoryRouter>
+							<SuggestionsSidebar />
+						</MemoryRouter>
+					</ToastProvider>
+				</LoggedInUserContext.Provider>,
+			);
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+
+			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
+			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+		});
 	});
 
 	it('has no dismiss button: only the carousel can be dismissed', async () => {

@@ -595,8 +595,8 @@ describe('visitor visibility against a real database', () => {
 
 	describe('suggestions (GET /suggestions)', () => {
 		it.each(['sidebar', 'carousel', 'empty-feed'])('should never suggest a visitor to a regular user (%s)', async (placement) => {
-			const { suggestions, reserve } = await getJson(`/suggestions?placement=${placement}`, { as: world.r1 });
-			const suggestedIds = [...suggestions, ...reserve].map((suggestion) => String(suggestion._id));
+			const { suggestions } = await getJson(`/suggestions?placement=${placement}`, { as: world.r1 });
+			const suggestedIds = suggestions.map((suggestion) => String(suggestion._id));
 
 			expect(suggestions.length).toBeGreaterThan(0);
 			expect(suggestedIds).not.toContain(String(world.v1._id));
@@ -604,8 +604,8 @@ describe('visitor visibility against a real database', () => {
 		});
 
 		it('should never suggest another visitor to a visitor', async () => {
-			const { suggestions, reserve } = await getJson('/suggestions?placement=carousel', { as: world.v1 });
-			const suggestedIds = [...suggestions, ...reserve].map((suggestion) => String(suggestion._id));
+			const { suggestions } = await getJson('/suggestions?placement=carousel', { as: world.v1 });
+			const suggestedIds = suggestions.map((suggestion) => String(suggestion._id));
 
 			expect(suggestedIds).not.toContain(String(world.v2._id));
 		});

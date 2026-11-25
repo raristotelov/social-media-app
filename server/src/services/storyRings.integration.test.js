@@ -479,7 +479,7 @@ describe('story rings against a real database', () => {
 			expect(storyOf(suggestions, 'poster')).toEqual({ isWatched: true });
 		});
 
-		it('carry the story on reserve rows too', async () => {
+		it('carry the story on every row of a full list', async () => {
 			const crowd = [];
 
 			for (let index = 0; index < 12; index += 1) {
@@ -490,12 +490,11 @@ describe('story rings against a real database', () => {
 				await createStory(candidate);
 			}
 
-			const { suggestions, reserve } = await fetchSuggestions(viewer);
+			const { suggestions } = await fetchSuggestions(viewer);
+			const crowdRows = suggestions.filter((row) => row.username.startsWith('crowd'));
 
-			expect(reserve.length).toBeGreaterThan(0);
-			expect(
-				[...suggestions, ...reserve].filter((row) => row.username.startsWith('crowd')).every((row) => row.story?.isWatched === false),
-			).toBe(true);
+			expect(crowdRows.length).toBeGreaterThan(0);
+			expect(crowdRows.every((row) => row.story?.isWatched === false)).toBe(true);
 		});
 
 		it('ignore expired stories', async () => {

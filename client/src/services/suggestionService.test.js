@@ -6,7 +6,7 @@ vi.mock('./requester');
 describe('suggestionService', () => {
 	describe('getSuggestions', () => {
 		it.each([['sidebar'], ['carousel'], ['empty-feed']])('gets the suggestions endpoint with the %s placement', async (placement) => {
-			const get = vi.fn().mockResolvedValue({ suggestions: [], reserve: [], isCarouselDismissed: false });
+			const get = vi.fn().mockResolvedValue({ suggestions: [], isCarouselDismissed: false });
 
 			requestFactory.mockReturnValue({ get });
 
@@ -17,7 +17,7 @@ describe('suggestionService', () => {
 		});
 
 		it('resolves with the server result', async () => {
-			const result = { suggestions: [{ _id: 'u2' }], reserve: [{ _id: 'u3' }], isCarouselDismissed: false };
+			const result = { suggestions: [{ _id: 'u2' }], isCarouselDismissed: false };
 
 			requestFactory.mockReturnValue({ get: vi.fn().mockResolvedValue(result) });
 

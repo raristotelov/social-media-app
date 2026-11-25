@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { dismissSuggestionsCarousel, getSuggestions } from '../../services/suggestionService';
-import { followUser } from '../../services/userService';
+import { followUser, unfollowUser } from '../../services/userService';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
 
@@ -24,7 +24,7 @@ const suggestions = [
 	buildSuggestion('n1', 'new'),
 ];
 
-const renderCarousel = ({ result = { suggestions, reserve: [], isCarouselDismissed: false }, endSession = vi.fn() } = {}) => {
+const renderCarousel = ({ result = { suggestions, isCarouselDismissed: false }, endSession = vi.fn() } = {}) => {
 	getSuggestions.mockResolvedValue(result);
 
 	const rendered = render(
@@ -44,6 +44,7 @@ describe('SuggestionsCarousel', () => {
 	beforeEach(() => {
 		vi.resetAllMocks();
 		followUser.mockResolvedValue({ user: loggedInUser });
+		unfollowUser.mockResolvedValue({ user: loggedInUser });
 		dismissSuggestionsCarousel.mockResolvedValue(undefined);
 	});
 
@@ -113,7 +114,7 @@ describe('SuggestionsCarousel', () => {
 	});
 
 	it('is hidden when there are no suggestions', async () => {
-		renderCarousel({ result: { suggestions: [], reserve: [], isCarouselDismissed: false } });
+		renderCarousel({ result: { suggestions: [], isCarouselDismissed: false } });
 
 		await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
 
@@ -121,7 +122,7 @@ describe('SuggestionsCarousel', () => {
 	});
 
 	it('is hidden when the server says it is dismissed', async () => {
-		renderCarousel({ result: { suggestions: [], reserve: [], isCarouselDismissed: true } });
+		renderCarousel({ result: { suggestions: [], isCarouselDismissed: true } });
 
 		await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
 
@@ -129,7 +130,7 @@ describe('SuggestionsCarousel', () => {
 	});
 
 	it('is hidden when dismissed even if suggestions came with it', async () => {
-		renderCarousel({ result: { suggestions, reserve: [], isCarouselDismissed: true } });
+		renderCarousel({ result: { suggestions, isCarouselDismissed: true } });
 
 		await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
 
@@ -202,30 +203,55 @@ describe('SuggestionsCarousel', () => {
 			expect(button).not.toHaveClass('button-secondary');
 		});
 
-		it('removes the followed card at once and fills the gap from the spares', async () => {
+		it('keeps the followed card in place and switches it to a secondary Unfollow button at once', async () => {
 			const user = userEvent.setup();
 
 			followUser.mockReturnValue(new Promise(() => {}));
-			renderCarousel({ result: { suggestions, reserve: [buildSuggestion('p3', 'popular')], isCarouselDismissed: false } });
+			renderCarousel();
+
+			const carousel = await screen.findByRole('region', { name: 'Suggested for you' });
+
+			await user.click(screen.getByRole('button', { name: 'Follow name-p1' }));
+
+			const unfollowButton = screen.getByRole('button', { name: 'Unfollow name-p1' });
+
+			expect(unfollowButton).toHaveTextContent('Unfollow');
+			expect(unfollowButton).toHaveClass('button-secondary');
+			expect(screen.queryByRole('button', { name: 'Follow name-p1' })).not.toBeInTheDocument();
+			expect(within(carousel).getAllByRole('article')).toHaveLength(4);
+			expect(
+				within(carousel)
+					.getAllByRole('link')
+					.map((link) => link.getAttribute('href')),
+			).toEqual(['/user/m1', '/user/p1', '/user/p2', '/user/n1']);
+		});
+
+		it('keeps the other cards as primary Follow buttons', async () => {
+			const user = userEvent.setup();
+
+			followUser.mockReturnValue(new Promise(() => {}));
+			renderCarousel();
 
 			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
 
-			expect(screen.queryByRole('button', { name: 'Follow name-p1' })).not.toBeInTheDocument();
-			expect(screen.getByRole('button', { name: 'Follow name-p3' })).toBeInTheDocument();
-			expect(screen.getAllByRole('article')).toHaveLength(4);
+			expect(screen.getByRole('button', { name: 'Follow name-p2' })).not.toHaveClass('button-secondary');
 		});
 
-		it('shows one card fewer when no spare is left', async () => {
+		it('turns Unfollow back into a primary Follow when clicked, and sends the unfollow request', async () => {
 			const user = userEvent.setup();
 
 			renderCarousel();
 
 			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Unfollow name-p1' }));
 
-			await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(3));
+			expect(await screen.findByRole('button', { name: 'Follow name-p1' })).not.toHaveClass('button-secondary');
+			expect(unfollowUser).toHaveBeenCalledTimes(1);
+			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'me', userIdToUnfollow: 'p1' });
+			expect(screen.getAllByRole('article')).toHaveLength(4);
 		});
 
-		it('puts the card back and shows the follow toast when the request fails', async () => {
+		it('turns back to Follow and shows the follow toast when the request fails', async () => {
 			const user = userEvent.setup();
 
 			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
@@ -235,7 +261,61 @@ describe('SuggestionsCarousel', () => {
 
 			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
 			expect(screen.getByRole('button', { name: 'Follow name-p1' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: /^Unfollow / })).not.toBeInTheDocument();
 			expect(screen.getAllByRole('article')).toHaveLength(4);
+		});
+
+		it('turns back to Unfollow and shows the unfollow toast when the unfollow fails', async () => {
+			const user = userEvent.setup();
+
+			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			renderCarousel();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(await screen.findByRole('button', { name: 'Unfollow name-p1' }));
+
+			expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
+			expect(await screen.findByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+		});
+
+		it('follows two users at once, each keeping their own button', async () => {
+			const user = userEvent.setup();
+
+			followUser.mockReturnValue(new Promise(() => {}));
+			renderCarousel();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(screen.getByRole('button', { name: 'Follow name-n1' }));
+
+			expect(screen.getByRole('button', { name: 'Unfollow name-p1' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Unfollow name-n1' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Follow name-m1' })).toBeInTheDocument();
+			expect(followUser).toHaveBeenCalledTimes(2);
+		});
+
+		it('sends one request when the button is clicked again before the follow returns', async () => {
+			const user = userEvent.setup();
+
+			followUser.mockReturnValue(new Promise(() => {}));
+			renderCarousel();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+			await user.click(screen.getByRole('button', { name: 'Unfollow name-p1' }));
+
+			expect(followUser).toHaveBeenCalledTimes(1);
+			expect(unfollowUser).not.toHaveBeenCalled();
+		});
+
+		it('ends the session without a toast when the follow fails with UNAUTHENTICATED', async () => {
+			const user = userEvent.setup();
+
+			followUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			const { endSession } = renderCarousel();
+
+			await user.click(await screen.findByRole('button', { name: 'Follow name-p1' }));
+
+			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
+			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
 		});
 	});
 });

@@ -28,7 +28,12 @@ const SuggestedUser = ({ suggestion, actionStyle, isFollowed = false, onFollowCl
 			</Link>
 
 			{actionStyle === SUGGESTED_USER_ACTION_STYLES.LINK ? (
-				<button type='button' className='suggested-user-follow-link' aria-label={`${actionLabel} ${username}`} onClick={handleActionClick}>
+				<button
+					type='button'
+					className={isFollowed ? 'suggested-user-follow-link is-followed' : 'suggested-user-follow-link'}
+					aria-label={`${actionLabel} ${username}`}
+					onClick={handleActionClick}
+				>
 					{actionLabel}
 				</button>
 			) : (

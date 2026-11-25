@@ -7,7 +7,9 @@ import CloseIcon from '../icons/Close';
 import './SuggestionsCarousel.css';
 
 const SuggestionsCarousel = () => {
-	const { suggestions, isLoaded, isCarouselDismissed, followSuggestion, dismissCarousel } = useSuggestions(SUGGESTION_PLACEMENTS.CAROUSEL);
+	const { suggestions, followedIds, isLoaded, isCarouselDismissed, followSuggestion, unfollowSuggestion, dismissCarousel } = useSuggestions(
+		SUGGESTION_PLACEMENTS.CAROUSEL,
+	);
 
 	if (!isLoaded || isCarouselDismissed || !suggestions.length) {
 		return null;
@@ -25,7 +27,13 @@ const SuggestionsCarousel = () => {
 
 			<div className='suggestions-carousel-cards'>
 				{suggestions.map((suggestion) => (
-					<SuggestionCard key={suggestion._id} suggestion={suggestion} onFollowClick={followSuggestion} />
+					<SuggestionCard
+						key={suggestion._id}
+						suggestion={suggestion}
+						isFollowed={followedIds.includes(suggestion._id)}
+						onFollowClick={followSuggestion}
+						onUnfollowClick={unfollowSuggestion}
+					/>
 				))}
 			</div>
 		</section>

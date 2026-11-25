@@ -134,7 +134,7 @@ const getSuggestions = async ({ userId, placement }) => {
 			throw new AppError('Unknown suggestions placement', 400, { code: ERROR_CODES.BAD_REQUEST });
 		}
 
-		const { mix, reserveSize } = SUGGESTION_PLACEMENT_CONFIG[placement];
+		const { mix } = SUGGESTION_PLACEMENT_CONFIG[placement];
 
 		const currentUser = await UserModel.findById(userId).select({ following: 1, suggestionsCarouselDismissedUntil: 1 }).lean();
 
@@ -143,14 +143,14 @@ const getSuggestions = async ({ userId, placement }) => {
 		}
 
 		if (placement === SUGGESTION_PLACEMENTS.CAROUSEL && isCarouselDismissed(currentUser)) {
-			return { suggestions: [], reserve: [], isCarouselDismissed: true };
+			return { suggestions: [], isCarouselDismissed: true };
 		}
 
 		const followingIds = currentUser.following ?? [];
 		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
 		const excludedIds = [currentUser._id, ...followingIds, ...hiddenVisitorIds];
 		const size = Object.values(mix).reduce((total, groupCount) => total + groupCount, 0);
-		const poolSize = (size + reserveSize) * POOL_SIZE_FACTOR;
+		const poolSize = size * POOL_SIZE_FACTOR;
 
 		const [mutualPool, popularPool, newPool] = await Promise.all([
 			mix[SUGGESTION_GROUPS.MUTUAL] ? getMutualPool({ excludedIds, followingIds, poolSize }) : [],
@@ -160,7 +160,7 @@ const getSuggestions = async ({ userId, placement }) => {
 
 		const resolvedMutualPool = await resolveMutualPool(mutualPool);
 
-		const { suggestions, reserve } = selectSuggestions({
+		const suggestions = selectSuggestions({
 			pools: {
 				[SUGGESTION_GROUPS.MUTUAL]: resolvedMutualPool,
 				[SUGGESTION_GROUPS.POPULAR]: popularPool,
@@ -168,18 +168,11 @@ const getSuggestions = async ({ userId, placement }) => {
 			},
 			mix,
 			size,
-			reserveSize,
 		});
 
-		const suggestionsData = suggestions.map(toSuggestionData);
-		const reserveData = reserve.map(toSuggestionData);
-		const withStories = await storyService.withStorySummaries({ users: [...suggestionsData, ...reserveData], viewerId: userId });
+		const suggestionsWithStories = await storyService.withStorySummaries({ users: suggestions.map(toSuggestionData), viewerId: userId });
 
-		return {
-			suggestions: withStories.slice(0, suggestionsData.length),
-			reserve: withStories.slice(suggestionsData.length),
-			isCarouselDismissed: false,
-		};
+		return { suggestions: suggestionsWithStories, isCarouselDismissed: false };
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;

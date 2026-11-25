@@ -8,8 +8,11 @@ import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
 import './SuggestionCard.css';
 
-const SuggestionCard = ({ suggestion, onFollowClick }) => {
+const SuggestionCard = ({ suggestion, isFollowed = false, onFollowClick, onUnfollowClick }) => {
 	const { _id: userId, username, profilePicture, story } = suggestion;
+
+	const actionLabel = isFollowed ? 'Unfollow' : 'Follow';
+	const handleActionClick = () => (isFollowed ? onUnfollowClick(userId) : onFollowClick(userId));
 
 	return (
 		<article className='suggestion-card'>
@@ -24,10 +27,10 @@ const SuggestionCard = ({ suggestion, onFollowClick }) => {
 			<Button
 				type='button'
 				className='suggestion-card-follow-button'
-				variant='primary'
-				label='Follow'
-				aria-label={`Follow ${username}`}
-				onClick={() => onFollowClick(userId)}
+				variant={isFollowed ? 'secondary' : 'primary'}
+				label={actionLabel}
+				aria-label={`${actionLabel} ${username}`}
+				onClick={handleActionClick}
 			/>
 		</article>
 	);

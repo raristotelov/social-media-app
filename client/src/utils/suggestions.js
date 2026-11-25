@@ -1,5 +1,5 @@
 import { APP_NAME } from '../constants/app';
-import { SUGGESTION_GROUPS, SUGGESTION_GROUP_ORDER } from '../constants/suggestions';
+import { SUGGESTION_GROUPS } from '../constants/suggestions';
 
 export const getSuggestionReason = (suggestion) => {
 	if (suggestion.group === SUGGESTION_GROUPS.MUTUAL && suggestion.followedBy) {
@@ -13,12 +13,4 @@ export const getSuggestionReason = (suggestion) => {
 	}
 
 	return `Popular on ${APP_NAME}`;
-};
-
-const getGroupRank = (suggestion) => SUGGESTION_GROUP_ORDER.indexOf(suggestion.group);
-
-export const insertInGroupOrder = (suggestions, suggestion) => {
-	const insertIndex = suggestions.findLastIndex((existing) => getGroupRank(existing) <= getGroupRank(suggestion)) + 1;
-
-	return [...suggestions.slice(0, insertIndex), suggestion, ...suggestions.slice(insertIndex)];
 };

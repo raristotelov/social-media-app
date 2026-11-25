@@ -22,7 +22,7 @@ const suggestions = [
 	...['n1', 'n2', 'n3'].map((id) => buildSuggestion(id, 'new')),
 ];
 
-const renderList = ({ result = { suggestions, reserve: [], isCarouselDismissed: false }, onFollowChange = vi.fn() } = {}) => {
+const renderList = ({ result = { suggestions, isCarouselDismissed: false }, onFollowChange = vi.fn() } = {}) => {
 	getSuggestions.mockResolvedValue(result);
 
 	const rendered = render(
@@ -123,7 +123,7 @@ describe('EmptyFeedSuggestions', () => {
 	});
 
 	it('shows nothing when there is nobody to suggest', async () => {
-		renderList({ result: { suggestions: [], reserve: [], isCarouselDismissed: false } });
+		renderList({ result: { suggestions: [], isCarouselDismissed: false } });
 
 		await waitFor(() => expect(getSuggestions).toHaveBeenCalled());
 

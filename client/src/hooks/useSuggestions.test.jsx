@@ -34,9 +34,8 @@ const buildDeferred = () => {
 	return deferred;
 };
 
-const buildResult = ({ suggestions = SIDEBAR_SUGGESTIONS, reserve = [], isCarouselDismissed = false } = {}) => ({
+const buildResult = ({ suggestions = SIDEBAR_SUGGESTIONS, isCarouselDismissed = false } = {}) => ({
 	suggestions,
-	reserve,
 	isCarouselDismissed,
 });
 
@@ -135,28 +134,13 @@ describe('useSuggestions', () => {
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
 		});
-
-		it('ignores a response that arrives after unmounting', async () => {
-			const request = buildDeferred();
-
-			getSuggestions.mockReturnValue(request.promise);
-			const wrapper = ({ children }) => (
-				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
-					<ToastProvider>{children}</ToastProvider>
-				</LoggedInUserContext.Provider>
-			);
-			const { result, unmount } = renderHook(() => useSuggestions('sidebar'), { wrapper });
-
-			unmount();
-			await act(async () => request.resolve(buildResult()));
-
-			expect(result.current.isLoaded).toBe(false);
-		});
 	});
 
-	describe('following from the sidebar or carousel', () => {
-		it('removes the user from the list straight away, before the request returns', async () => {
-			const { result } = await renderSuggestions();
+	describe.each([['sidebar'], ['carousel'], ['empty-feed']])('following and unfollowing in the %s placement', (placement) => {
+		const renderPlacement = (options) => renderSuggestions({ placement, options });
+
+		it('keeps the user in place and marks them followed straight away, before the request returns', async () => {
+			const { result } = await renderPlacement();
 
 			followUser.mockReturnValue(new Promise(() => {}));
 
@@ -164,217 +148,39 @@ describe('useSuggestions', () => {
 				result.current.followSuggestion('p1');
 			});
 
-			expect(getIds(result)).toEqual(['m1', 'm2', 'p2', 'n1']);
+			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
+			expect(result.current.followedIds).toEqual(['p1']);
 		});
 
 		it('sends the follow request for that user', async () => {
-			const { result } = await renderSuggestions();
+			const { result } = await renderPlacement();
 
 			await act(() => result.current.followSuggestion('p1'));
 
+			expect(followUser).toHaveBeenCalledTimes(1);
 			expect(followUser).toHaveBeenCalledWith({ userId: 'me', userIdToFollow: 'p1' });
 		});
 
-		it('fills the gap with the first spare suggestion, keeping the list size', async () => {
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve: [buildSuggestion('p3', 'popular')] }) });
-
-			await act(() => result.current.followSuggestion('m1'));
-
-			expect(result.current.suggestions).toHaveLength(5);
-			expect(getIds(result)).toContain('p3');
-		});
-
-		it('places the replacement in group order: a mutual replacement goes after the mutuals', async () => {
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve: [buildSuggestion('m3', 'mutual')] }) });
-
-			await act(() => result.current.followSuggestion('p1'));
-
-			expect(getIds(result)).toEqual(['m1', 'm2', 'm3', 'p2', 'n1']);
-		});
-
-		it('places a most-followed replacement after the other most-followed and before the new', async () => {
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve: [buildSuggestion('p3', 'popular')] }) });
-
-			await act(() => result.current.followSuggestion('m1'));
-
-			expect(getIds(result)).toEqual(['m2', 'p1', 'p2', 'p3', 'n1']);
-		});
-
-		it('keeps new users last: a new replacement goes at the end', async () => {
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve: [buildSuggestion('n2', 'new')] }) });
-
-			await act(() => result.current.followSuggestion('m1'));
-
-			expect(getIds(result)).toEqual(['m2', 'p1', 'p2', 'n1', 'n2']);
-		});
-
-		it('keeps new users last when a new user is followed and a most-followed one replaces them', async () => {
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve: [buildSuggestion('p3', 'popular')] }) });
-
-			await act(() => result.current.followSuggestion('n1'));
-
-			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'p3']);
-		});
-
-		it('takes spares in the order the server sent them', async () => {
-			const reserve = [buildSuggestion('p3', 'popular'), buildSuggestion('p4', 'popular')];
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve }) });
-
-			await act(() => result.current.followSuggestion('m1'));
-			await act(() => result.current.followSuggestion('m2'));
-
-			expect(getIds(result)).toEqual(['p1', 'p2', 'p3', 'p4', 'n1']);
-		});
-
-		it('shrinks the list once the spares run out', async () => {
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve: [buildSuggestion('p3', 'popular')] }) });
-
-			await act(() => result.current.followSuggestion('m1'));
-			await act(() => result.current.followSuggestion('m2'));
-
-			expect(getIds(result)).toEqual(['p1', 'p2', 'p3', 'n1']);
-		});
-
-		it('keeps the user out of the list once the follow succeeded', async () => {
-			const { result } = await renderSuggestions();
-
-			await act(() => result.current.followSuggestion('p1'));
-
-			expect(getIds(result)).not.toContain('p1');
-		});
-
-		it('puts the user back in their place and shows the follow toast when the request fails', async () => {
-			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			const { result } = await renderSuggestions();
+		it('keeps the user in place, followed and with the list size unchanged once the follow succeeded', async () => {
+			const { result } = await renderPlacement();
 
 			await act(() => result.current.followSuggestion('p1'));
 
 			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
-			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
-		});
-
-		it('sends the spare back to the reserve when the follow fails, so nobody is shown twice', async () => {
-			followUser.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 });
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve: [buildSuggestion('m3', 'mutual')] }) });
-
-			await act(() => result.current.followSuggestion('p1'));
-
-			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
-
-			await act(() => result.current.followSuggestion('p2'));
-
-			expect(getIds(result)).toEqual(['m1', 'm2', 'm3', 'p1', 'n1']);
-		});
-
-		it('restores the user to the same index', async () => {
-			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			const { result } = await renderSuggestions();
-
-			await act(() => result.current.followSuggestion('m2'));
-
-			expect(getIds(result).indexOf('m2')).toBe(1);
-		});
-
-		it('ends the session without a toast when the request fails with UNAUTHENTICATED', async () => {
-			followUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
-			const { result, endSession } = await renderSuggestions();
-
-			await act(() => result.current.followSuggestion('p1'));
-
-			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
-			expect(endSession).toHaveBeenCalledTimes(1);
-			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
-		});
-
-		it('sends one request when the same user is followed twice before the first returns', async () => {
-			const request = buildDeferred();
-
-			followUser.mockReturnValue(request.promise);
-			const { result } = await renderSuggestions();
-
-			act(() => {
-				result.current.followSuggestion('p1');
-				result.current.followSuggestion('p1');
-			});
-
-			expect(followUser).toHaveBeenCalledTimes(1);
-
-			await act(async () => request.resolve({ user: loggedInUser }));
-		});
-
-		it('can follow two different users at once', async () => {
-			followUser.mockReturnValue(new Promise(() => {}));
-			const { result } = await renderSuggestions();
-
-			act(() => {
-				result.current.followSuggestion('p1');
-				result.current.followSuggestion('n1');
-			});
-
-			expect(followUser).toHaveBeenCalledTimes(2);
-			expect(getIds(result)).toEqual(['m1', 'm2', 'p2']);
-		});
-
-		it('ignores following a user who is not listed', async () => {
-			const { result } = await renderSuggestions({ serverResult: buildResult({ reserve: [buildSuggestion('p3', 'popular')] }) });
-
-			await act(() => result.current.followSuggestion('stranger'));
-
-			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
-		});
-	});
-
-	describe('following from the empty feed', () => {
-		const EMPTY_FEED_SUGGESTIONS = [buildSuggestion('p1', 'popular'), buildSuggestion('p2', 'popular'), buildSuggestion('n1', 'new')];
-
-		const renderEmptyFeed = (options) =>
-			renderSuggestions({ placement: 'empty-feed', serverResult: buildResult({ suggestions: EMPTY_FEED_SUGGESTIONS }), options });
-
-		it('keeps the user in the list and marks them as followed straight away', async () => {
-			const { result } = await renderEmptyFeed();
-
-			followUser.mockReturnValue(new Promise(() => {}));
-
-			act(() => {
-				result.current.followSuggestion('p1');
-			});
-
-			expect(getIds(result)).toEqual(['p1', 'p2', 'n1']);
 			expect(result.current.followedIds).toEqual(['p1']);
-		});
-
-		it('keeps them marked as followed once the request succeeds', async () => {
-			const { result } = await renderEmptyFeed();
-
-			await act(() => result.current.followSuggestion('p1'));
-
-			expect(result.current.followedIds).toEqual(['p1']);
-			expect(getIds(result)).toEqual(['p1', 'p2', 'n1']);
 		});
 
 		it('tells the caller about a successful follow', async () => {
 			const onFollowChange = vi.fn();
-			const { result } = await renderEmptyFeed({ onFollowChange });
+			const { result } = await renderPlacement({ onFollowChange });
 
 			await act(() => result.current.followSuggestion('p1'));
 
 			expect(onFollowChange).toHaveBeenCalledTimes(1);
 		});
 
-		it('marks the user as not followed again and shows the follow toast when the request fails', async () => {
-			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			const onFollowChange = vi.fn();
-			const { result } = await renderEmptyFeed({ onFollowChange });
-
-			await act(() => result.current.followSuggestion('p1'));
-
-			expect(result.current.followedIds).toEqual([]);
-			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
-			expect(onFollowChange).not.toHaveBeenCalled();
-		});
-
-		it('unfollows: marks the user as not followed straight away and sends the request', async () => {
-			const { result } = await renderEmptyFeed();
+		it('unfollows: marks the user as not followed straight away, keeps them in place and sends the request', async () => {
+			const { result } = await renderPlacement();
 
 			await act(() => result.current.followSuggestion('p1'));
 
@@ -386,12 +192,33 @@ describe('useSuggestions', () => {
 
 			expect(result.current.followedIds).toEqual([]);
 			expect(unfollowUser).toHaveBeenCalledWith({ userId: 'me', userIdToUnfollow: 'p1' });
-			expect(getIds(result)).toEqual(['p1', 'p2', 'n1']);
+			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
+		});
+
+		it('keeps the user in place and not followed once the unfollow succeeded', async () => {
+			const { result } = await renderPlacement();
+
+			await act(() => result.current.followSuggestion('p1'));
+			await act(() => result.current.unfollowSuggestion('p1'));
+
+			expect(result.current.followedIds).toEqual([]);
+			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
+		});
+
+		it('can follow again after unfollowing', async () => {
+			const { result } = await renderPlacement();
+
+			await act(() => result.current.followSuggestion('p1'));
+			await act(() => result.current.unfollowSuggestion('p1'));
+			await act(() => result.current.followSuggestion('p1'));
+
+			expect(followUser).toHaveBeenCalledTimes(2);
+			expect(result.current.followedIds).toEqual(['p1']);
 		});
 
 		it('tells the caller about a successful unfollow', async () => {
 			const onFollowChange = vi.fn();
-			const { result } = await renderEmptyFeed({ onFollowChange });
+			const { result } = await renderPlacement({ onFollowChange });
 
 			await act(() => result.current.followSuggestion('p1'));
 			await act(() => result.current.unfollowSuggestion('p1'));
@@ -399,22 +226,47 @@ describe('useSuggestions', () => {
 			expect(onFollowChange).toHaveBeenCalledTimes(2);
 		});
 
-		it('marks the user as followed again and shows the unfollow toast when the unfollow fails', async () => {
+		it('marks the user as not followed again, keeps their place and shows the follow toast when the follow fails', async () => {
+			followUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			const onFollowChange = vi.fn();
+			const { result } = await renderPlacement({ onFollowChange });
+
+			await act(() => result.current.followSuggestion('p1'));
+
+			expect(result.current.followedIds).toEqual([]);
+			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
+			expect(await screen.findByText("Couldn't follow this user. Try again.")).toBeInTheDocument();
+			expect(onFollowChange).not.toHaveBeenCalled();
+		});
+
+		it('marks the user as followed again, keeps their place and shows the unfollow toast when the unfollow fails', async () => {
 			unfollowUser.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const onFollowChange = vi.fn();
-			const { result } = await renderEmptyFeed({ onFollowChange });
+			const { result } = await renderPlacement({ onFollowChange });
 
 			await act(() => result.current.followSuggestion('p1'));
 			await act(() => result.current.unfollowSuggestion('p1'));
 
 			expect(result.current.followedIds).toEqual(['p1']);
+			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
 			expect(await screen.findByText("Couldn't unfollow this user. Try again.")).toBeInTheDocument();
 			expect(onFollowChange).toHaveBeenCalledTimes(1);
 		});
 
+		it('ends the session without a toast when the follow fails with UNAUTHENTICATED', async () => {
+			followUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			const { result, endSession } = await renderPlacement();
+
+			await act(() => result.current.followSuggestion('p1'));
+
+			expect(result.current.followedIds).toEqual([]);
+			expect(endSession).toHaveBeenCalledTimes(1);
+			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+		});
+
 		it('ends the session without a toast when the unfollow fails with UNAUTHENTICATED', async () => {
 			unfollowUser.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
-			const { result, endSession } = await renderEmptyFeed();
+			const { result, endSession } = await renderPlacement();
 
 			await act(() => result.current.followSuggestion('p1'));
 			await act(() => result.current.unfollowSuggestion('p1'));
@@ -423,22 +275,89 @@ describe('useSuggestions', () => {
 			expect(screen.getByRole('alert')).toBeEmptyDOMElement();
 		});
 
-		it('follows several users independently', async () => {
-			const { result } = await renderEmptyFeed();
+		it('sends one request when the same user is followed twice before the first returns', async () => {
+			const request = buildDeferred();
+
+			followUser.mockReturnValue(request.promise);
+			const { result } = await renderPlacement();
+
+			act(() => {
+				result.current.followSuggestion('p1');
+				result.current.followSuggestion('p1');
+			});
+
+			expect(followUser).toHaveBeenCalledTimes(1);
+
+			await act(async () => request.resolve({ user: loggedInUser }));
+		});
+
+		it('sends no unfollow request while the follow is still pending', async () => {
+			const request = buildDeferred();
+
+			followUser.mockReturnValue(request.promise);
+			const { result } = await renderPlacement();
+
+			act(() => {
+				result.current.followSuggestion('p1');
+				result.current.unfollowSuggestion('p1');
+			});
+
+			expect(unfollowUser).not.toHaveBeenCalled();
+			expect(result.current.followedIds).toEqual(['p1']);
+
+			await act(async () => request.resolve({ user: loggedInUser }));
+		});
+
+		it('sends one request when the same user is unfollowed twice before the first returns', async () => {
+			const request = buildDeferred();
+			const { result } = await renderPlacement();
+
+			await act(() => result.current.followSuggestion('p1'));
+
+			unfollowUser.mockReturnValue(request.promise);
+
+			act(() => {
+				result.current.unfollowSuggestion('p1');
+				result.current.unfollowSuggestion('p1');
+			});
+
+			expect(unfollowUser).toHaveBeenCalledTimes(1);
+
+			await act(async () => request.resolve({ user: loggedInUser }));
+		});
+
+		it('can follow two different users at once', async () => {
+			followUser.mockReturnValue(new Promise(() => {}));
+			const { result } = await renderPlacement();
+
+			act(() => {
+				result.current.followSuggestion('p1');
+				result.current.followSuggestion('n1');
+			});
+
+			expect(followUser).toHaveBeenCalledTimes(2);
+			expect(result.current.followedIds).toEqual(['p1', 'n1']);
+			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
+		});
+
+		it('keeps two users independent when only one of the follows fails', async () => {
+			followUser.mockRejectedValueOnce({ code: 'INTERNAL_ERROR', status: 500 }).mockResolvedValueOnce({ user: loggedInUser });
+			const { result } = await renderPlacement();
+
+			await act(() => Promise.all([result.current.followSuggestion('p1'), result.current.followSuggestion('n1')]));
+
+			expect(result.current.followedIds).toEqual(['n1']);
+			expect(getIds(result)).toEqual(['m1', 'm2', 'p1', 'p2', 'n1']);
+		});
+
+		it('follows several users independently and unfollows one of them', async () => {
+			const { result } = await renderPlacement();
 
 			await act(() => result.current.followSuggestion('p1'));
 			await act(() => result.current.followSuggestion('n1'));
 			await act(() => result.current.unfollowSuggestion('p1'));
 
 			expect(result.current.followedIds).toEqual(['n1']);
-		});
-
-		it('never replaces anyone, since the empty feed has no spares', async () => {
-			const { result } = await renderEmptyFeed();
-
-			await act(() => result.current.followSuggestion('p1'));
-
-			expect(result.current.suggestions).toHaveLength(3);
 		});
 	});
 
@@ -484,7 +403,7 @@ describe('useSuggestions', () => {
 	});
 
 	describe('changing placement', () => {
-		it('loads again for the new placement and drops the previous list', async () => {
+		it('loads again for the new placement and drops the previous list and followed marks', async () => {
 			getSuggestions.mockResolvedValue(buildResult());
 			const wrapper = ({ children }) => (
 				<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
@@ -497,12 +416,40 @@ describe('useSuggestions', () => {
 			});
 
 			await waitFor(() => expect(result.current.isLoaded).toBe(true));
+			await act(() => result.current.followSuggestion('p1'));
 
 			getSuggestions.mockResolvedValue(buildResult({ suggestions: [buildSuggestion('x1', 'popular')] }));
 			rerender({ placement: 'carousel' });
 
 			await waitFor(() => expect(getIds(result)).toEqual(['x1']));
+			expect(result.current.followedIds).toEqual([]);
 			expect(getSuggestions).toHaveBeenLastCalledWith({ placement: 'carousel' });
+		});
+
+		it('keeps the new list when the previous placement answers last', async () => {
+			const sidebarRequest = buildDeferred();
+			const carouselRequest = buildDeferred();
+
+			getSuggestions.mockReturnValueOnce(sidebarRequest.promise).mockReturnValueOnce(carouselRequest.promise);
+			const contextValue = { loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() };
+			const wrapper = ({ children }) => (
+				<LoggedInUserContext.Provider value={contextValue}>
+					<ToastProvider>{children}</ToastProvider>
+				</LoggedInUserContext.Provider>
+			);
+			const { result, rerender } = renderHook(({ placement }) => useSuggestions(placement), {
+				wrapper,
+				initialProps: { placement: 'sidebar' },
+			});
+
+			rerender({ placement: 'carousel' });
+			expect(getSuggestions).toHaveBeenCalledTimes(2);
+
+			await act(async () => carouselRequest.resolve(buildResult({ suggestions: [buildSuggestion('x1', 'popular')] })));
+			await act(async () => sidebarRequest.resolve(buildResult()));
+
+			expect(result.current.isLoaded).toBe(true);
+			expect(getIds(result)).toEqual(['x1']);
 		});
 	});
 });

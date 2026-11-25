@@ -87,7 +87,7 @@ describe('FeedView infinite scroll', () => {
 		vi.resetAllMocks();
 		user = userEvent.setup();
 		getStoryTray.mockResolvedValue([]);
-		getSuggestions.mockResolvedValue({ suggestions: [], reserve: [], isCarouselDismissed: false });
+		getSuggestions.mockResolvedValue({ suggestions: [], isCarouselDismissed: false });
 		setViewport(false);
 		Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: PAGE_HEIGHT });
 		Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: FAR_FROM_BOTTOM_SCROLL_Y });
@@ -311,10 +311,9 @@ describe('FeedView infinite scroll', () => {
 			placement === 'carousel'
 				? {
 						suggestions: [1, 2, 3].map((id) => ({ _id: `c${id}`, username: `name-c${id}`, group: 'popular' })),
-						reserve: [],
 						isCarouselDismissed: false,
 					}
-				: { suggestions: [], reserve: [], isCarouselDismissed: false },
+				: { suggestions: [], isCarouselDismissed: false },
 		);
 	}
 

@@ -1,6 +1,6 @@
 import { APP_NAME } from '../constants/app';
 
-import { getSuggestionReason, insertInGroupOrder } from './suggestions';
+import { getSuggestionReason } from './suggestions';
 
 describe('getSuggestionReason', () => {
 	it('says "Followed by X" for a mutual suggestion with no one else', () => {
@@ -42,42 +42,5 @@ describe('getSuggestionReason', () => {
 	it('uses the app name constant, not a hardcoded name', () => {
 		expect(getSuggestionReason({ group: 'popular' })).toContain(APP_NAME);
 		expect(getSuggestionReason({ group: 'new' })).toContain(APP_NAME);
-	});
-});
-
-describe('insertInGroupOrder', () => {
-	const mutual = { _id: 'm', group: 'mutual' };
-	const popularA = { _id: 'pA', group: 'popular' };
-	const popularB = { _id: 'pB', group: 'popular' };
-	const fresh = { _id: 'n', group: 'new' };
-
-	const getIds = (suggestions) => suggestions.map((suggestion) => suggestion._id);
-
-	it('puts a new-group suggestion at the end', () => {
-		expect(getIds(insertInGroupOrder([mutual, popularA], fresh))).toEqual(['m', 'pA', 'n']);
-	});
-
-	it('puts a most-followed suggestion after the last most-followed and before the new ones', () => {
-		expect(getIds(insertInGroupOrder([mutual, popularA, fresh], popularB))).toEqual(['m', 'pA', 'pB', 'n']);
-	});
-
-	it('puts a mutual suggestion after the last mutual and before the rest', () => {
-		expect(getIds(insertInGroupOrder([popularA, fresh], mutual))).toEqual(['m', 'pA', 'n']);
-	});
-
-	it('puts it at the start when nothing of an earlier or equal group is listed', () => {
-		expect(getIds(insertInGroupOrder([fresh], mutual))).toEqual(['m', 'n']);
-	});
-
-	it('inserts into an empty list', () => {
-		expect(getIds(insertInGroupOrder([], popularA))).toEqual(['pA']);
-	});
-
-	it('does not change the list it was given', () => {
-		const suggestions = [mutual];
-
-		insertInGroupOrder(suggestions, fresh);
-
-		expect(suggestions).toEqual([mutual]);
 	});
 });

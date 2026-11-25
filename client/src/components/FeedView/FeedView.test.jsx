@@ -24,7 +24,7 @@ const loggedInUser = { _id: 'user1', username: 'johndoe', following: ['user2', '
 
 const buildSuggestion = (id, group = 'popular') => ({ _id: id, username: `name-${id}`, group });
 
-const EMPTY_SUGGESTIONS = { suggestions: [], reserve: [], isCarouselDismissed: false };
+const EMPTY_SUGGESTIONS = { suggestions: [], isCarouselDismissed: false };
 
 const setViewport = (isDesktop) => {
 	window.matchMedia = vi.fn((query) => ({
@@ -648,7 +648,7 @@ describe('FeedView', () => {
 		beforeEach(() => {
 			setViewport(true);
 			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
-			mockSuggestionsByPlacement({ sidebar: { suggestions: sidebarSuggestions, reserve: [], isCarouselDismissed: false } });
+			mockSuggestionsByPlacement({ sidebar: { suggestions: sidebarSuggestions, isCarouselDismissed: false } });
 		});
 
 		it('shows the suggestions sidebar beside the posts', async () => {
@@ -741,7 +741,7 @@ describe('FeedView', () => {
 			Array.from(document.querySelector('.feed-posts').children).map((child) => (child.tagName === 'ARTICLE' ? child.id : 'carousel'));
 
 		beforeEach(() => {
-			mockSuggestionsByPlacement({ carousel: { suggestions: carouselSuggestions, reserve: [], isCarouselDismissed: false } });
+			mockSuggestionsByPlacement({ carousel: { suggestions: carouselSuggestions, isCarouselDismissed: false } });
 		});
 
 		it('inserts the carousel after the 5th post', async () => {
@@ -803,7 +803,7 @@ describe('FeedView', () => {
 		});
 
 		it('is hidden when it was dismissed on the server', async () => {
-			mockSuggestionsByPlacement({ carousel: { suggestions: [], reserve: [], isCarouselDismissed: true } });
+			mockSuggestionsByPlacement({ carousel: { suggestions: [], isCarouselDismissed: true } });
 			getFollowedUsersPosts.mockResolvedValue(feedPage(feedPosts));
 			renderFeed();
 
@@ -883,7 +883,7 @@ describe('FeedView', () => {
 
 		beforeEach(() => {
 			getFollowedUsersPosts.mockResolvedValue(feedPage([]));
-			mockSuggestionsByPlacement({ 'empty-feed': { suggestions: listSuggestions, reserve: [], isCarouselDismissed: false } });
+			mockSuggestionsByPlacement({ 'empty-feed': { suggestions: listSuggestions, isCarouselDismissed: false } });
 		});
 
 		it('shows the message, the stories tray and the list of 8', async () => {

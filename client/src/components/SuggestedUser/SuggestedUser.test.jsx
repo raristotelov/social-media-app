@@ -203,5 +203,31 @@ describe('SuggestedUser', () => {
 
 			expect(onFollowClick).toHaveBeenCalledWith('user2');
 		});
+
+		it('does not mark the Follow text button as followed', () => {
+			renderSuggestedUser({ actionStyle: 'link' });
+
+			expect(screen.getByRole('button', { name: 'Follow alice' })).not.toHaveClass('is-followed');
+		});
+
+		it('shows an Unfollow text button marked as followed once followed', () => {
+			renderSuggestedUser({ actionStyle: 'link', isFollowed: true });
+
+			const button = screen.getByRole('button', { name: 'Unfollow alice' });
+
+			expect(button).toHaveTextContent('Unfollow');
+			expect(button).toHaveClass('suggested-user-follow-link', 'is-followed');
+			expect(button).not.toHaveClass('button-secondary');
+			expect(screen.queryByRole('button', { name: 'Follow alice' })).not.toBeInTheDocument();
+		});
+
+		it('unfollows the user when Unfollow is clicked', async () => {
+			const { onFollowClick, onUnfollowClick } = renderSuggestedUser({ actionStyle: 'link', isFollowed: true });
+
+			await user.click(screen.getByRole('button', { name: 'Unfollow alice' }));
+
+			expect(onUnfollowClick).toHaveBeenCalledWith('user2');
+			expect(onFollowClick).not.toHaveBeenCalled();
+		});
 	});
 });
