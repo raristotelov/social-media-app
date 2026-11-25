@@ -1,3 +1,5 @@
+import { getStoryRingState } from '../../utils/stories';
+
 import Button from '../Button/Button';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
@@ -33,6 +35,8 @@ const ProfileHeader = (props) => {
 		onFollowersClick,
 		onFollowingClick,
 		isLoggedInUserProfile,
+		story,
+		onStoryClick,
 	} = props;
 
 	const totalPostsCount = userData?.posts?.length ? userData.posts.length : 0;
@@ -44,10 +48,23 @@ const ProfileHeader = (props) => {
 
 	const isFollowed = loggedInUserData?.following?.includes(userData._id);
 
+	const storyRingState = getStoryRingState(story);
+
 	return (
 		<header className={bio ? 'profile-header' : 'profile-header profile-header-no-bio'}>
 			<div className='profile-picture-wrapper'>
-				<ProfilePicture imageUrl={profilePictureUrl} />
+				{storyRingState ? (
+					<button
+						type='button'
+						className='profile-picture-button'
+						aria-label={isLoggedInUserProfile ? 'View your story' : `View ${userData.username}'s story`}
+						onClick={onStoryClick}
+					>
+						<ProfilePicture imageUrl={profilePictureUrl} ringState={storyRingState} />
+					</button>
+				) : (
+					<ProfilePicture imageUrl={profilePictureUrl} />
+				)}
 			</div>
 
 			<span className='username'>{userData.username}</span>

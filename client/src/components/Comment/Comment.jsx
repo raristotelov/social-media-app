@@ -2,12 +2,11 @@ import { useContext, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import ToastContext from '../../contexts/ToastContext';
 import useLoginRedirect from '../../hooks/useLoginRedirect';
 import { likeComment, unlikeComment, addComment } from '../../services/commentService';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 import { USER_LIST_TYPES } from '../../constants/userLists';
-import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
+import { isUnauthenticatedError } from '../../utils/errors';
 
 import AddCommentForm from '../AddCommentForm/AddCommentForm';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
@@ -28,14 +27,13 @@ const AuthorLink = ({ authorId, className, children }) => {
 	);
 };
 
-const Comment = ({ comment, userPostId, onReload, onCloseComments, isReply = false, parentCommentId = null }) => {
+const Comment = ({ comment, userPostId, onReload, onLikeChange, onCloseComments, isReply = false, parentCommentId = null }) => {
 	const [showReplies, setShowReplies] = useState(false);
 	const [isReplying, setIsReplying] = useState(false);
 	const [isLikesPopupOpen, setIsLikesPopupOpen] = useState(false);
 	const isUpdatingLikeRef = useRef(false);
 
 	const { loggedInUser, endSession } = useContext(LoggedInUserContext);
-	const { showToast } = useContext(ToastContext);
 	const redirectToLogin = useLoginRedirect();
 
 	const author = comment.userId || {};
@@ -63,19 +61,17 @@ const Comment = ({ comment, userPostId, onReload, onCloseComments, isReply = fal
 
 		isUpdatingLikeRef.current = true;
 
+		onLikeChange({ commentId: comment._id, userId: loggedInUser._id, isLiked: !hasLikedComment });
+
 		try {
 			if (hasLikedComment) {
 				await unlikeComment({ commentId: comment._id });
 			} else {
 				await likeComment({ commentId: comment._id });
 			}
-
-			await onReload(undefined, { commentId: comment._id, userId: loggedInUser._id, isLiked: !hasLikedComment });
 		} catch (error) {
 			if (isUnauthenticatedError(error)) {
 				endSession();
-			} else {
-				showToast(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.UPDATE_LIKE));
 			}
 		} finally {
 			isUpdatingLikeRef.current = false;
@@ -165,7 +161,7 @@ const Comment = ({ comment, userPostId, onReload, onCloseComments, isReply = fal
 
 						{!isReply && replies.length && !showReplies ? (
 							<button type='button' className='comment-util-button' onClick={() => setShowReplies(true)}>
-								View replies
+								View replies ({replies.length})
 							</button>
 						) : null}
 					</div>
@@ -195,6 +191,7 @@ const Comment = ({ comment, userPostId, onReload, onCloseComments, isReply = fal
 							comment={reply}
 							userPostId={userPostId}
 							onReload={onReload}
+							onLikeChange={onLikeChange}
 							onCloseComments={onCloseComments}
 							isReply
 							parentCommentId={comment._id}

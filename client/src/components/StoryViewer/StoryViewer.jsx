@@ -1,8 +1,9 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 
 import ToastContext from '../../contexts/ToastContext';
 import useSessionGuard from '../../hooks/useSessionGuard';
-import { deleteStory, getUserStories, markStoryViewed } from '../../services/storyService';
+import { deleteStory, markStoryViewed } from '../../services/storyService';
 import { USER_LIST_TYPES } from '../../constants/userLists';
 import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 import {
@@ -13,7 +14,8 @@ import {
 	STORY_VIEWER_OVERLAYS,
 } from '../../constants/stories';
 import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
-import { formatStoryAge, getStartStoryIndex, isStoryAspectRatio } from '../../utils/stories';
+import { preloadImage } from '../../utils/images';
+import { formatStoryAge, getStartStoryIndex, getUpcomingStories, isStoryAspectRatio } from '../../utils/stories';
 
 import DeletePostConfirm from '../DeletePostConfirm/DeletePostConfirm';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
@@ -30,51 +32,47 @@ import './StoryViewer.css';
 
 const StoryViewer = ({ queue, startIndex, onClose }) => {
 	const [userIndex, setUserIndex] = useState(startIndex);
-	const [storyIndex, setStoryIndex] = useState(0);
-	const [loadedStories, setLoadedStories] = useState({});
+	const [storyIndex, setStoryIndex] = useState(() => getStartStoryIndex(queue[startIndex].stories, STORY_START_TARGETS.FIRST_UNWATCHED));
+	const [storiesByUserId, setStoriesByUserId] = useState(() => Object.fromEntries(queue.map((entry) => [entry.user._id, entry.stories])));
 	const [isHolding, setIsHolding] = useState(false);
 	const [openOverlay, setOpenOverlay] = useState(null);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [loadedPhotoStoryId, setLoadedPhotoStoryId] = useState(null);
 	const holdStartedAtRef = useRef(0);
 	const viewedStoryIdsRef = useRef(new Set());
-	const startTargetRef = useRef(STORY_START_TARGETS.FIRST_UNWATCHED);
 
 	const { showToast } = useContext(ToastContext);
 	const { endSessionIfUnauthenticated } = useSessionGuard();
 
 	const { user, isOwn } = queue[userIndex];
 	const userId = user._id;
-	const userStories = loadedStories[userId]?.stories;
-	const currentStory = userStories?.[storyIndex];
+	const userStories = storiesByUserId[userId];
+	const currentStory = userStories[storyIndex];
 	const currentStoryId = currentStory?._id;
 	const hasStoryAspectRatio = currentStory ? isStoryAspectRatio(currentStory) : false;
-	const isUserLoaded = Boolean(userStories);
 	const isPhotoLoaded = Boolean(currentStoryId) && loadedPhotoStoryId === currentStoryId;
 	const isPaused = isHolding || openOverlay !== null || !isPhotoLoaded;
 	const hasPreviousStory = userIndex > 0 || storyIndex > 0;
 
+	const close = useCallback(() => {
+		onClose(storiesByUserId);
+	}, [onClose, storiesByUserId]);
+
 	const advanceToNextUser = useCallback(() => {
 		if (userIndex + 1 < queue.length) {
-			const nextStories = loadedStories[queue[userIndex + 1].user._id]?.stories;
-
-			startTargetRef.current = STORY_START_TARGETS.FIRST_UNWATCHED;
+			const nextStories = storiesByUserId[queue[userIndex + 1].user._id];
 
 			setLoadedPhotoStoryId(null);
 			setUserIndex(userIndex + 1);
-			setStoryIndex(nextStories ? getStartStoryIndex(nextStories, STORY_START_TARGETS.FIRST_UNWATCHED) : 0);
+			setStoryIndex(getStartStoryIndex(nextStories, STORY_START_TARGETS.FIRST_UNWATCHED));
 
 			return;
 		}
 
-		onClose();
-	}, [userIndex, queue, loadedStories, onClose]);
+		close();
+	}, [userIndex, queue, storiesByUserId, close]);
 
 	const goToNext = useCallback(() => {
-		if (!userStories) {
-			return;
-		}
-
 		if (storyIndex + 1 < userStories.length) {
 			setLoadedPhotoStoryId(null);
 			setStoryIndex(storyIndex + 1);
@@ -86,73 +84,35 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 	}, [userStories, storyIndex, advanceToNextUser]);
 
 	const goToPrevious = useCallback(() => {
-		if (!userStories) {
-			return;
-		}
-
 		if (storyIndex > 0) {
 			setLoadedPhotoStoryId(null);
 			setStoryIndex(storyIndex - 1);
 		} else if (userIndex > 0) {
-			const previousUserId = queue[userIndex - 1].user._id;
-			const previousStories = loadedStories[previousUserId]?.stories;
-
-			startTargetRef.current = STORY_START_TARGETS.LAST;
+			const previousStories = storiesByUserId[queue[userIndex - 1].user._id];
 
 			setLoadedPhotoStoryId(null);
 			setUserIndex(userIndex - 1);
-			setStoryIndex(previousStories ? getStartStoryIndex(previousStories, STORY_START_TARGETS.LAST) : 0);
+			setStoryIndex(getStartStoryIndex(previousStories, STORY_START_TARGETS.LAST));
 		}
-	}, [userStories, storyIndex, userIndex, queue, loadedStories]);
+	}, [storyIndex, userIndex, queue, storiesByUserId]);
 
 	const closeOverlay = useCallback(() => {
 		setOpenOverlay(null);
 	}, []);
 
 	useEffect(() => {
-		if (isUserLoaded) {
-			return;
-		}
-
-		let isCurrentRequest = true;
-
-		getUserStories({ userId })
-			.then((result) => {
-				if (!isCurrentRequest) {
-					return;
-				}
-
-				const startTarget = startTargetRef.current;
-
-				startTargetRef.current = STORY_START_TARGETS.FIRST;
-
-				setLoadedStories((state) => ({ ...state, [userId]: result }));
-				setStoryIndex(getStartStoryIndex(result.stories, startTarget));
-			})
-			.catch((error) => {
-				if (!isCurrentRequest) {
-					return;
-				}
-
-				if (isUnauthenticatedError(error)) {
-					endSessionIfUnauthenticated(error);
-				} else {
-					showToast(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.LOAD_STORIES));
-				}
-
-				onClose();
-			});
-
-		return () => {
-			isCurrentRequest = false;
-		};
-	}, [userId, isUserLoaded, endSessionIfUnauthenticated, showToast, onClose]);
-
-	useEffect(() => {
-		if (userStories && storyIndex >= userStories.length) {
+		if (storyIndex >= userStories.length) {
 			advanceToNextUser();
 		}
 	}, [userStories, storyIndex, advanceToNextUser]);
+
+	useEffect(() => {
+		if (!isPhotoLoaded) {
+			return;
+		}
+
+		getUpcomingStories({ queue, storiesByUserId, userIndex, storyIndex }).forEach((story) => preloadImage(story.imageUrl));
+	}, [isPhotoLoaded, queue, storiesByUserId, userIndex, storyIndex]);
 
 	const handlePhotoLoad = () => {
 		setLoadedPhotoStoryId(currentStoryId);
@@ -162,6 +122,11 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		}
 
 		viewedStoryIdsRef.current.add(currentStoryId);
+
+		setStoriesByUserId((state) => ({
+			...state,
+			[userId]: state[userId].map((story) => (story._id === currentStoryId ? { ...story, isWatched: true } : story)),
+		}));
 
 		markStoryViewed({ storyId: currentStoryId }).catch(endSessionIfUnauthenticated);
 	};
@@ -173,7 +138,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 			}
 
 			if (event.key === 'Escape') {
-				onClose();
+				close();
 			} else if (event.key === 'ArrowLeft') {
 				goToPrevious();
 			} else if (event.key === 'ArrowRight') {
@@ -186,7 +151,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		return () => {
 			document.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [openOverlay, onClose, goToPrevious, goToNext]);
+	}, [openOverlay, close, goToPrevious, goToNext]);
 
 	const startHold = () => {
 		holdStartedAtRef.current = Date.now();
@@ -220,9 +185,9 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 		try {
 			await deleteStory({ storyId: currentStoryId });
 
-			setLoadedStories((state) => ({
+			setStoriesByUserId((state) => ({
 				...state,
-				[userId]: { ...state[userId], stories: state[userId].stories.filter((story) => story._id !== currentStoryId) },
+				[userId]: state[userId].filter((story) => story._id !== currentStoryId),
 			}));
 		} catch (error) {
 			if (isUnauthenticatedError(error)) {
@@ -275,12 +240,14 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 								onLoad={handlePhotoLoad}
 								onError={goToNext}
 							/>
+
+							{isPhotoLoaded ? null : (
+								<div className='story-viewer-loading'>
+									<LoadingSpinner />
+								</div>
+							)}
 						</div>
-					) : (
-						<div className='story-viewer-loading'>
-							<LoadingSpinner />
-						</div>
-					)}
+					) : null}
 
 					<div className='story-viewer-scrim story-viewer-scrim-top' />
 
@@ -309,7 +276,7 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 					/>
 
 					<div className='story-viewer-progress'>
-						{userStories?.map((story, index) => (
+						{userStories.map((story, index) => (
 							<div key={story._id} className='story-viewer-segment'>
 								{renderSegmentFill(index)}
 							</div>
@@ -318,14 +285,16 @@ const StoryViewer = ({ queue, startIndex, onClose }) => {
 
 					<header className='story-viewer-header'>
 						<div className='story-viewer-poster'>
-							<ProfilePicture imageUrl={user.profilePicture?.imageUrl} className='story-viewer-avatar' />
+							<Link to={`/user/${userId}`} className='story-viewer-poster-link' onClick={close}>
+								<ProfilePicture imageUrl={user.profilePicture?.imageUrl} className='story-viewer-avatar' />
 
-							<span className='story-viewer-username'>{user.username}</span>
+								<span className='story-viewer-username'>{user.username}</span>
+							</Link>
 
 							{currentStory ? <span className='story-viewer-age'>{formatStoryAge(currentStory.createdAt)}</span> : null}
 						</div>
 
-						<button type='button' className='story-viewer-icon-button' aria-label='Close' onClick={onClose}>
+						<button type='button' className='story-viewer-icon-button' aria-label='Close' onClick={close}>
 							<CloseIcon iconColorProp='currentColor' />
 						</button>
 					</header>

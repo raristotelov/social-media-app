@@ -8,6 +8,7 @@ import {
 	uploadStoryViaApi,
 	getStoryTrayViaApi,
 	recordStoryViewViaApi,
+	serverUrl,
 } from '../../support/api';
 
 describe('watching stories', () => {
@@ -270,6 +271,17 @@ describe('watching stories', () => {
 			cy.get('.story-viewer').should('not.exist');
 			cy.get('.stories-tray').should('be.visible');
 		});
+
+		it('closes and opens the poster profile when their username is clicked', () => {
+			visitAsUser('/user-feed', viewerSession);
+			openCircle(posterB.username);
+			waitForPhotoLoad();
+
+			username().click();
+
+			cy.get('.story-viewer').should('not.exist');
+			cy.location('pathname').should('eq', `/user/${userIdFromSession(posterBSession)}`);
+		});
 	});
 
 	describe('watching all the way through', () => {
@@ -369,58 +381,45 @@ describe('watching stories', () => {
 		});
 	});
 
-	describe('when the stories cannot be loaded', () => {
-		it('closes the viewer and shows the error toast', () => {
+	describe('opening the viewer', () => {
+		it('sends no request to load the stories, because the tray already carries them', () => {
+			cy.intercept('GET', `${serverUrl}/stories/**`).as('storyReads');
 			visitAsUser('/user-feed', viewerSession);
 			cy.get('.stories-tray .story-circle-label').should('have.length', 3);
-			cy.intercept('GET', '**/stories/user/*', { statusCode: 500, body: { code: 'INTERNAL_ERROR', message: 'Something went wrong' } }).as(
-				'userStories',
-			);
+			cy.wait('@storyReads');
 
-			circle(posterB.username).find('button.story-circle-button').click();
-			cy.wait('@userStories');
+			cy.get('@storyReads.all').then((requestsBeforeOpening) => {
+				openCircle(posterB.username);
+				waitForPhotoLoad();
 
-			cy.get('.story-viewer').should('not.exist');
-			cy.get('.toast-region').should('contain.text', "Couldn't load stories. Try again.");
-		});
-
-		it('ends the session and goes to /log-in when the token is no longer valid', () => {
-			visitAsUser('/user-feed', viewerSession);
-			cy.get('.stories-tray .story-circle-label').should('have.length', 3);
-			cy.intercept('GET', '**/stories/user/*', { statusCode: 401, body: { code: 'UNAUTHENTICATED', message: 'Invalid or expired token' } }).as(
-				'userStories',
-			);
-
-			circle(posterB.username).find('button.story-circle-button').click();
-			cy.wait('@userStories');
-
-			cy.location('pathname').should('eq', '/log-in');
+				cy.get('@storyReads.all').should('have.length', requestsBeforeOpening.length);
+			});
 		});
 	});
 
 	describe('a photo that fails to load', () => {
 		it('is skipped straight away, through every user, and never recorded as watched', () => {
 			cy.intercept('GET', 'https://res.cloudinary.com/cypress-missing/**', { forceNetworkError: true });
-			cy.intercept('GET', '**/stories/user/*', (req) => {
+			cy.intercept('GET', `${serverUrl}/stories/tray`, (req) => {
 				delete req.headers['if-none-match'];
 				delete req.headers['if-modified-since'];
 
 				req.continue((res) => {
 					const body = typeof res.body === 'string' ? JSON.parse(res.body) : res.body;
 
-					body.stories.forEach((story, index) => {
-						story.imageUrl = `https://res.cloudinary.com/cypress-missing/image/upload/${Date.now()}-${index}.png`;
+					body.forEach((entry) => {
+						entry.stories.forEach((story, index) => {
+							story.imageUrl = `https://res.cloudinary.com/cypress-missing/image/upload/${Date.now()}-${index}.png`;
+						});
 					});
 
 					res.send(body);
 				});
-			}).as('userStories');
+			}).as('storyTray');
 			visitAsUser('/user-feed', viewerSession);
 			cy.get('.stories-tray .story-circle-label').should('have.length', 3);
 
 			circle(posterB.username).find('button.story-circle-button').click();
-			cy.wait('@userStories');
-			cy.wait('@userStories');
 
 			cy.get('.story-viewer').should('not.exist');
 			ring(posterB.username).should('have.class', 'story-circle-ring-unwatched');

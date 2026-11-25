@@ -1,4 +1,11 @@
-import { MINUTES_PER_HOUR, MS_PER_MINUTE, STORY_ASPECT_RATIO, STORY_ASPECT_RATIO_TOLERANCE, STORY_START_TARGETS } from '../constants/stories';
+import {
+	MINUTES_PER_HOUR,
+	MS_PER_MINUTE,
+	STORY_ASPECT_RATIO,
+	STORY_ASPECT_RATIO_TOLERANCE,
+	STORY_RING_STATES,
+	STORY_START_TARGETS,
+} from '../constants/stories';
 
 const MIN_DISPLAYED_MINUTES = 1;
 
@@ -17,14 +24,33 @@ export const getStartStoryIndex = (stories, target) => {
 		return Math.max(0, stories.length - 1);
 	}
 
-	if (target === STORY_START_TARGETS.FIRST_UNWATCHED) {
-		return Math.max(
-			0,
-			stories.findIndex((story) => story.isWatched === false),
-		);
+	return Math.max(
+		0,
+		stories.findIndex((story) => story.isWatched === false),
+	);
+};
+
+export const getUpcomingStories = ({ queue, storiesByUserId, userIndex, storyIndex }) => {
+	const nextStoryOfUser = storiesByUserId[queue[userIndex].user._id][storyIndex + 1];
+	const nextUser = queue[userIndex + 1];
+	const nextUserStories = nextUser ? storiesByUserId[nextUser.user._id] : [];
+	const nextUserStartStory = nextUserStories[getStartStoryIndex(nextUserStories, STORY_START_TARGETS.FIRST_UNWATCHED)];
+
+	return [nextStoryOfUser, nextUserStartStory].filter(Boolean);
+};
+
+export const getTrayStartStories = (entries, userCount) =>
+	entries
+		.slice(0, userCount)
+		.map((entry) => entry.stories[getStartStoryIndex(entry.stories, STORY_START_TARGETS.FIRST_UNWATCHED)])
+		.filter(Boolean);
+
+export const getStoryRingState = (story) => {
+	if (!story) {
+		return undefined;
 	}
 
-	return 0;
+	return story.isWatched ? STORY_RING_STATES.WATCHED : STORY_RING_STATES.UNWATCHED;
 };
 
 export const isStoryAspectRatio = ({ imageWidth, imageHeight }) =>

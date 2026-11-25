@@ -17,6 +17,7 @@
 	gap: 12px;
 
 	text-decoration: none;
+	-webkit-tap-highlight-color: transparent;
 }
 
 .suggested-user-avatar {
@@ -62,6 +63,10 @@
 	font-size: 13px;
 	font-weight: bold;
 	color: var(--brand-red);
+}
+
+.suggested-user-follow-link.is-followed {
+	color: var(--text-primary);
 }
 
 .suggested-user-follow-link:hover {

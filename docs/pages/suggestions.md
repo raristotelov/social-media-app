@@ -38,9 +38,10 @@ Ticket #14. Suggestions of people to follow on the feed (`/user-feed`). Tokens: 
 
 ## Following
 
-- Follow takes effect immediately; the user leaves the list and the next suggestion fills the gap, so the list keeps its size.
+- Follow takes effect immediately: the user stays in place and the button turns into Unfollow; tapping it again unfollows. The list shows new people only on the next page change or reload. (#54)
+- Unfollow style: sidebar — text link in `text/primary`; carousel and empty feed — secondary button. (#54)
 - Following from the sidebar or carousel doesn't reload the feed; their posts show from the next visit.
-- Follow fails: toast "Couldn't follow this user. Try again.", the button goes back to Follow. Unfollow (empty feed) fails: toast "Couldn't unfollow this user. Try again.". The profile's Follow / Unfollow button uses the same toasts.
+- Follow fails: toast "Couldn't follow this user. Try again.", the button goes back to Follow. Unfollow fails: toast "Couldn't unfollow this user. Try again.", the button goes back to Unfollow. The profile's Follow / Unfollow button uses the same toasts.
 - The photo and username open the user's profile.
 
 ## Loading and errors
@@ -59,7 +60,7 @@ Ticket #14. Suggestions of people to follow on the feed (`/user-feed`). Tokens: 
 
 - Shown whenever the feed has no posts — following nobody, or only people who haven't posted.
 - Message, the stories tray (only "Your story" when you follow nobody), and the list of 8. No sidebar or carousel on the empty feed (design).
-- Following from the list keeps the list for that visit: the button turns into Unfollow (same style as the profile's Unfollow), tapping it again unfollows, and the followed user's posts appear below the list. The next visit shows the normal feed.
+- Following from the list keeps the list for that visit, and the followed user's posts appear below it; unfollowing removes them. The next visit shows the normal feed.
 
 ## Figma frames
 

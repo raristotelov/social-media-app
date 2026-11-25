@@ -1,4 +1,4 @@
-import { getPostImageAspectRatio, isAcceptedImageType, resizeImage } from './images';
+import { getPostImageAspectRatio, isAcceptedImageType, preloadImage, resizeImage } from './images';
 
 const buildImage = (name = 'photo.png', type = 'image/png') => new File(['(image)'], name, { type });
 
@@ -13,6 +13,46 @@ describe('isAcceptedImageType', () => {
 
 	it.each([[undefined], [null]])('rejects %p without throwing', (file) => {
 		expect(isAcceptedImageType(file)).toBe(false);
+	});
+});
+
+describe('preloadImage', () => {
+	let createdImages;
+
+	beforeEach(() => {
+		createdImages = [];
+
+		class FakeImage {
+			constructor() {
+				createdImages.push(this);
+			}
+		}
+
+		vi.stubGlobal('Image', FakeImage);
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('creates one new Image and sets its src to the given URL', () => {
+		preloadImage('https://example.com/a1.jpg');
+
+		expect(createdImages).toHaveLength(1);
+		expect(createdImages[0].src).toBe('https://example.com/a1.jpg');
+	});
+
+	it('creates a separate Image for each call', () => {
+		preloadImage('https://example.com/a1.jpg');
+		preloadImage('https://example.com/a2.jpg');
+
+		expect(createdImages.map((image) => image.src)).toEqual(['https://example.com/a1.jpg', 'https://example.com/a2.jpg']);
+	});
+
+	it('does not add anything to the document', () => {
+		preloadImage('https://example.com/a1.jpg');
+
+		expect(document.querySelector('img')).not.toBeInTheDocument();
 	});
 });
 

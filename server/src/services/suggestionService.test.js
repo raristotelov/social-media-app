@@ -1,5 +1,6 @@
 jest.mock('../models/userModel');
 jest.mock('./visitorVisibilityService');
+jest.mock('./storyService');
 
 const mongoose = require('mongoose');
 
@@ -8,6 +9,7 @@ const { ERROR_CODES } = require('../config/errorCodes');
 const AppError = require('../utils/AppError');
 const { getSuggestions, dismissCarousel } = require('./suggestionService');
 const { getHiddenVisitorIds } = require('./visitorVisibilityService');
+const storyService = require('./storyService');
 
 const NOW = new Date('2026-10-22T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -74,6 +76,7 @@ describe('suggestionService', () => {
 		UserModel.findById.mockImplementation(() => buildLeanQuery(currentUser));
 		UserModel.aggregate.mockImplementation(async (pipeline) => pools[getPoolName(pipeline)]);
 		getHiddenVisitorIds.mockResolvedValue([]);
+		storyService.withStorySummaries.mockImplementation(async ({ users }) => users);
 	});
 
 	afterEach(() => {
@@ -81,6 +84,47 @@ describe('suggestionService', () => {
 	});
 
 	describe('getSuggestions', () => {
+		describe('story rings', () => {
+			beforeEach(() => {
+				pools.popular = buildCandidates(10, 8);
+			});
+
+			it('asks for the story summaries of the suggestions in one call, for the signed-in user', async () => {
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				expect(storyService.withStorySummaries).toHaveBeenCalledTimes(1);
+				expect(storyService.withStorySummaries).toHaveBeenCalledWith({ users: suggestions, viewerId: ME });
+			});
+
+			it('puts the story summary of each user on their own row', async () => {
+				storyService.withStorySummaries.mockImplementation(async ({ users }) =>
+					users.map((user) => ({ ...user, story: { isWatched: user.username === 'user10' } })),
+				);
+
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				expect(suggestions).toHaveLength(5);
+				expect(suggestions.every((row) => row.story !== undefined)).toBe(true);
+				expect(suggestions.find((row) => row.username === 'user10').story).toEqual({ isWatched: true });
+			});
+
+			it('keeps every suggestion in the same order after the summaries are added', async () => {
+				const { suggestions: before } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				storyService.withStorySummaries.mockImplementation(async ({ users }) => users.map((user) => ({ ...user, story: null })));
+
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				expect(getListedIds(suggestions)).toEqual(getListedIds(before));
+			});
+
+			it('answers 500 when the story summaries cannot be loaded', async () => {
+				storyService.withStorySummaries.mockRejectedValue(new AppError('Could not load the stories', 500));
+
+				await expect(getSuggestions({ userId: ME, placement: 'sidebar' })).rejects.toMatchObject({ statusCode: 500 });
+			});
+		});
+
 		describe('validating the request', () => {
 			it.each([['nowhere'], [undefined], [''], ['SIDEBAR'], ['toString'], ['__proto__']])(
 				'answers 400 BAD_REQUEST for the placement %p, without touching the database',
@@ -273,11 +317,11 @@ describe('suggestionService', () => {
 					{ _id: FOLLOWED_B, username: 'bob', followersCount: 1 },
 				];
 
-				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
 
 				const lookups = UserModel.aggregate.mock.calls.filter(([pipeline]) => getPoolName(pipeline) === 'mutualFollowers');
 
-				expect(getListedIds([...suggestions, ...reserve])).not.toContain(buildId(30).toString());
+				expect(getListedIds(suggestions)).not.toContain(buildId(30).toString());
 				expect(lookups).toHaveLength(1);
 				expect(lookups[0][0][0].$match._id.$in.map(String).sort()).toEqual([FOLLOWED_A, FOLLOWED_B].map(String).sort());
 			});
@@ -297,13 +341,13 @@ describe('suggestionService', () => {
 				pools.mutualFollowers = [];
 				pools.popular = buildCandidates(200, 10);
 
-				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
 
-				expect(getListedIds([...suggestions, ...reserve])).not.toContain(unresolved._id.toString());
-				expect([...suggestions, ...reserve].some((suggestion) => suggestion.group === 'mutual')).toBe(false);
+				expect(getListedIds(suggestions)).not.toContain(unresolved._id.toString());
+				expect(suggestions.some((suggestion) => suggestion.group === 'mutual')).toBe(false);
 			});
 
-			it('keeps suggestions and reserve in mutual, most-followed, new order when a mutual candidate is dropped between mutual rows', async () => {
+			it('keeps suggestions in mutual, most-followed, new order when a mutual candidate is dropped between mutual rows', async () => {
 				pools.mutual = [
 					buildCandidate(100, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 }),
 					buildCandidate(101, { mutualFollowerIds: [buildId(9)], mutualCount: 1 }),
@@ -315,12 +359,10 @@ describe('suggestionService', () => {
 				pools.popular = buildCandidates(200, 10);
 				pools.new = buildCandidates(300, 10);
 
-				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
 
 				expect(suggestions.map((suggestion) => suggestion.group)).toEqual(['mutual', 'mutual', 'popular', 'popular', 'new']);
 				expect(getListedIds(suggestions)).toEqual([100, 102, 200, 201, 300].map((value) => buildId(value).toString()));
-				expect(reserve.map((suggestion) => suggestion.group)).toEqual(['mutual', 'mutual', 'popular', 'popular', 'popular']);
-				expect(getListedIds(reserve)).toEqual([103, 104, 202, 203, 204].map((value) => buildId(value).toString()));
 			});
 		});
 
@@ -470,16 +512,15 @@ describe('suggestionService', () => {
 			it('returns a shorter list when there are fewer candidates than places', async () => {
 				pools.popular = buildCandidates(200, 3);
 
-				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'carousel' });
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'carousel' });
 
 				expect(suggestions).toHaveLength(3);
-				expect(reserve).toEqual([]);
 			});
 
-			it('returns empty lists when nobody is left to suggest', async () => {
+			it('returns an empty list when nobody is left to suggest', async () => {
 				const result = await getSuggestions({ userId: ME, placement: 'sidebar' });
 
-				expect(result).toEqual({ suggestions: [], reserve: [], isCarouselDismissed: false });
+				expect(result).toEqual({ suggestions: [], isCarouselDismissed: false });
 			});
 
 			it('lists someone once even if they qualify for two groups', async () => {
@@ -488,13 +529,27 @@ describe('suggestionService', () => {
 				pools.popular = [shared, buildCandidate(11)];
 				pools.new = [shared, buildCandidate(12)];
 
-				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
 
-				expect(getListedIds([...suggestions, ...reserve]).filter((id) => id === shared._id.toString())).toHaveLength(1);
+				expect(getListedIds(suggestions).filter((id) => id === shared._id.toString())).toHaveLength(1);
+			});
+
+			it('still fills every place when the same people qualify for several groups', async () => {
+				const people = buildCandidates(10, 8);
+
+				pools.mutual = people.slice(0, 2).map((person) => ({ ...person, mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 }));
+				pools.mutualFollowers = [{ _id: FOLLOWED_A, username: 'alice', followersCount: 3 }];
+				pools.popular = people.slice(0, 4);
+				pools.new = people.slice(0, 6);
+
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+
+				expect(suggestions).toHaveLength(5);
+				expect(new Set(getListedIds(suggestions)).size).toBe(5);
 			});
 		});
 
-		describe('the reserve', () => {
+		describe('the response', () => {
 			beforeEach(() => {
 				pools.mutual = buildCandidates(100, 12, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 });
 				pools.popular = buildCandidates(200, 12);
@@ -502,49 +557,50 @@ describe('suggestionService', () => {
 				pools.mutualFollowers = [{ _id: FOLLOWED_A, username: 'alice', followersCount: 3 }];
 			});
 
-			it('holds 5 spare suggestions for the sidebar', async () => {
-				const { reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
+			it.each([['sidebar'], ['carousel'], ['empty-feed']])(
+				'holds only the suggestions and the dismissal flag for the %s',
+				async (placement) => {
+					const result = await getSuggestions({ userId: ME, placement });
 
-				expect(reserve).toHaveLength(5);
+					expect(Object.keys(result).sort()).toEqual(['isCarouselDismissed', 'suggestions']);
+					expect(result).not.toHaveProperty('reserve');
+				},
+			);
+
+			it('holds no reserve for a dismissed carousel either', async () => {
+				currentUser = { ...currentUser, suggestionsCarouselDismissedUntil: new Date(NOW.getTime() + DAY_MS) };
+
+				const result = await getSuggestions({ userId: ME, placement: 'carousel' });
+
+				expect(result).not.toHaveProperty('reserve');
 			});
 
-			it('holds 5 spare suggestions for the carousel', async () => {
-				const { reserve } = await getSuggestions({ userId: ME, placement: 'carousel' });
+			it('carries each mutual suggestion its reason details', async () => {
+				const { suggestions } = await getSuggestions({ userId: ME, placement: 'sidebar' });
 
-				expect(reserve).toHaveLength(5);
+				expect(suggestions[0].followedBy).toEqual({ _id: FOLLOWED_A, username: 'alice' });
+			});
+		});
+
+		describe('how many candidates are asked for', () => {
+			beforeEach(() => {
+				pools.mutual = buildCandidates(100, 12, { mutualFollowerIds: [FOLLOWED_A], mutualCount: 1 });
+				pools.mutualFollowers = [{ _id: FOLLOWED_A, username: 'alice', followersCount: 3 }];
 			});
 
-			it('holds none for the empty feed', async () => {
-				const { reserve } = await getSuggestions({ userId: ME, placement: 'empty-feed' });
+			it.each([
+				['sidebar', 5 * 2],
+				['carousel', 10 * 2],
+				['empty-feed', 8 * 2],
+			])('limits each pool to twice the list size for the %s', async (placement, expectedLimit) => {
+				await getSuggestions({ userId: ME, placement });
 
-				expect(reserve).toEqual([]);
-			});
+				const askedPools = ['mutual', 'popular', 'new'].filter((poolName) => getPipeline(poolName));
 
-			it('never repeats a listed suggestion', async () => {
-				const { suggestions, reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
-
-				const listedIds = getListedIds(suggestions);
-
-				expect(getListedIds(reserve).filter((id) => listedIds.includes(id))).toEqual([]);
-			});
-
-			it('is in group order, mutual first, and carries each one reason details', async () => {
-				const { reserve } = await getSuggestions({ userId: ME, placement: 'sidebar' });
-
-				expect(reserve.map((suggestion) => suggestion.group)).toEqual(['mutual', 'mutual', 'mutual', 'mutual', 'mutual']);
-				expect(reserve[0].followedBy).toEqual({ _id: FOLLOWED_A, username: 'alice' });
-			});
-
-			it('asks the database for enough candidates to cover the list, the reserve and the ones already followed', async () => {
-				await getSuggestions({ userId: ME, placement: 'sidebar' });
-
-				expect(getStage('popular', '$limit')).toBe((5 + 5) * 2);
-			});
-
-			it('asks for no reserve on the empty feed', async () => {
-				await getSuggestions({ userId: ME, placement: 'empty-feed' });
-
-				expect(getStage('popular', '$limit')).toBe(8 * 2);
+				expect(askedPools.length).toBeGreaterThan(0);
+				askedPools.forEach((poolName) => {
+					expect(getStage(poolName, '$limit')).toBe(expectedLimit);
+				});
 			});
 		});
 
@@ -592,7 +648,7 @@ describe('suggestionService', () => {
 
 				const result = await getSuggestions({ userId: ME, placement: 'carousel' });
 
-				expect(result).toEqual({ suggestions: [], reserve: [], isCarouselDismissed: true });
+				expect(result).toEqual({ suggestions: [], isCarouselDismissed: true });
 				expect(UserModel.aggregate).not.toHaveBeenCalled();
 			});
 

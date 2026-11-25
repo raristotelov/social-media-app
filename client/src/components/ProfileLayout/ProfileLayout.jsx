@@ -4,6 +4,7 @@ import { Outlet, useMatch, useNavigate, useParams } from 'react-router';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import ToastContext from '../../contexts/ToastContext';
 import useSessionGuard from '../../hooks/useSessionGuard';
+import useUserStory from '../../hooks/useUserStory';
 import { updateUserPostCaption, deleteUserPost } from '../../services/userPostService';
 import { getUsersProfileData } from '../../services/userService';
 import { ERROR_CODES } from '../../constants/errorCodes';
@@ -35,6 +36,7 @@ const ProfileLayout = () => {
 	const { runWithSessionGuard } = useSessionGuard();
 
 	const { userId } = useParams();
+	const { userStory, replaceStories: replaceUserStories } = useUserStory(userId);
 	const navigate = useNavigate();
 	const isPostsViewOpen = Boolean(useMatch('/user/:userId/posts'));
 
@@ -162,6 +164,8 @@ const ProfileLayout = () => {
 		setUserPosts,
 		isLoggedInUserProfile,
 		profileRequestCount,
+		userStory,
+		replaceUserStories,
 		onEditPostClick: setPostToEdit,
 		onDeletePostClick: setPostToDelete,
 	};

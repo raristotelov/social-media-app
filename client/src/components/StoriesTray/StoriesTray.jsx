@@ -2,8 +2,9 @@ import { useCallback, useContext, useState } from 'react';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { CREATE_MODES, OWN_STORY_LABEL } from '../../constants/stories';
+import { getStoryRingState } from '../../utils/stories';
 
-import StoryCircle, { STORY_RING_STATES } from '../StoryCircle/StoryCircle';
+import StoryCircle from '../StoryCircle/StoryCircle';
 import CreatePopup from '../CreatePopup/CreatePopup';
 import StoryViewer from '../StoryViewer/StoryViewer';
 
@@ -56,7 +57,7 @@ const StoriesTray = ({ entries, isLoaded, reload }) => {
 					key={entry.user._id}
 					imageUrl={entry.user.profilePicture?.imageUrl}
 					label={entry.user.username}
-					ringState={entry.isWatched ? STORY_RING_STATES.WATCHED : STORY_RING_STATES.UNWATCHED}
+					ringState={getStoryRingState(entry)}
 					ariaLabel={`View ${entry.user.username}'s story`}
 					onClick={() => showViewer(ownEntry ? index + 1 : index)}
 				/>

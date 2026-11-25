@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import StoryCircle, { STORY_RING_STATES } from './StoryCircle';
+import { STORY_RING_STATES } from '../../constants/stories';
+
+import StoryCircle from './StoryCircle';
 
 const renderCircle = (props = {}) => render(<StoryCircle label='alice' ariaLabel="View alice's story" onClick={vi.fn()} {...props} />);
 

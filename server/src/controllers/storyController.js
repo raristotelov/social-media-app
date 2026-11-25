@@ -18,12 +18,6 @@ router.get('/tray', verifyJwtToken, async (req, res) => {
 	return res.json(trayData);
 });
 
-router.get('/user/:userId', verifyJwtToken, async (req, res) => {
-	const userStoriesData = await storyService.getUserStories({ authorId: req.params.userId, requesterId: res.userId });
-
-	return res.json(userStoriesData);
-});
-
 router.post('/:storyId/view', verifyJwtToken, async (req, res) => {
 	await storyService.recordStoryView({ storyId: req.params.storyId, viewerId: res.userId });
 

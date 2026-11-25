@@ -28,22 +28,36 @@ Ticket #13. Tray above the feed (`/user-feed`), full-screen viewer, story creati
 - Your own circle always has the grey ring (design).
 - The tray also shows on the empty feed (design), so a user who follows nobody can still post a story.
 - Loading: an empty tray card of the same height. Load failure: stays empty, no error.
+- The tray response carries each user's active stories, so opening the viewer sends no request.
+- Once the feed's posts have shown, the starting photo of the first 3 users in the tray is preloaded.
 - The tray loads in parallel with the feed and shows straight away; while the posts load, a spinner sits under the tray (no full-page spinner). A feed load error still replaces the whole page, tray included.
+
+## Rings outside the tray (#54)
+
+- A user with an active story gets a ring around their picture on their profile page, in search results and in suggestions (sidebar rows, carousel cards). No active story: no ring.
+- Same colours as the tray: red until you've watched all their active stories, grey after; your own profile is always grey.
+- Ring sits inside the picture's usual size, with a gap before the photo: 3px ring + 3px gap on the 190px profile picture, 2px + 2px everywhere else.
+- Profile page: tapping the ringed picture opens that user's stories in the viewer; after their last story it closes. Without a ring the picture does nothing, as before.
+- Search results and suggestions: the ring is an indicator only; tapping the row still opens the profile.
+- Guests: stories stay logged-in only. Guests see the rings, always red (no watched history); tapping a ringed profile picture sends them to `/log-in`.
+- Figma: profile `Story Ring` in the Other User frames (desktop 111:153 / 350:1128, tablet 277:891 / 354:3033, mobile 231:503 / 355:2658); search, first result in 266:463 / 350:1265, 275:672 / 354:2872, 264:463 / 355:2482; components `Suggested User` (325:1084) and `Suggestion Card` (778:13926), `Story=Ring` variants.
 
 ## Errors
 
-- Opening a user's stories fails: close the viewer, error toast "Couldn't load stories. Try again."
 - Deleting a story fails: close the confirmation, resume, error toast "Couldn't delete your story. Try again."
 - Recording a view fails: silent.
 
 ## Viewer
 
 - Opens on the user's first unwatched story (their first story if all are watched). Moving on to the next user uses the same rule.
+- While a story's photo loads, the loader appears only after 200ms, so fast loads never flash it.
 - A story whose photo fails to load is skipped straight away.
+- Once a story's photo has loaded, the next story's photo and the next user's starting photo are preloaded.
 - A story counts as watched once its photo has loaded on screen, even if you tap past it before 5 seconds. A story whose photo never loaded does not count.
 - Each story shows for 5 seconds from when its photo has loaded; its progress segment fills, then it advances. The unwatched part of a segment is white at 35%.
 - After a user's last story it continues to the next user in the tray; after the last user it closes.
 - Tap left goes back, tap right goes forward; hold pauses. Back from a user's first story goes to the previous user's last story; on the very first story it does nothing. Desktop also has the side arrows (design).
+- The poster's picture and username link to their profile and close the viewer.
 - Time label next to the poster: "Nm" under an hour (minimum "1m"), then "Nh".
 - Stories are public to any logged-in user; the tray shows only followed users.
 - No reply input.

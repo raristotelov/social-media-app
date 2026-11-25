@@ -9,7 +9,7 @@ const AppError = require('../utils/AppError');
 const { createStoryNotFoundError, createUserNotFoundError } = require('../utils/notFoundErrors');
 const { asFieldError } = require('../utils/fieldErrors');
 const imageStorageService = require('./imageStorageService');
-const { getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
+const { assertUserNotHidden, getHiddenVisitorIds, isHiddenId, withoutHiddenIds } = require('./visitorVisibilityService');
 
 const STORY_AUTHOR_SELECT = { username: 1, 'profilePicture.imageUrl': 1 };
 
@@ -100,72 +100,6 @@ const addStory = async ({ imageFile }, userId) => {
 	}
 };
 
-const compareTrayEntries = (a, b) =>
-	Number(b.isOwn) - Number(a.isOwn) || Number(a.isWatched) - Number(b.isWatched) || b.latestStoryAt - a.latestStoryAt;
-
-const getStoryTray = async (userId) => {
-	try {
-		const currentUser = await UserModel.findById(userId).select({ following: 1 });
-
-		if (!currentUser) {
-			throw new AppError('Unauthorized', 401, { code: ERROR_CODES.UNAUTHENTICATED });
-		}
-
-		const authorIds = [currentUser._id, ...withoutHiddenIds(currentUser.following, await getHiddenVisitorIds(userId))];
-
-		const activeStories = await StoryModel.find({ userId: { $in: authorIds }, ...getActiveStoriesFilter() })
-			.select({ userId: 1, createdAt: 1 })
-			.lean();
-
-		const watchedStoryIds = new Set(
-			(
-				await StoryViewModel.find({ viewerId: userId, storyId: { $in: activeStories.map((story) => story._id) } })
-					.select({ storyId: 1 })
-					.lean()
-			).map((view) => String(view.storyId)),
-		);
-
-		const entriesByAuthorId = new Map();
-
-		activeStories.forEach((story) => {
-			const authorKey = String(story.userId);
-			const entry = entriesByAuthorId.get(authorKey) || {
-				authorId: story.userId,
-				isOwn: authorKey === String(userId),
-				isWatched: true,
-				latestStoryAt: story.createdAt,
-			};
-
-			entry.isWatched = entry.isWatched && (entry.isOwn || watchedStoryIds.has(String(story._id)));
-			entry.latestStoryAt = story.createdAt > entry.latestStoryAt ? story.createdAt : entry.latestStoryAt;
-
-			entriesByAuthorId.set(authorKey, entry);
-		});
-
-		const authors = await UserModel.find({ _id: { $in: [...entriesByAuthorId.values()].map((entry) => entry.authorId) } })
-			.select(STORY_AUTHOR_SELECT)
-			.lean();
-
-		const authorsById = new Map(authors.map((author) => [String(author._id), author]));
-
-		return [...entriesByAuthorId.values()]
-			.filter((entry) => authorsById.has(String(entry.authorId)))
-			.sort(compareTrayEntries)
-			.map((entry) => ({
-				user: toStoryAuthorData(authorsById.get(String(entry.authorId))),
-				isOwn: entry.isOwn,
-				isWatched: entry.isWatched,
-				latestStoryAt: entry.latestStoryAt,
-			}));
-	} catch (error) {
-		if (error instanceof AppError) {
-			throw error;
-		}
-
-		throw new AppError('Could not load the stories tray', 500, { cause: error });
-	}
-};
-
 const getViewersCountsByStoryId = async (storyIds, hiddenVisitorIds) => {
 	const match = { storyId: { $in: storyIds } };
 
@@ -186,42 +120,155 @@ const getWatchedStoryIds = async ({ storyIds, viewerId }) => {
 	return new Set(views.map((view) => String(view.storyId)));
 };
 
-const getUserStories = async ({ authorId, requesterId }) => {
+const getStorySummariesByUserId = async ({ userIds, viewerId }) => {
+	if (!userIds.length) {
+		return new Map();
+	}
+
+	const activeStories = await StoryModel.find({ userId: { $in: userIds }, ...getActiveStoriesFilter() })
+		.select({ _id: 1, userId: 1 })
+		.lean();
+
+	const othersStoryIds = activeStories.filter((story) => String(story.userId) !== String(viewerId)).map((story) => story._id);
+	const watchedStoryIds = viewerId && othersStoryIds.length ? await getWatchedStoryIds({ storyIds: othersStoryIds, viewerId }) : new Set();
+
+	const summariesByUserId = new Map();
+
+	activeStories.forEach((story) => {
+		const authorKey = String(story.userId);
+		const isStoryWatched = authorKey === String(viewerId) || watchedStoryIds.has(String(story._id));
+		const summary = summariesByUserId.get(authorKey);
+
+		summariesByUserId.set(authorKey, { isWatched: (summary ? summary.isWatched : true) && isStoryWatched });
+	});
+
+	return summariesByUserId;
+};
+
+const withStorySummaries = async ({ users, viewerId }) => {
 	try {
-		if (!mongoose.isObjectIdOrHexString(authorId)) {
+		const summariesByUserId = await getStorySummariesByUserId({ userIds: users.map((user) => user._id), viewerId });
+
+		return users.map((user) => ({ ...user, story: summariesByUserId.get(String(user._id)) ?? null }));
+	} catch (error) {
+		throw new AppError('Could not load the stories', 500, { cause: error });
+	}
+};
+
+const getUserStory = async ({ userId, viewerId }) => {
+	try {
+		if (!mongoose.isObjectIdOrHexString(userId)) {
 			throw createUserNotFoundError();
 		}
 
-		const author = await UserModel.findById(authorId).select(STORY_AUTHOR_SELECT).lean();
+		const hiddenVisitorIds = await getHiddenVisitorIds(viewerId);
 
-		const hiddenVisitorIds = await getHiddenVisitorIds(requesterId);
+		assertUserNotHidden(userId, hiddenVisitorIds);
 
-		if (!author || isHiddenId(author._id, hiddenVisitorIds)) {
-			throw createUserNotFoundError();
+		const activeStories = await StoryModel.find({ userId, ...getActiveStoriesFilter() })
+			.sort({ createdAt: 1, _id: 1 })
+			.lean();
+
+		if (!activeStories.length) {
+			return { story: null, stories: [] };
 		}
 
-		const stories = await StoryModel.find({ userId: authorId, ...getActiveStoriesFilter() }).sort({ createdAt: 1, _id: 1 });
+		if (!viewerId) {
+			return { story: { isWatched: false }, stories: [] };
+		}
 
-		const isOwnStories = String(authorId) === String(requesterId);
-		const storyIds = stories.map((story) => story._id);
-		const viewersCounts = isOwnStories ? await getViewersCountsByStoryId(storyIds, hiddenVisitorIds) : null;
-		const watchedStoryIds = isOwnStories ? null : await getWatchedStoryIds({ storyIds, viewerId: requesterId });
+		const storyIds = activeStories.map((story) => story._id);
 
-		return {
-			user: toStoryAuthorData(author),
-			stories: stories.map((story) =>
-				toStoryData(story, {
-					viewersCount: viewersCounts ? viewersCounts.get(String(story._id)) || 0 : undefined,
-					isWatched: watchedStoryIds ? watchedStoryIds.has(String(story._id)) : undefined,
-				}),
-			),
-		};
+		if (String(userId) === String(viewerId)) {
+			const viewersCounts = await getViewersCountsByStoryId(storyIds, hiddenVisitorIds);
+
+			return {
+				story: { isWatched: true },
+				stories: activeStories.map((story) => toStoryData(story, { viewersCount: viewersCounts.get(String(story._id)) || 0 })),
+			};
+		}
+
+		const watchedStoryIds = await getWatchedStoryIds({ storyIds, viewerId });
+		const stories = activeStories.map((story) => toStoryData(story, { isWatched: watchedStoryIds.has(String(story._id)) }));
+
+		return { story: { isWatched: stories.every((story) => story.isWatched) }, stories };
 	} catch (error) {
 		if (error instanceof AppError) {
 			throw error;
 		}
 
-		throw new AppError('Could not load the stories', 500, { cause: error });
+		throw new AppError('Could not load the user story', 500, { cause: error });
+	}
+};
+
+const compareTrayEntries = (a, b) =>
+	Number(b.isOwn) - Number(a.isOwn) || Number(a.isWatched) - Number(b.isWatched) || b.latestStoryAt - a.latestStoryAt;
+
+const getStoryTray = async (userId) => {
+	try {
+		const currentUser = await UserModel.findById(userId).select({ following: 1 });
+
+		if (!currentUser) {
+			throw new AppError('Unauthorized', 401, { code: ERROR_CODES.UNAUTHENTICATED });
+		}
+
+		const hiddenVisitorIds = await getHiddenVisitorIds(userId);
+		const authorIds = [currentUser._id, ...withoutHiddenIds(currentUser.following, hiddenVisitorIds)];
+
+		const activeStories = await StoryModel.find({ userId: { $in: authorIds }, ...getActiveStoriesFilter() })
+			.sort({ createdAt: 1, _id: 1 })
+			.lean();
+
+		const ownStoryIds = activeStories.filter((story) => String(story.userId) === String(userId)).map((story) => story._id);
+		const otherStoryIds = activeStories.filter((story) => String(story.userId) !== String(userId)).map((story) => story._id);
+		const viewersCounts = await getViewersCountsByStoryId(ownStoryIds, hiddenVisitorIds);
+		const watchedStoryIds = await getWatchedStoryIds({ storyIds: otherStoryIds, viewerId: userId });
+
+		const entriesByAuthorId = new Map();
+
+		activeStories.forEach((story) => {
+			const authorKey = String(story.userId);
+			const isOwn = authorKey === String(userId);
+			const isStoryWatched = watchedStoryIds.has(String(story._id));
+			const entry = entriesByAuthorId.get(authorKey) || {
+				authorId: story.userId,
+				isOwn,
+				isWatched: true,
+				latestStoryAt: story.createdAt,
+				stories: [],
+			};
+
+			entry.isWatched = entry.isWatched && (isOwn || isStoryWatched);
+			entry.latestStoryAt = story.createdAt > entry.latestStoryAt ? story.createdAt : entry.latestStoryAt;
+			entry.stories.push(
+				toStoryData(story, isOwn ? { viewersCount: viewersCounts.get(String(story._id)) || 0 } : { isWatched: isStoryWatched }),
+			);
+
+			entriesByAuthorId.set(authorKey, entry);
+		});
+
+		const authors = await UserModel.find({ _id: { $in: [...entriesByAuthorId.values()].map((entry) => entry.authorId) } })
+			.select(STORY_AUTHOR_SELECT)
+			.lean();
+
+		const authorsById = new Map(authors.map((author) => [String(author._id), author]));
+
+		return [...entriesByAuthorId.values()]
+			.filter((entry) => authorsById.has(String(entry.authorId)))
+			.sort(compareTrayEntries)
+			.map((entry) => ({
+				user: toStoryAuthorData(authorsById.get(String(entry.authorId))),
+				isOwn: entry.isOwn,
+				isWatched: entry.isWatched,
+				latestStoryAt: entry.latestStoryAt,
+				stories: entry.stories,
+			}));
+	} catch (error) {
+		if (error instanceof AppError) {
+			throw error;
+		}
+
+		throw new AppError('Could not load the stories tray', 500, { cause: error });
 	}
 };
 
@@ -312,7 +359,8 @@ const deleteExpiredStories = async () => {
 module.exports = {
 	addStory,
 	getStoryTray,
-	getUserStories,
+	getUserStory,
+	withStorySummaries,
 	recordStoryView,
 	getStoryViewers,
 	deleteStory,

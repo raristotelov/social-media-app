@@ -27,7 +27,7 @@ const createTaker = (pools) => {
 	};
 };
 
-const selectSuggestions = ({ pools, mix, size, reserveSize }) => {
+const selectSuggestions = ({ pools, mix, size }) => {
 	const take = createTaker(pools);
 	const suggestions = [];
 	let shortfall = 0;
@@ -44,9 +44,7 @@ const selectSuggestions = ({ pools, mix, size, reserveSize }) => {
 
 	suggestions.sort((a, b) => getGroupRank(a.group) - getGroupRank(b.group));
 
-	const reserve = take(SUGGESTION_GROUP_ORDER, reserveSize);
-
-	return { suggestions, reserve };
+	return suggestions;
 };
 
 module.exports = {

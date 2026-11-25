@@ -275,7 +275,13 @@ describe('likes list endpoints against a real database', () => {
 			const response = await get('/users?searchWord=ali');
 
 			await expect(response.json()).resolves.toEqual([
-				{ _id: String(alice._id), username: 'alice', profilePicture: { imageUrl: 'https://cdn.example.com/alice.jpg' }, followersCount: 0 },
+				{
+					_id: String(alice._id),
+					username: 'alice',
+					profilePicture: { imageUrl: 'https://cdn.example.com/alice.jpg' },
+					followersCount: 0,
+					story: null,
+				},
 			]);
 		});
 
@@ -284,7 +290,7 @@ describe('likes list endpoints against a real database', () => {
 
 			const [row] = await response.json();
 
-			expect(row).toEqual({ _id: String(author._id), username: 'author', followersCount: 3 });
+			expect(row).toEqual({ _id: String(author._id), username: 'author', followersCount: 3, story: null });
 		});
 	});
 });

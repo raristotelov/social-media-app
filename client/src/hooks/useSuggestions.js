@@ -3,70 +3,21 @@ import { useCallback, useContext, useEffect, useReducer, useRef } from 'react';
 import LoggedInUserContext from '../contexts/LoggedInUserContext';
 import useFollowActions from './useFollowActions';
 import { dismissSuggestionsCarousel, getSuggestions } from '../services/suggestionService';
-import { PLACEMENTS_KEEPING_FOLLOWED } from '../constants/suggestions';
 import { isUnauthenticatedError } from '../utils/errors';
-import { insertInGroupOrder } from '../utils/suggestions';
 
 const ACTIONS = Object.freeze({
 	LOAD_STARTED: 'load-started',
 	LOADED: 'loaded',
-	REMOVED: 'removed',
-	RESTORED: 'restored',
-	CONFIRMED: 'confirmed',
 	FOLLOWED_SET: 'followed-set',
 	CAROUSEL_DISMISSED: 'carousel-dismissed',
 });
 
 const INITIAL_STATE = Object.freeze({
 	suggestions: [],
-	reserve: [],
-	removals: {},
 	followedIds: [],
 	isLoaded: false,
 	isCarouselDismissed: false,
 });
-
-const withoutKey = (object, key) => Object.fromEntries(Object.entries(object).filter(([entryKey]) => entryKey !== key));
-
-const removeSuggestion = (state, userId) => {
-	const index = state.suggestions.findIndex((suggestion) => suggestion._id === userId);
-
-	if (index === -1) {
-		return state;
-	}
-
-	const [replacement, ...remainingReserve] = state.reserve;
-	const remainingSuggestions = state.suggestions.filter((suggestion) => suggestion._id !== userId);
-
-	return {
-		...state,
-		suggestions: replacement ? insertInGroupOrder(remainingSuggestions, replacement) : remainingSuggestions,
-		reserve: remainingReserve,
-		removals: { ...state.removals, [userId]: { suggestion: state.suggestions[index], index, replacement } },
-	};
-};
-
-const restoreSuggestion = (state, userId) => {
-	const removal = state.removals[userId];
-
-	if (!removal) {
-		return state;
-	}
-
-	const { suggestion, index, replacement } = removal;
-	const isReplacementListed = Boolean(replacement) && state.suggestions.some((listed) => listed._id === replacement._id);
-	const suggestionsWithoutReplacement = isReplacementListed
-		? state.suggestions.filter((listed) => listed._id !== replacement._id)
-		: state.suggestions;
-	const restoreIndex = Math.min(index, suggestionsWithoutReplacement.length);
-
-	return {
-		...state,
-		suggestions: [...suggestionsWithoutReplacement.slice(0, restoreIndex), suggestion, ...suggestionsWithoutReplacement.slice(restoreIndex)],
-		reserve: isReplacementListed ? [replacement, ...state.reserve] : state.reserve,
-		removals: withoutKey(state.removals, userId),
-	};
-};
 
 const setFollowed = (state, { userId, isFollowed }) => {
 	const otherFollowedIds = state.followedIds.filter((followedId) => followedId !== userId);
@@ -82,16 +33,9 @@ const suggestionsReducer = (state, action) => {
 			return {
 				...INITIAL_STATE,
 				suggestions: action.suggestions,
-				reserve: action.reserve,
 				isCarouselDismissed: action.isCarouselDismissed,
 				isLoaded: true,
 			};
-		case ACTIONS.REMOVED:
-			return removeSuggestion(state, action.userId);
-		case ACTIONS.RESTORED:
-			return restoreSuggestion(state, action.userId);
-		case ACTIONS.CONFIRMED:
-			return { ...state, removals: withoutKey(state.removals, action.userId) };
 		case ACTIONS.FOLLOWED_SET:
 			return setFollowed(state, action);
 		case ACTIONS.CAROUSEL_DISMISSED:
@@ -109,8 +53,6 @@ const useSuggestions = (placement, { onFollowChange } = {}) => {
 
 	const pendingUserIdsRef = useRef(new Set());
 
-	const keepsFollowed = PLACEMENTS_KEEPING_FOLLOWED.includes(placement);
-
 	useEffect(() => {
 		let isCurrentRequest = true;
 
@@ -122,7 +64,6 @@ const useSuggestions = (placement, { onFollowChange } = {}) => {
 					dispatch({
 						type: ACTIONS.LOADED,
 						suggestions: result.suggestions,
-						reserve: result.reserve,
 						isCarouselDismissed: result.isCarouselDismissed,
 					});
 				}
@@ -155,21 +96,17 @@ const useSuggestions = (placement, { onFollowChange } = {}) => {
 	const followSuggestion = useCallback(
 		(userId) =>
 			runOncePerUser(userId, async () => {
-				dispatch(keepsFollowed ? { type: ACTIONS.FOLLOWED_SET, userId, isFollowed: true } : { type: ACTIONS.REMOVED, userId });
+				dispatch({ type: ACTIONS.FOLLOWED_SET, userId, isFollowed: true });
 
 				const isFollowed = await follow(userId);
 
-				if (keepsFollowed) {
-					dispatch({ type: ACTIONS.FOLLOWED_SET, userId, isFollowed });
+				if (!isFollowed) {
+					dispatch({ type: ACTIONS.FOLLOWED_SET, userId, isFollowed: false });
 				} else {
-					dispatch({ type: isFollowed ? ACTIONS.CONFIRMED : ACTIONS.RESTORED, userId });
-				}
-
-				if (isFollowed) {
 					onFollowChange?.();
 				}
 			}),
-		[runOncePerUser, keepsFollowed, follow, onFollowChange],
+		[runOncePerUser, follow, onFollowChange],
 	);
 
 	const unfollowSuggestion = useCallback(

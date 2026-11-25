@@ -15,10 +15,10 @@ export const getStoryTray = () => {
 	return request.get(`${serverUrl}/stories/tray`);
 };
 
-export const getUserStories = ({ userId }) => {
+export const getUserStory = ({ userId }) => {
 	const request = requestFactory();
 
-	return request.get(`${serverUrl}/stories/user/${userId}`);
+	return request.get(`${serverUrl}/users/${userId}/story`);
 };
 
 export const markStoryViewed = ({ storyId }) => {

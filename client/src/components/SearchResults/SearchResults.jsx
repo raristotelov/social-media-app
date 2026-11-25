@@ -1,5 +1,7 @@
 import { Link } from 'react-router';
 
+import { getStoryRingState } from '../../utils/stories';
+
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
 
@@ -31,7 +33,11 @@ const SearchResults = ({ results, isLoading, onResultClick, className = '', show
 
 				return (
 					<Link to={`/user/${user._id}`} key={user._id} className='search-result' onClick={onResultClick}>
-						<ProfilePicture imageUrl={user.profilePicture?.imageUrl} className='search-result-avatar' />
+						<ProfilePicture
+							imageUrl={user.profilePicture?.imageUrl}
+							ringState={getStoryRingState(user.story)}
+							className='search-result-avatar'
+						/>
 
 						<span className='search-result-text'>
 							<span className='search-result-username'>{user.username}</span>

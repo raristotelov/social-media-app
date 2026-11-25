@@ -26,6 +26,7 @@
 	gap: 8px;
 
 	text-decoration: none;
+	-webkit-tap-highlight-color: transparent;
 }
 
 .suggestion-card-avatar {

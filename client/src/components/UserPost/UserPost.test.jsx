@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { useCallback, useState } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
@@ -56,6 +57,20 @@ const buildDeferred = () => {
 	return deferred;
 };
 
+const StatefulUserPost = ({ initialPost, onPostChange, ...props }) => {
+	const [post, setPost] = useState(initialPost);
+
+	const applyPostChange = useCallback(
+		(userPostId, changes) => {
+			setPost((currentPost) => ({ ...currentPost, ...changes }));
+			onPostChange(userPostId, changes);
+		},
+		[onPostChange],
+	);
+
+	return <UserPost userPostData={post} onPostChange={applyPostChange} {...props} />;
+};
+
 const renderPost = ({
 	post = basePost,
 	user = loggedInUser,
@@ -65,19 +80,31 @@ const renderPost = ({
 	onEditClick = vi.fn(),
 	onDeleteClick = vi.fn(),
 	showActions,
+	isStateful = false,
 } = {}) => {
 	const rendered = render(
 		<LoggedInUserContext.Provider value={{ loggedInUser: user, endSession }}>
 			<ToastProvider>
 				<MemoryRouter initialEntries={[entry]}>
-					<UserPost
-						userPostData={post}
-						author={author}
-						showActions={showActions}
-						onPostChange={onPostChange}
-						onEditClick={onEditClick}
-						onDeleteClick={onDeleteClick}
-					/>
+					{isStateful ? (
+						<StatefulUserPost
+							initialPost={post}
+							author={author}
+							showActions={showActions}
+							onPostChange={onPostChange}
+							onEditClick={onEditClick}
+							onDeleteClick={onDeleteClick}
+						/>
+					) : (
+						<UserPost
+							userPostData={post}
+							author={author}
+							showActions={showActions}
+							onPostChange={onPostChange}
+							onEditClick={onEditClick}
+							onDeleteClick={onDeleteClick}
+						/>
+					)}
 				</MemoryRouter>
 			</ToastProvider>
 		</LoggedInUserContext.Provider>,
@@ -325,54 +352,214 @@ describe('UserPost', () => {
 			await user.dblClick(screen.getByRole('button', { name: 'Like post' }));
 
 			expect(likeUserPost).toHaveBeenCalledTimes(1);
+			expect(onPostChange).toHaveBeenCalledTimes(1);
 
 			request.resolve({ _id: 'post1', likes: ['user1'] });
-			await waitFor(() => expect(onPostChange).toHaveBeenCalledTimes(1));
+			await waitFor(() => expect(onPostChange).toHaveBeenCalledTimes(2));
 		});
 
-		it('shows the like fallback copy as a toast when the request fails', async () => {
+		it('ignores clicks on the heart while a request is pending, so the like is not undone', async () => {
+			const user = userEvent.setup();
+			const request = buildDeferred();
+
+			likeUserPost.mockReturnValue(request.promise);
+			renderPost({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like post' }));
+			await user.click(screen.getByRole('button', { name: 'Unlike post' }));
+
+			expect(unlikeUserPost).not.toHaveBeenCalled();
+			expect(screen.getByRole('button', { name: 'Unlike post' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByText('1 like')).toBeInTheDocument();
+
+			request.resolve({ _id: 'post1', likes: ['user1'] });
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(1));
+		});
+
+		it('shows the heart pressed and the new like count before the like request resolves', async () => {
+			const user = userEvent.setup();
+			const request = buildDeferred();
+
+			likeUserPost.mockReturnValue(request.promise);
+			renderPost({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like post' }));
+
+			expect(screen.getByRole('button', { name: 'Unlike post' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+
+			request.resolve({ _id: 'post1', likes: ['user1'] });
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Unlike post' })).toBeInTheDocument());
+		});
+
+		it('reports the optimistic likes before the like request resolves', async () => {
+			const user = userEvent.setup();
+			const request = buildDeferred();
+
+			likeUserPost.mockReturnValue(request.promise);
+			const { onPostChange } = renderPost({ post: { ...basePost, likes: ['user9'] } });
+
+			await user.click(screen.getByRole('button', { name: 'Like post' }));
+
+			expect(onPostChange).toHaveBeenCalledTimes(1);
+			expect(onPostChange).toHaveBeenCalledWith('post1', { likes: ['user9', 'user1'] });
+
+			request.resolve({ _id: 'post1', likes: ['user9', 'user1'] });
+			await waitFor(() => expect(onPostChange).toHaveBeenCalledTimes(2));
+		});
+
+		it('shows the heart unpressed and the new like count before the unlike request resolves', async () => {
+			const user = userEvent.setup();
+			const request = buildDeferred();
+
+			unlikeUserPost.mockReturnValue(request.promise);
+			renderPost({ post: { ...basePost, likes: ['user1', 'user9'] }, isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Unlike post' }));
+
+			expect(screen.getByRole('button', { name: 'Like post' })).toHaveAttribute('aria-pressed', 'false');
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+
+			request.resolve({ _id: 'post1', likes: ['user9'] });
+			await waitFor(() => expect(unlikeUserPost).toHaveBeenCalledTimes(1));
+		});
+
+		it('pulses the heart before the like request resolves', async () => {
+			const user = userEvent.setup();
+			const request = buildDeferred();
+
+			likeUserPost.mockReturnValue(request.promise);
+			renderPost({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like post' }));
+
+			expect(screen.getByRole('button', { name: 'Unlike post' })).toHaveClass('user-post-like-button-pulse');
+
+			request.resolve({ _id: 'post1', likes: ['user1'] });
+			await waitFor(() => expect(screen.getByRole('button', { name: 'Unlike post' })).toBeInTheDocument());
+		});
+
+		it('does not pulse the heart when the like is removed', async () => {
+			const user = userEvent.setup();
+			const request = buildDeferred();
+
+			unlikeUserPost.mockReturnValue(request.promise);
+			renderPost({ post: { ...basePost, likes: ['user1'] }, isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Unlike post' }));
+
+			expect(screen.getByRole('button', { name: 'Like post' })).not.toHaveClass('user-post-like-button-pulse');
+
+			request.resolve({ _id: 'post1', likes: [] });
+			await waitFor(() => expect(unlikeUserPost).toHaveBeenCalledTimes(1));
+		});
+
+		describe('when the heart is liked again within the pulse duration', () => {
+			const HEART_PULSE_DURATION_MS = 500;
+
+			beforeEach(() => {
+				vi.useFakeTimers();
+			});
+
+			afterEach(() => {
+				vi.useRealTimers();
+			});
+
+			const clickHeart = async (name) => {
+				await act(async () => {
+					fireEvent.click(screen.getByRole('button', { name }));
+				});
+			};
+
+			const advance = (ms) =>
+				act(async () => {
+					await vi.advanceTimersByTimeAsync(ms);
+				});
+
+			it('keeps the pulse for the full duration after the last like', async () => {
+				likeUserPost.mockResolvedValue({ _id: 'post1', likes: ['user1'] });
+				unlikeUserPost.mockResolvedValue({ _id: 'post1', likes: [] });
+				renderPost({ isStateful: true });
+
+				await clickHeart('Like post');
+				await advance(200);
+				await clickHeart('Unlike post');
+				await advance(200);
+				await clickHeart('Like post');
+
+				await advance(HEART_PULSE_DURATION_MS - 1);
+				expect(screen.getByRole('button', { name: 'Unlike post' })).toHaveClass('user-post-like-button-pulse');
+
+				await advance(1);
+				expect(screen.getByRole('button', { name: 'Unlike post' })).not.toHaveClass('user-post-like-button-pulse');
+			});
+		});
+
+		it('applies the likes returned by the server, including likes from other people', async () => {
+			const user = userEvent.setup();
+			const request = buildDeferred();
+
+			likeUserPost.mockReturnValue(request.promise);
+			const { onPostChange } = renderPost({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like post' }));
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+
+			request.resolve({ _id: 'post1', likes: ['user9', 'user1'] });
+
+			expect(await screen.findByRole('button', { name: '2 likes' })).toBeInTheDocument();
+			expect(onPostChange).toHaveBeenLastCalledWith('post1', { likes: ['user9', 'user1'] });
+		});
+
+		it.each([
+			['a request error', { code: 'INTERNAL_ERROR', status: 500 }],
+			['a post that no longer exists', { code: 'POST_NOT_FOUND', status: 404 }],
+			['a failure that is not a request error', new Error('network down')],
+		])('keeps the like and shows no toast when the like fails with %s', async (_description, failure) => {
+			const user = userEvent.setup();
+
+			likeUserPost.mockRejectedValue(failure);
+			const { endSession } = renderPost({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like post' }));
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(1));
+
+			expect(screen.getByRole('button', { name: 'Unlike post' })).toHaveAttribute('aria-pressed', 'true');
+			expect(screen.getByRole('button', { name: '1 like' })).toBeInTheDocument();
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			expect(endSession).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			['a request error', { code: 'INTERNAL_ERROR', status: 500 }],
+			['a post that no longer exists', { code: 'POST_NOT_FOUND', status: 404 }],
+			['a failure that is not a request error', new Error('network down')],
+		])('keeps the unlike and shows no toast when the unlike fails with %s', async (_description, failure) => {
+			const user = userEvent.setup();
+
+			unlikeUserPost.mockRejectedValue(failure);
+			const { endSession } = renderPost({ post: { ...basePost, likes: ['user1'] }, isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Unlike post' }));
+			await waitFor(() => expect(unlikeUserPost).toHaveBeenCalledTimes(1));
+
+			expect(screen.getByRole('button', { name: 'Like post' })).toHaveAttribute('aria-pressed', 'false');
+			expect(screen.getByText('0 likes')).toBeInTheDocument();
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+			expect(endSession).not.toHaveBeenCalled();
+		});
+
+		it('reports only the optimistic likes to the parent when the like request fails', async () => {
 			const user = userEvent.setup();
 
 			likeUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
 			const { onPostChange } = renderPost();
 
 			await user.click(screen.getByRole('button', { name: 'Like post' }));
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(1));
 
-			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
-			expect(onPostChange).not.toHaveBeenCalled();
-		});
-
-		it('shows the like fallback copy as a toast when the failure is not a request error', async () => {
-			const user = userEvent.setup();
-
-			likeUserPost.mockRejectedValue(new Error('network down'));
-			renderPost();
-
-			await user.click(screen.getByRole('button', { name: 'Like post' }));
-
-			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
-		});
-
-		it('shows the POST_NOT_FOUND copy as a toast when the post no longer exists', async () => {
-			const user = userEvent.setup();
-
-			likeUserPost.mockRejectedValue({ code: 'POST_NOT_FOUND', status: 404 });
-			renderPost();
-
-			await user.click(screen.getByRole('button', { name: 'Like post' }));
-
-			expect(await screen.findByText('This post no longer exists')).toBeInTheDocument();
-		});
-
-		it('shows the like fallback copy as a toast when unliking fails', async () => {
-			const user = userEvent.setup();
-
-			unlikeUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-			renderPost({ post: { ...basePost, likes: ['user1'] } });
-
-			await user.click(screen.getByRole('button', { name: 'Unlike post' }));
-
-			expect(await screen.findByText("Couldn't update your like. Try again.")).toBeInTheDocument();
+			expect(onPostChange).toHaveBeenCalledTimes(1);
+			expect(onPostChange).toHaveBeenCalledWith('post1', { likes: ['user1'] });
 		});
 
 		it('ends the session and shows no toast when the like fails with UNAUTHENTICATED', async () => {
@@ -387,6 +574,18 @@ describe('UserPost', () => {
 			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
 		});
 
+		it('ends the session and shows no toast when the unlike fails with UNAUTHENTICATED', async () => {
+			const user = userEvent.setup();
+
+			unlikeUserPost.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
+			const { endSession } = renderPost({ post: { ...basePost, likes: ['user1'] } });
+
+			await user.click(screen.getByRole('button', { name: 'Unlike post' }));
+
+			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
+			expect(document.querySelector('.toast-region')).toBeEmptyDOMElement();
+		});
+
 		it('allows liking again after a failure', async () => {
 			const user = userEvent.setup();
 
@@ -394,10 +593,27 @@ describe('UserPost', () => {
 			const { onPostChange } = renderPost();
 
 			await user.click(screen.getByRole('button', { name: 'Like post' }));
-			await screen.findByText("Couldn't update your like. Try again.");
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(1));
 			await user.click(screen.getByRole('button', { name: 'Like post' }));
 
-			await waitFor(() => expect(onPostChange).toHaveBeenCalledWith('post1', { likes: ['user1'] }));
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(2));
+			await waitFor(() => expect(onPostChange).toHaveBeenCalledTimes(3));
+			expect(onPostChange).toHaveBeenLastCalledWith('post1', { likes: ['user1'] });
+		});
+
+		it('unlikes on the next click after a like failed, since the heart kept the like', async () => {
+			const user = userEvent.setup();
+
+			likeUserPost.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			unlikeUserPost.mockResolvedValue({ _id: 'post1', likes: [] });
+			renderPost({ isStateful: true });
+
+			await user.click(screen.getByRole('button', { name: 'Like post' }));
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(1));
+			await user.click(screen.getByRole('button', { name: 'Unlike post' }));
+
+			await waitFor(() => expect(unlikeUserPost).toHaveBeenCalledWith({ userPostToUnlikeId: 'post1' }));
+			expect(await screen.findByRole('button', { name: 'Like post' })).toHaveAttribute('aria-pressed', 'false');
 		});
 	});
 

@@ -1,12 +1,9 @@
+import { STORY_RING_STATES } from '../../constants/stories';
+
 import ProfilePicture from '../ProfilePicture/ProfilePicture';
 import PlusSmallIcon from '../icons/PlusSmall';
 
 import './StoryCircle.css';
-
-export const STORY_RING_STATES = Object.freeze({
-	UNWATCHED: 'unwatched',
-	WATCHED: 'watched',
-});
 
 const StoryCircle = ({ imageUrl, label, ringState = STORY_RING_STATES.WATCHED, hasAddBadge = false, onClick, onAddClick, ariaLabel }) => {
 	const ringClassName = ringState === STORY_RING_STATES.UNWATCHED ? 'story-circle-ring story-circle-ring-unwatched' : 'story-circle-ring';

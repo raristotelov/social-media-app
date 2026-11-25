@@ -22,10 +22,13 @@
 	gap: var(--search-result-gap);
 
 	text-decoration: none;
+	-webkit-tap-highlight-color: transparent;
 }
 
-.search-result:hover {
-	background-color: var(--border-inset);
+@media (hover: hover) {
+	.search-result:hover {
+		background-color: var(--border-inset);
+	}
 }
 
 .search-result-avatar {

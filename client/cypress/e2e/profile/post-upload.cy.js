@@ -85,6 +85,72 @@ describe('post upload', () => {
 		});
 	});
 
+	it('shows the Upload tile 3:4', () => {
+		visitAsUser(profilePath, session);
+
+		cy.get('.add-post-button').should(($tile) => {
+			const { width, height } = $tile[0].getBoundingClientRect();
+
+			expect(Math.abs(height - (width * 4) / 3)).to.be.lessThan(1);
+		});
+	});
+
+	const expectPreviewFrame = (width, height) => {
+		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
+
+		cy.get('#add-image-post-form .preview-wrapper:not(.hidden)').should(($frame) => {
+			const bounds = $frame[0].getBoundingClientRect();
+
+			expect(Math.round(bounds.width), 'frame width').to.equal(width);
+			expect(Math.round(bounds.height), 'frame height').to.equal(height);
+		});
+
+		cy.get('#add-image-post-form .preview-wrapper img[alt="preview"]').should('have.css', 'object-fit', 'contain');
+	};
+
+	it('shows the preview frame at 210 by 280 on desktop', () => {
+		cy.viewport(1440, 900);
+		visitAsUser(profilePath, session);
+		openUploadPopup();
+
+		expectPreviewFrame(210, 280);
+	});
+
+	it('shows the preview frame at 240 by 320 on mobile', () => {
+		cy.viewport(390, 844);
+		visitAsUser(profilePath, session);
+		openUploadPopup();
+
+		expectPreviewFrame(240, 320);
+	});
+
+	it('keeps the preview frame 3:4 and Share and Cancel reachable inside a short mobile viewport', () => {
+		cy.viewport(390, 560);
+		visitAsUser(profilePath, session);
+		openUploadPopup();
+
+		fileInput().selectFile(FIXTURE_IMAGE, { force: true });
+
+		cy.get('#add-image-post-form .preview-wrapper:not(.hidden)').should(($frame) => {
+			const { width, height } = $frame[0].getBoundingClientRect();
+
+			expect(Math.abs(height - (width * 4) / 3)).to.be.lessThan(1);
+		});
+
+		['Share', 'Cancel'].forEach((label) => {
+			cy.get('#add-image-post-form').contains('button', label).scrollIntoView().should('be.visible');
+
+			cy.get('#add-image-post-form')
+				.contains('button', label)
+				.should(($button) => {
+					const { top, bottom } = $button[0].getBoundingClientRect();
+
+					expect(top, `${label} top`).to.be.at.least(0);
+					expect(bottom, `${label} bottom`).to.be.at.most(560);
+				});
+		});
+	});
+
 	it('keeps the post after a refresh', () => {
 		visitAsUser(profilePath, session);
 		openUploadPopup();

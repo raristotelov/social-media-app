@@ -7,7 +7,7 @@ Ticket #3. Popular posts (`/popular-posts`), open to guests and logged-in users.
 ## Page
 
 - Guests get the guest header (Log In / Sign up); logged-in users get the member header. The page is otherwise the same.
-- Grid of 3 square tiles: a centred column on desktop and tablet, full-bleed on mobile (2px gutters). Design.
+- Grid of 3 columns of 3:4 tiles (whole photo, `background/surface` bars, never cropped; see [profile-page.md](./profile-page.md)): a centred column on desktop and tablet, full-bleed on mobile (2px gutters). Design.
 - Desktop / tablet: hovering a tile shows its likes and comments counts. Design.
 
 ## Ranking

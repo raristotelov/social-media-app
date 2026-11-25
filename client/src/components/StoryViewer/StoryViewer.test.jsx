@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import { deleteStory, getStoryViewers, getUserStories, markStoryViewed } from '../../services/storyService';
+import { deleteStory, getStoryTray, getStoryViewers, markStoryViewed } from '../../services/storyService';
 import { dragDown, fireTransitionEnd, installBottomSheetEnvironment, restoreBottomSheetEnvironment } from '../../testUtils/bottomSheet';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
@@ -12,7 +12,6 @@ import StoryViewer from './StoryViewer';
 
 vi.mock('../../services/storyService');
 
-const LOAD_ERROR_TOAST = "Couldn't load stories. Try again.";
 const DELETE_ERROR_TOAST = "Couldn't delete your story. Try again.";
 
 const minutesAgoIso = (minutes) => new Date(Date.now() - minutes * 60 * 1000 - 1000).toISOString();
@@ -33,9 +32,14 @@ const buildStoriesByUser = () => ({
 });
 
 const buildQueue = () => [
-	{ user: { _id: 'me', username: 'me' }, isOwn: true, isWatched: true },
-	{ user: { _id: 'alice', username: 'alice', profilePicture: { imageUrl: 'https://example.com/alice.jpg' } }, isOwn: false, isWatched: false },
-	{ user: { _id: 'bob', username: 'bob' }, isOwn: false, isWatched: false },
+	{ user: { _id: 'me', username: 'me' }, isOwn: true, isWatched: true, stories: storiesByUser.me },
+	{
+		user: { _id: 'alice', username: 'alice', profilePicture: { imageUrl: 'https://example.com/alice.jpg' } },
+		isOwn: false,
+		isWatched: false,
+		stories: storiesByUser.alice,
+	},
+	{ user: { _id: 'bob', username: 'bob' }, isOwn: false, isWatched: false, stories: storiesByUser.bob },
 ];
 
 const buildDeferred = () => {
@@ -89,7 +93,6 @@ describe('StoryViewer', () => {
 		vi.resetAllMocks();
 		user = userEvent.setup();
 		storiesByUser = buildStoriesByUser();
-		getUserStories.mockImplementation(({ userId }) => Promise.resolve({ user: { _id: userId }, stories: storiesByUser[userId] }));
 		markStoryViewed.mockResolvedValue({});
 		getStoryViewers.mockResolvedValue([]);
 		deleteStory.mockResolvedValue({});
@@ -102,20 +105,99 @@ describe('StoryViewer', () => {
 			expect(getViewer()).toHaveAttribute('aria-modal', 'true');
 		});
 
-		it("requests the stories of the user it starts on, with the token, and nobody else's", async () => {
+		it('sends no request when it opens, because the queue already carries the stories', async () => {
+			const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
 			await openViewer({ startIndex: 1 });
 
-			expect(getUserStories).toHaveBeenCalledTimes(1);
-			expect(getUserStories).toHaveBeenCalledWith({ userId: 'alice' });
+			expect(fetchSpy).not.toHaveBeenCalled();
+			expect(getStoryTray).not.toHaveBeenCalled();
+			expect(markStoryViewed).not.toHaveBeenCalled();
+			expect(getStoryViewers).not.toHaveBeenCalled();
+			expect(deleteStory).not.toHaveBeenCalled();
+
+			fetchSpy.mockRestore();
 		});
 
-		it('shows a spinner and no photo while the stories load', () => {
-			getUserStories.mockReturnValue(new Promise(() => {}));
-
+		it('shows the first photo straight away', () => {
 			renderViewer();
 
-			expect(document.querySelector('.loading-spinner')).toBeInTheDocument();
-			expect(screen.queryByAltText(/^Story by/)).not.toBeInTheDocument();
+			expect(screen.getByAltText('Story by alice')).toBeInTheDocument();
+		});
+
+		describe('the photo loader', () => {
+			const getLoader = () => document.querySelector('.story-viewer-loading');
+
+			it('is in the DOM, with a spinner, until the photo has loaded', async () => {
+				await openViewer({ startIndex: 1 });
+
+				expect(getLoader()).toBeInTheDocument();
+				expect(getLoader().querySelector('.loading-spinner')).toBeInTheDocument();
+			});
+
+			it('sits inside the media wrapper of the current story', async () => {
+				await openViewer({ startIndex: 1 });
+
+				expect(getLoader().parentElement).toHaveClass('story-viewer-media');
+			});
+
+			it('is removed once the photo has loaded', async () => {
+				await openViewer({ startIndex: 1 });
+
+				loadPhoto();
+
+				expect(getLoader()).not.toBeInTheDocument();
+			});
+
+			it('comes back as a fresh loader when moving to the next story, until that photo loads', async () => {
+				await openViewer({ startIndex: 1 });
+				const firstLoader = getLoader();
+				loadPhoto();
+
+				await tapNext();
+
+				expect(firstLoader).not.toBeInTheDocument();
+				expect(getPhotoName()).toBe('a3');
+				expect(getLoader()).toBeInTheDocument();
+				expect(getLoader()).not.toBe(firstLoader);
+
+				loadPhoto();
+
+				expect(getLoader()).not.toBeInTheDocument();
+			});
+
+			it('comes back when moving to the previous story, until that photo loads', async () => {
+				await openViewer({ startIndex: 1 });
+				loadPhoto();
+
+				await tapPrevious();
+
+				expect(getPhotoName()).toBe('a1');
+				expect(getLoader()).toBeInTheDocument();
+
+				loadPhoto();
+
+				expect(getLoader()).not.toBeInTheDocument();
+			});
+
+			it('is removed after a failed photo skips ahead and the next photo loads', async () => {
+				await openViewer({ startIndex: 1 });
+
+				fireEvent.error(getPhoto());
+
+				expect(getPhotoName()).toBe('a3');
+				expect(getLoader()).toBeInTheDocument();
+
+				loadPhoto();
+
+				expect(getLoader()).not.toBeInTheDocument();
+			});
+		});
+
+		it('shows no toast on open', async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(getToastText()).toBe('');
 		});
 
 		it("opens on the user's first unwatched story", async () => {
@@ -171,6 +253,87 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 1 });
 
 			expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('the poster link', () => {
+		const getPosterLink = () => document.querySelector('.story-viewer-poster-link');
+
+		it("links to the current poster's profile", async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(getPosterLink()).toHaveAttribute('href', '/user/alice');
+		});
+
+		it('wraps the profile picture and the username', async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(getPosterLink()).toContainElement(document.querySelector('.story-viewer-avatar'));
+			expect(getPosterLink()).toContainElement(screen.getByText('alice'));
+		});
+
+		it('keeps the age label outside the link', async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(getPosterLink()).not.toContainElement(document.querySelector('.story-viewer-age'));
+		});
+
+		it('points at the next user once the viewer moves on to them', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			await openViewer({ startIndex: 1 });
+
+			await tapNext();
+
+			await screen.findByAltText('Story by bob');
+			expect(getPosterLink()).toHaveAttribute('href', '/user/bob');
+		});
+
+		it('points back at the previous user when moving back to them', async () => {
+			await openViewer({ startIndex: 2 });
+
+			await tapPrevious();
+			await tapPrevious();
+
+			await screen.findByAltText('Story by alice');
+			expect(getPosterLink()).toHaveAttribute('href', '/user/alice');
+		});
+
+		it('closes the viewer when clicked', async () => {
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			await user.click(getPosterLink());
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('closes the viewer when the username is clicked', async () => {
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			await user.click(screen.getByText('alice'));
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not move to another story when clicked', async () => {
+			await openViewer({ startIndex: 1 });
+
+			await user.click(getPosterLink());
+
+			expect(getPhotoName()).toBe('a2');
+		});
+
+		it('links to your own profile on your own story', async () => {
+			await openViewer({ startIndex: 0 });
+
+			expect(getPosterLink()).toHaveAttribute('href', '/user/me');
+		});
+
+		it('closes the viewer when clicked on your own story', async () => {
+			const { onClose } = await openViewer({ startIndex: 0 });
+
+			await user.click(getPosterLink());
+
+			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 	});
 
@@ -311,7 +474,6 @@ describe('StoryViewer', () => {
 			finishSegment();
 
 			expect(await screen.findByAltText('Story by bob')).toBeInTheDocument();
-			expect(getUserStories).toHaveBeenCalledWith({ userId: 'bob' });
 		});
 
 		it('starts the next user on their first unwatched story, not their first story', async () => {
@@ -330,6 +492,45 @@ describe('StoryViewer', () => {
 
 			await openViewer({ startIndex: 1 });
 			finishSegment();
+
+			await screen.findByAltText('Story by bob');
+			expect(getPhotoName()).toBe('b1');
+		});
+
+		it('restarts the next user on their first story not yet watched in this session after going back and forward again', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: false }), buildStory('b2', { isWatched: false })];
+
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			await tapNext();
+			await screen.findByAltText('Story by bob');
+			expect(getPhotoName()).toBe('b1');
+			loadPhoto();
+			await tapNext();
+			expect(getPhotoName()).toBe('b2');
+			await tapPrevious();
+			await tapPrevious();
+			await screen.findByAltText('Story by alice');
+
+			await tapNext();
+
+			await screen.findByAltText('Story by bob');
+			expect(getPhotoName()).toBe('b2');
+		});
+
+		it('keeps starting the next user on their first story when its photo never loaded in this session', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: false }), buildStory('b2', { isWatched: false })];
+
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			await tapNext();
+			await screen.findByAltText('Story by bob');
+			await tapPrevious();
+			await screen.findByAltText('Story by alice');
+
+			await tapNext();
 
 			await screen.findByAltText('Story by bob');
 			expect(getPhotoName()).toBe('b1');
@@ -432,17 +633,6 @@ describe('StoryViewer', () => {
 			await tapNext();
 
 			expect(onClose).toHaveBeenCalledTimes(1);
-		});
-
-		it('does not move a story that is still loading its user', async () => {
-			getUserStories.mockReturnValue(new Promise(() => {}));
-			const { onClose } = renderViewer({ startIndex: 1 });
-
-			await tapNext();
-			await tapPrevious();
-
-			expect(onClose).not.toHaveBeenCalled();
-			expect(getUserStories).toHaveBeenCalledTimes(1);
 		});
 
 		it('moves with a keyboard activation of the side buttons', async () => {
@@ -572,6 +762,27 @@ describe('StoryViewer', () => {
 			expect(onClose).toHaveBeenCalledTimes(1);
 		});
 
+		it('reports the stories that were watched when it closes', async () => {
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			const [reportedStoriesByUserId] = onClose.mock.calls[0];
+
+			expect(reportedStoriesByUserId.alice.map((story) => story.isWatched)).toEqual([true, true, false]);
+		});
+
+		it('does not report a story whose photo never loaded as watched', async () => {
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			const [reportedStoriesByUserId] = onClose.mock.calls[0];
+
+			expect(reportedStoriesByUserId.alice.map((story) => story.isWatched)).toEqual([true, false, false]);
+		});
+
 		it('has a next arrow that goes forward', async () => {
 			await openViewer({ startIndex: 1 });
 
@@ -619,6 +830,164 @@ describe('StoryViewer', () => {
 		});
 	});
 
+	describe('reporting the watched state when it closes', () => {
+		const closePaths = [
+			['Escape', () => fireEvent.keyDown(document, { key: 'Escape' })],
+			['the close button', () => user.click(screen.getByRole('button', { name: 'Close' }))],
+			['the poster link', () => user.click(document.querySelector('.story-viewer-poster-link'))],
+			['tapping past the last story', () => tapNext()],
+			['the next arrow on the last story', () => user.click(document.querySelector('.story-viewer-arrow-next'))],
+			['the right arrow key on the last story', () => fireEvent.keyDown(document, { key: 'ArrowRight' })],
+			['the last segment filling', () => finishSegment()],
+		];
+
+		const getWatchedFlags = (onClose, userId) => onClose.mock.calls[0][0][userId].map((story) => story.isWatched);
+
+		it.each(closePaths)('reports once, for every user in the queue, when closed by %s', async (name, close) => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			await close();
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+			expect(Object.keys(onClose.mock.calls[0][0]).sort()).toEqual(['alice', 'bob', 'me']);
+		});
+
+		it.each(closePaths)('reports the story as watched when its photo had loaded and it is closed by %s', async (name, close) => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			await close();
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, true]);
+		});
+
+		it.each(closePaths)('reports the story as unwatched when its photo never loaded and it is closed by %s', async (name, close) => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			await close();
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, false]);
+		});
+
+		it('reports a story whose photo failed to load, on the last story, as unwatched', async () => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			fireEvent.error(getPhoto());
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, false]);
+		});
+
+		it('reports the stories of every user watched on the way, not just the last one', async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+			finishSegment();
+			await screen.findByAltText('Story by bob');
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'alice')).toEqual([true]);
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, false]);
+		});
+
+		it('reports only the stories whose photos loaded, when some were tapped past', async () => {
+			storiesByUser.alice = [
+				buildStory('a1', { isWatched: false }),
+				buildStory('a2', { isWatched: false }),
+				buildStory('a3', { isWatched: false }),
+			];
+			const { onClose } = await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+			await tapNext();
+			await tapNext();
+			loadPhoto();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'alice')).toEqual([true, false, true]);
+		});
+
+		it('reports the story as watched without waiting for the view to be recorded', async () => {
+			markStoryViewed.mockReturnValue(new Promise(() => {}));
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, true]);
+		});
+
+		it('still reports the story as watched when recording the view fails', async () => {
+			markStoryViewed.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			await waitFor(() => expect(markStoryViewed).toHaveBeenCalled());
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, true]);
+		});
+
+		it('leaves your own stories without a watched flag, even when their photos loaded', async () => {
+			const { onClose } = await openViewer({ startIndex: 0 });
+
+			loadPhoto();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'me')).toEqual([undefined, undefined]);
+		});
+
+		it('keeps a story reported as watched after going back and forward over it', async () => {
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+			await tapPrevious();
+			await tapNext();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(getWatchedFlags(onClose, 'bob')).toEqual([true, true]);
+		});
+
+		it('reports the remaining stories after your own last story is deleted, so the ring can go', async () => {
+			storiesByUser.me = [buildStory('m1', { viewersCount: 0 })];
+			const queue = [buildQueue()[0]];
+			const { onClose } = await openViewer({ queue, startIndex: 0 });
+
+			await user.click(screen.getByRole('button', { name: 'Delete story' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+			expect(onClose.mock.calls[0][0]).toEqual({ me: [] });
+		});
+
+		it('reports your remaining story, not the deleted one, when you close after deleting one of two', async () => {
+			const { onClose } = await openViewer({ startIndex: 0 });
+
+			await user.click(screen.getByRole('button', { name: 'Delete story' }));
+			await user.click(screen.getByRole('button', { name: 'Delete' }));
+			await waitFor(() => expect(getPhotoName()).toBe('m2'));
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(onClose.mock.calls[0][0].me.map((story) => story._id)).toEqual(['m2']);
+		});
+
+		it('sends no request to the server when it closes', async () => {
+			const fetchSpy = vi.spyOn(globalThis, 'fetch');
+			const { onClose } = await openViewer({ startIndex: 2 });
+
+			markStoryViewed.mockClear();
+			fireEvent.keyDown(document, { key: 'Escape' });
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+			expect(fetchSpy).not.toHaveBeenCalled();
+			expect(getStoryTray).not.toHaveBeenCalled();
+			expect(markStoryViewed).not.toHaveBeenCalled();
+
+			fetchSpy.mockRestore();
+		});
+	});
+
 	describe('how the photo is laid out', () => {
 		it('lets a photo within 0.02 of 9:16 fill the frame, with no blurred copy', async () => {
 			storiesByUser.alice = [buildStory('a1', { isWatched: false, imageWidth: 1080, imageHeight: 1920 })];
@@ -645,6 +1014,131 @@ describe('StoryViewer', () => {
 			await openViewer({ startIndex: 1 });
 
 			expect(document.querySelector('.story-viewer-media-blur')).toBeInTheDocument();
+		});
+	});
+
+	describe('preloading the upcoming photos', () => {
+		let preloadedUrls;
+
+		const url = (id) => `https://example.com/${id}.jpg`;
+
+		beforeEach(() => {
+			preloadedUrls = [];
+
+			class FakeImage {
+				set src(value) {
+					preloadedUrls.push(value);
+				}
+			}
+
+			vi.stubGlobal('Image', FakeImage);
+		});
+
+		afterEach(() => {
+			vi.unstubAllGlobals();
+		});
+
+		it('preloads nothing before the current photo has loaded', async () => {
+			await openViewer({ startIndex: 1 });
+
+			expect(preloadedUrls).toEqual([]);
+		});
+
+		it("preloads the next story and the next user's starting story once the photo has loaded", async () => {
+			await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('a3'), url('b2')]);
+		});
+
+		it("preloads only the next user's starting story on the last story of a user", async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('b2')]);
+		});
+
+		it("preloads the next user's first story when all of theirs are watched", async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: true }), buildStory('b2', { isWatched: true })];
+			await openViewer({ startIndex: 1 });
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('b1')]);
+		});
+
+		it("preloads the next user's first story not yet watched in this session after going back and forward again", async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: false }), buildStory('b2', { isWatched: false })];
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			expect(preloadedUrls).toEqual([url('b1')]);
+			await tapNext();
+			await screen.findByAltText('Story by bob');
+			loadPhoto();
+			await tapPrevious();
+			await screen.findByAltText('Story by alice');
+			preloadedUrls.length = 0;
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('b2')]);
+		});
+
+		it('preloads nothing on the last story of the last user', async () => {
+			await openViewer({ startIndex: 2 });
+
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([]);
+		});
+
+		it('preloads the new upcoming photos after moving on and loading the next photo', async () => {
+			storiesByUser.alice = [
+				buildStory('a1', { isWatched: false }),
+				buildStory('a2', { isWatched: false }),
+				buildStory('a3', { isWatched: false }),
+			];
+			await openViewer({ startIndex: 1 });
+			loadPhoto();
+			preloadedUrls.length = 0;
+
+			await tapNext();
+			expect(preloadedUrls).toEqual([]);
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('a3'), url('b2')]);
+		});
+
+		it("preloads the next user's starting story after moving on to the next user", async () => {
+			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
+			storiesByUser.bob = [buildStory('b1', { isWatched: false }), buildStory('b2', { isWatched: false })];
+			storiesByUser.carol = [buildStory('c1', { isWatched: false })];
+			const queue = [
+				...buildQueue(),
+				{ user: { _id: 'carol', username: 'carol' }, isOwn: false, isWatched: false, stories: storiesByUser.carol },
+			];
+			await openViewer({ queue, startIndex: 1 });
+			loadPhoto();
+			preloadedUrls.length = 0;
+
+			finishSegment();
+			await screen.findByAltText('Story by bob');
+			loadPhoto();
+
+			expect(preloadedUrls).toEqual([url('b2'), url('c1')]);
+		});
+
+		it('preloads nothing for a photo that fails to load', async () => {
+			await openViewer({ startIndex: 1 });
+
+			fireEvent.error(getPhoto());
+
+			expect(preloadedUrls).toEqual([]);
 		});
 	});
 
@@ -797,67 +1291,6 @@ describe('StoryViewer', () => {
 			loadPhoto();
 
 			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
-		});
-	});
-
-	describe('when the stories cannot be loaded', () => {
-		it('closes the viewer and shows the load error toast', async () => {
-			getUserStories.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
-
-			const { onClose } = renderViewer({ startIndex: 1 });
-
-			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
-		});
-
-		it('shows the same toast for a network failure', async () => {
-			getUserStories.mockRejectedValue(new Error('network down'));
-
-			const { onClose } = renderViewer({ startIndex: 1 });
-
-			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
-		});
-
-		it('shows the same toast when the user no longer exists', async () => {
-			getUserStories.mockRejectedValue({ code: 'USER_NOT_FOUND', status: 404 });
-
-			const { onClose } = renderViewer({ startIndex: 1 });
-
-			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
-		});
-
-		it('ends the session, with no toast, when the token is no longer valid', async () => {
-			getUserStories.mockRejectedValue({ code: 'UNAUTHENTICATED', status: 401 });
-
-			const { onClose, endSession } = renderViewer({ startIndex: 1 });
-
-			await waitFor(() => expect(endSession).toHaveBeenCalledTimes(1));
-			expect(onClose).toHaveBeenCalledTimes(1);
-			expect(getToastText()).toBe('');
-		});
-
-		it('closes with the toast when the next user fails to load', async () => {
-			storiesByUser.alice = [buildStory('a1', { isWatched: false })];
-			getUserStories.mockImplementation(({ userId }) =>
-				userId === 'bob'
-					? Promise.reject({ code: 'INTERNAL_ERROR', status: 500 })
-					: Promise.resolve({ user: { _id: userId }, stories: storiesByUser[userId] }),
-			);
-
-			const { onClose } = await openViewer({ startIndex: 1 });
-
-			await tapNext();
-
-			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-			expect(getToastText()).toBe(LOAD_ERROR_TOAST);
-		});
-
-		it('shows no toast when everything loads', async () => {
-			await openViewer({ startIndex: 1 });
-
-			expect(getToastText()).toBe('');
 		});
 	});
 
@@ -1080,6 +1513,8 @@ describe('StoryViewer', () => {
 			await user.click(screen.getByRole('button', { name: 'Delete' }));
 
 			await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+
+			expect(onClose).toHaveBeenCalledWith(expect.objectContaining({ me: [] }));
 		});
 
 		it('disables Delete while the request is in flight and sends one request', async () => {

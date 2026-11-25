@@ -25,13 +25,11 @@ export const applyLikeLocally = (comments, { commentId, userId, isLiked }) => {
 		return { ...comment, likes: isLiked ? [...otherLikes, userId] : otherLikes };
 	};
 
-	return comments
-		.map((comment) => {
-			const updatedComment = updateLikes(comment);
+	return comments.map((comment) => {
+		const updatedComment = updateLikes(comment);
 
-			return comment.replies ? { ...updatedComment, replies: comment.replies.map(updateLikes) } : updatedComment;
-		})
-		.sort(compareComments);
+		return comment.replies ? { ...updatedComment, replies: comment.replies.map(updateLikes) } : updatedComment;
+	});
 };
 
 export const getPreviewComments = (comments) => [...comments].sort(compareComments).slice(0, COMMENT_PREVIEW_LIMIT);

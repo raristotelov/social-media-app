@@ -35,7 +35,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 
 ## Post grid — Built
 
-- Square tiles, centre-cropped.
+- 3:4 portrait tiles. The whole photo always shows, never cropped: a photo of another shape is centred, with `background/surface` bars filling the rest. (#54)
 - Desktop: 900 column, 292 tiles, 12 gap. Tablet: 720 column, 232 tiles, 12 gap. Mobile: full-bleed, 3 columns, 2px gaps.
 - Clicking a tile opens the profile posts view — see [feed-page.md](./feed-page.md).
 - Hover shows the tile's like and comment counts, as on the Popular page (`Explore Tile`, `State=Hover`; Post Actions frames). Pointer devices only — no hover on touch. — Built (#28)
@@ -52,6 +52,7 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 ## Upload Picture popup (own profile)
 
 - Opened from the Upload Picture tile. Image chooser + caption input; Submit / Cancel.
+- Photo frame is 3:4, as the grid tile (210×280 desktop/tablet, 240×320 mobile). The whole photo shows, centred, with `background/surface` bars; never cropped. (#54)
 - Cancel closes it. Submitting with no picture shows "Please choose a picture". — Built
 - Error message in the popup on upload/save failure. — Built (#30)
 - Submit disabled while the request is in flight. — Built (#15)
@@ -73,17 +74,18 @@ Route `/user/:userId` (`client/src/Router.jsx`). Tokens: [style-guide.md](../sty
 
 - No picture: empty round input with add-profile-picture icon; click opens the file picker. — Built
 - Same validation, 2048px resize, server upload and Submit disabled in flight as the Upload Picture popup (shared `ImageInput`). — Built (#15)
-- Has picture: hover "Change" overlay. — Built
+- Has picture: hover "Change" overlay, mouse only (none on touch screens). — Built
 - Has picture: clicking the picture opens the file picker on every device. — Built
-- Has picture: small × button (24px, top-right of the picture, always visible) removes it. — Built
+- Has picture: small × button (24px, top-right of the picture, always visible) removes it. Hover flips its colours: `text/primary` circle and border, `background/surface` ×. — Built
 - Removal only takes effect on Save; Cancel leaves the picture untouched; no separate confirmation. After removal the form shows the empty input. — Built
 - Removing the picture also destroys its Cloudinary asset; the placeholder avatar then shows everywhere the picture appears. — Built
 
 ## Post actions (own profile) — Built
 
 - Three-dots button on each tile opens a menu with Edit and Delete. Anchored menu on desktop/tablet; bottom sheet on mobile.
+- The button sits on a black circle at 40% (60% on hover), 32px on desktop/tablet and 24px on mobile (tap area stays at least 32px), so it shows over photos and bars alike. (#54)
 - **Delete:** confirmation with Delete / Cancel (centred popup on desktop/tablet, bottom sheet on mobile). Delete removes the post, its comments and its Cloudinary image.
-- **Edit ("Edit Picture" frames):** caption only; the image cannot be replaced. Save / Cancel. Popup on desktop/tablet, full-screen on mobile.
+- **Edit ("Edit Picture" frames):** caption only; the image cannot be replaced. Save / Cancel. Popup on desktop/tablet, full-screen on mobile. The photo shows in the same 3:4 frame as Upload, whole, with bars. (#54)
 
 ## Authorization
 
@@ -166,7 +168,7 @@ Desktop and tablet popups are components; each Profile section shows an instance
 
 Shared components:
 
-- [Remove Picture Button](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=526-2412) (526:2412)
+- [Remove Picture Button](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=760-4034) (760:4034, State=Default/Hover)
 - [Post Actions Button](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=491-2052) (491:2052)
 - [Profile Picture](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=169-441) (169:441, Type=Photo/Placeholder)
 - [User Row](https://www.figma.com/design/bDyuGKpRh2vP1DlElilDaw/Social-Media-App-Design?node-id=580-2307) (580:2307, State=Default/Hover)

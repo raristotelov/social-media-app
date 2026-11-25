@@ -5,6 +5,7 @@ import { MemoryRouter, Routes, Route } from 'react-router';
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
 import { getUsersProfileData, getFollowers, getFollowing, followUser, unfollowUser, updateUserProfileData } from '../../services/userService';
 import { addUserPost, updateUserPostCaption, deleteUserPost } from '../../services/userPostService';
+import { getUserStory } from '../../services/storyService';
 import { resizeImage } from '../../utils/images';
 
 import ToastProvider from '../ToastProvider/ToastProvider';
@@ -16,6 +17,31 @@ import ProfileView from './ProfileView';
 
 vi.mock('../../services/userService');
 vi.mock('../../services/userPostService');
+vi.mock('../../services/storyService', async () => ({
+	...(await vi.importActual('../../services/storyService')),
+	getUserStory: vi.fn(async () => ({ story: null, stories: [] })),
+}));
+vi.mock('../StoryViewer/StoryViewer', () => ({
+	default: ({ queue, startIndex, onClose }) => {
+		const { user, stories } = queue[0];
+
+		return (
+			<div data-testid='story-viewer' data-queue={JSON.stringify(queue)} data-start-index={startIndex}>
+				<button type='button' onClick={() => onClose({ [user._id]: stories })}>
+					Close viewer
+				</button>
+
+				<button type='button' onClick={() => onClose({ [user._id]: stories.map((story) => ({ ...story, isWatched: true })) })}>
+					Close viewer after watching all
+				</button>
+
+				<button type='button' onClick={() => onClose({ [user._id]: [] })}>
+					Close viewer after deleting all
+				</button>
+			</div>
+		);
+	},
+}));
 vi.mock('../../utils/images', async () => ({
 	...(await vi.importActual('../../utils/images')),
 	resizeImage: vi.fn(),
@@ -1526,5 +1552,298 @@ describe('ProfileView followers and following popup', () => {
 
 		expect(await screen.findByText("Couldn't load this list")).toBeInTheDocument();
 		expect(screen.getByText('janedoe')).toBeInTheDocument();
+	});
+});
+
+describe('ProfileView story ring', () => {
+	const viewer = { _id: 'user1', username: 'johndoe', following: [] };
+	const profile = {
+		_id: 'user2',
+		username: 'janedoe',
+		bio: 'Just a bio',
+		profilePicture: { imageUrl: 'https://example.com/jane.jpg' },
+		posts: [],
+		followers: [],
+		following: [],
+	};
+	const stories = [
+		{ _id: 'story1', userId: 'user2', imageUrl: 'https://example.com/s1.jpg', isWatched: true },
+		{ _id: 'story2', userId: 'user2', imageUrl: 'https://example.com/s2.jpg', isWatched: false },
+	];
+	const unwatchedStory = { story: { isWatched: false }, stories };
+	const watchedStory = { story: { isWatched: true }, stories: stories.map((story) => ({ ...story, isWatched: true })) };
+
+	const renderProfile = async ({ loggedInUser = viewer, profileData = profile } = {}) => {
+		getUsersProfileData.mockResolvedValue([profileData]);
+
+		render(
+			<LoggedInUserContext.Provider value={{ loggedInUser, updateLoggedInUser: vi.fn(), endSession: vi.fn() }}>
+				<ToastProvider>
+					<MemoryRouter initialEntries={['/user/user2']}>
+						<Routes>
+							<Route path='/user/:userId' element={<ProfileLayout />}>
+								<Route index element={<ProfileView />} />
+							</Route>
+						</Routes>
+					</MemoryRouter>
+				</ToastProvider>
+			</LoggedInUserContext.Provider>,
+		);
+
+		await screen.findByText('janedoe');
+	};
+
+	const getRingedPicture = () => document.querySelector('.profile-picture-wrapper img');
+
+	const getOpenedQueue = () => JSON.parse(screen.getByTestId('story-viewer').dataset.queue);
+
+	beforeEach(() => {
+		vi.resetAllMocks();
+		user = userEvent.setup();
+	});
+
+	it("asks for the profile user's story", async () => {
+		getUserStory.mockResolvedValue(unwatchedStory);
+
+		await renderProfile();
+
+		await waitFor(() => expect(getUserStory).toHaveBeenCalledWith({ userId: 'user2' }));
+	});
+
+	describe('the ring', () => {
+		it('is red and makes the picture a button when the user has an unwatched story', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+
+			await renderProfile();
+
+			expect(await screen.findByRole('button', { name: "View janedoe's story" })).toBeInTheDocument();
+			expect(getRingedPicture()).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+
+		it('is grey when the user has watched every story', async () => {
+			getUserStory.mockResolvedValue(watchedStory);
+
+			await renderProfile();
+
+			await screen.findByRole('button', { name: "View janedoe's story" });
+			expect(getRingedPicture()).toHaveClass('story-ring');
+			expect(getRingedPicture()).not.toHaveClass('story-ring-unwatched');
+		});
+
+		it('is grey and named "View your story" on your own profile', async () => {
+			getUserStory.mockResolvedValue({ story: { isWatched: true }, stories: [{ _id: 'own1', userId: 'user2', viewersCount: 3 }] });
+
+			await renderProfile({ loggedInUser: { _id: 'user2', username: 'janedoe', following: [] } });
+
+			expect(await screen.findByRole('button', { name: 'View your story' })).toBeInTheDocument();
+			expect(getRingedPicture()).not.toHaveClass('story-ring-unwatched');
+		});
+
+		it('is absent, and the picture is not a button, when the user has no active story', async () => {
+			getUserStory.mockResolvedValue({ story: null, stories: [] });
+
+			await renderProfile();
+
+			await waitFor(() => expect(getUserStory).toHaveBeenCalled());
+			expect(screen.queryByRole('button', { name: /story/i })).not.toBeInTheDocument();
+			expect(getRingedPicture()).not.toHaveClass('story-ring');
+		});
+
+		it('is absent when the story cannot be loaded, and the rest of the profile still shows', async () => {
+			getUserStory.mockRejectedValue({ code: 'INTERNAL_ERROR', status: 500 });
+
+			await renderProfile();
+
+			await waitFor(() => expect(getUserStory).toHaveBeenCalled());
+			expect(screen.queryByRole('button', { name: /story/i })).not.toBeInTheDocument();
+			expect(screen.getByText('Just a bio')).toBeInTheDocument();
+		});
+
+		it('is red for a guest, who gets no stories to watch', async () => {
+			getUserStory.mockResolvedValue({ story: { isWatched: false }, stories: [] });
+
+			await renderProfile({ loggedInUser: null });
+
+			expect(await screen.findByRole('button', { name: "View janedoe's story" })).toBeInTheDocument();
+			expect(getRingedPicture()).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+	});
+
+	describe('tapping the ringed picture', () => {
+		it('opens the viewer with that user only, as a queue of one starting at the first entry', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+
+			expect(screen.getByTestId('story-viewer')).toHaveAttribute('data-start-index', '0');
+			expect(getOpenedQueue()).toHaveLength(1);
+		});
+
+		it("puts the profile user and their stories in the queue entry, marked as not the viewer's own", async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+
+			expect(getOpenedQueue()[0]).toEqual({
+				user: { _id: 'user2', username: 'janedoe', profilePicture: { imageUrl: 'https://example.com/jane.jpg' } },
+				isOwn: false,
+				isWatched: false,
+				stories,
+			});
+		});
+
+		it('marks the queue entry as watched when the ring is grey', async () => {
+			getUserStory.mockResolvedValue(watchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+
+			expect(getOpenedQueue()[0].isWatched).toBe(true);
+		});
+
+		it("marks the queue entry as the viewer's own on your own profile", async () => {
+			getUserStory.mockResolvedValue({ story: { isWatched: true }, stories: [{ _id: 'own1', userId: 'user2', viewersCount: 3 }] });
+			await renderProfile({ loggedInUser: { _id: 'user2', username: 'janedoe', following: [] } });
+
+			await user.click(await screen.findByRole('button', { name: 'View your story' }));
+
+			expect(getOpenedQueue()[0]).toMatchObject({ isOwn: true, stories: [{ _id: 'own1', viewersCount: 3 }] });
+		});
+
+		it('shows no viewer until the picture is tapped', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+
+			await renderProfile();
+
+			await screen.findByRole('button', { name: "View janedoe's story" });
+			expect(screen.queryByTestId('story-viewer')).not.toBeInTheDocument();
+		});
+
+		it('opens no viewer for a signed-in user when there are no stories to show', async () => {
+			getUserStory.mockResolvedValue({ story: { isWatched: false }, stories: [] });
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+
+			expect(screen.queryByTestId('story-viewer')).not.toBeInTheDocument();
+			expect(mockNavigate).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('closing the viewer', () => {
+		it('removes the viewer', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+			await user.click(screen.getByRole('button', { name: 'Close viewer' }));
+
+			expect(screen.queryByTestId('story-viewer')).not.toBeInTheDocument();
+		});
+
+		it('does not ask the server again, so a slow view recording cannot bring the red ring back', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+			await user.click(screen.getByRole('button', { name: 'Close viewer after watching all' }));
+
+			expect(getUserStory).toHaveBeenCalledTimes(1);
+		});
+
+		it('turns the ring from red to grey once the viewer reports everything watched', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+
+			expect(getRingedPicture()).toHaveClass('story-ring-unwatched');
+
+			await user.click(screen.getByRole('button', { name: 'Close viewer after watching all' }));
+
+			expect(getRingedPicture()).toHaveClass('story-ring');
+			expect(getRingedPicture()).not.toHaveClass('story-ring-unwatched');
+		});
+
+		it('opens the next viewer with the stories as the previous one reported them, without asking the server', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+			await user.click(screen.getByRole('button', { name: 'Close viewer after watching all' }));
+			await user.click(screen.getByRole('button', { name: "View janedoe's story" }));
+
+			expect(getOpenedQueue()[0].isWatched).toBe(true);
+			expect(getOpenedQueue()[0].stories.every((story) => story.isWatched)).toBe(true);
+			expect(getUserStory).toHaveBeenCalledTimes(1);
+		});
+
+		it('keeps the ring red when the viewer reports a story still unwatched', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+			await user.click(screen.getByRole('button', { name: 'Close viewer' }));
+
+			expect(getRingedPicture()).toHaveClass('story-ring-unwatched');
+		});
+
+		it('removes the ring when the viewer reports every story deleted', async () => {
+			getUserStory.mockResolvedValue({
+				story: { isWatched: true },
+				stories: [{ _id: 'own1', userId: 'user2', viewersCount: 3, isWatched: true }],
+			});
+			await renderProfile({ loggedInUser: { _id: 'user2', username: 'janedoe', following: [] } });
+
+			await user.click(await screen.findByRole('button', { name: 'View your story' }));
+			await user.click(screen.getByRole('button', { name: 'Close viewer after deleting all' }));
+
+			expect(screen.queryByRole('button', { name: /story/i })).not.toBeInTheDocument();
+			expect(getRingedPicture()).not.toHaveClass('story-ring');
+		});
+
+		it('can be opened again after closing', async () => {
+			getUserStory.mockResolvedValue(unwatchedStory);
+			await renderProfile();
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+			await user.click(screen.getByRole('button', { name: 'Close viewer' }));
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+
+			expect(screen.getByTestId('story-viewer')).toBeInTheDocument();
+		});
+	});
+
+	describe('as a guest', () => {
+		it('sends a guest to /log-in, remembering the profile, instead of opening the viewer', async () => {
+			getUserStory.mockResolvedValue({ story: { isWatched: false }, stories: [] });
+			await renderProfile({ loggedInUser: null });
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+
+			expect(mockNavigate).toHaveBeenCalledWith('/log-in', { state: { from: '/user/user2' } });
+			expect(screen.queryByTestId('story-viewer')).not.toBeInTheDocument();
+		});
+
+		it('does not send a guest to /log-in when there is no ring to tap', async () => {
+			getUserStory.mockResolvedValue({ story: null, stories: [] });
+			await renderProfile({ loggedInUser: null });
+
+			await waitFor(() => expect(getUserStory).toHaveBeenCalled());
+			await user.click(getRingedPicture());
+
+			expect(mockNavigate).not.toHaveBeenCalled();
+		});
+
+		it('does not reload the story when a guest is sent away', async () => {
+			getUserStory.mockResolvedValue({ story: { isWatched: false }, stories: [] });
+			await renderProfile({ loggedInUser: null });
+
+			await user.click(await screen.findByRole('button', { name: "View janedoe's story" }));
+
+			expect(getUserStory).toHaveBeenCalledTimes(1);
+		});
 	});
 });

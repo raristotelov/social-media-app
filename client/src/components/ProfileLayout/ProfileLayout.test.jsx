@@ -13,6 +13,10 @@ import ProfileLayout from './ProfileLayout';
 
 vi.mock('../../services/userService');
 vi.mock('../../services/userPostService');
+vi.mock('../../services/storyService', async () => ({
+	...(await vi.importActual('../../services/storyService')),
+	getUserStory: vi.fn(async () => ({ story: null, stories: [] })),
+}));
 
 const validProfile = { _id: 'user2', username: 'janedoe', posts: [], followers: [], following: [] };
 

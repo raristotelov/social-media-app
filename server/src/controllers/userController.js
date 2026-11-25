@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const router = Router();
 
-const { userService } = require('../services');
+const { userService, storyService } = require('../services');
 const verifyJwtToken = require('../middlewares/verifyJwtToken');
 const readOptionalJwtToken = require('../middlewares/readOptionalJwtToken');
 const verifyProfileOwner = require('../middlewares/verifyProfileOwner');
@@ -90,6 +90,12 @@ router.get('/', readOptionalJwtToken, async (req, res) => {
 	}
 
 	return res.json(usersAccountData);
+});
+
+router.get('/:userId/story', readOptionalJwtToken, async (req, res) => {
+	const userStoryData = await storyService.getUserStory({ userId: req.params.userId, viewerId: res.userId });
+
+	return res.json(userStoryData);
 });
 
 router.get('/:userId/followers', readOptionalJwtToken, async (req, res) => {

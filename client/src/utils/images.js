@@ -14,6 +14,12 @@ const MAX_POST_IMAGE_ASPECT_RATIO = 1.91;
 
 export const isAcceptedImageType = (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type);
 
+export const preloadImage = (imageUrl) => {
+	const image = new Image();
+
+	image.src = imageUrl;
+};
+
 export const getPostImageAspectRatio = ({ imageWidth, imageHeight }) =>
 	Math.min(MAX_POST_IMAGE_ASPECT_RATIO, Math.max(MIN_POST_IMAGE_ASPECT_RATIO, imageWidth / imageHeight));
 

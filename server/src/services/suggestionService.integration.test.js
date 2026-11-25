@@ -72,7 +72,7 @@ const ids = (users) => users.map((user) => String(user._id));
 
 const idsInGroup = (suggestions, group) => ids(suggestions.filter((suggestion) => suggestion.group === group));
 
-const listedIds = ({ suggestions, reserve }) => ids([...suggestions, ...reserve]);
+const listedIds = ({ suggestions }) => ids(suggestions);
 
 const fetchSuggestions = (user, placement) => getSuggestions({ userId: user._id, placement });
 
@@ -171,7 +171,7 @@ describe('suggestionService against a real database', () => {
 
 			const result = await fetchSuggestions(me, 'sidebar');
 
-			expect(listedIds(result)).toHaveLength(10);
+			expect(listedIds(result)).toHaveLength(5);
 			expect(listedIds(result)).not.toContain(String(me._id));
 		});
 	});
@@ -276,21 +276,20 @@ describe('suggestionService against a real database', () => {
 	});
 
 	describe('the mix per placement', () => {
-		it('gives the sidebar 2 mutual, 2 most-followed and 1 new, with a reserve of 5', async () => {
+		it('gives the sidebar 2 mutual, 2 most-followed and 1 new', async () => {
 			const { me, populars, news } = await seedFullWorld();
 
-			const { suggestions, reserve } = await fetchSuggestions(me, 'sidebar');
+			const { suggestions } = await fetchSuggestions(me, 'sidebar');
 
 			expect(suggestions.map((suggestion) => suggestion.group)).toEqual(['mutual', 'mutual', 'popular', 'popular', 'new']);
 			expect(idsInGroup(suggestions, 'popular')).toEqual(ids(populars.slice(0, 2)));
 			expect(idsInGroup(suggestions, 'new')).toEqual(ids(news.slice(0, 1)));
-			expect(reserve).toHaveLength(5);
 		});
 
-		it('gives the carousel 4 mutual, 4 most-followed and 2 new, with a reserve of 5', async () => {
+		it('gives the carousel 4 mutual, 4 most-followed and 2 new', async () => {
 			const { me, populars, news } = await seedFullWorld();
 
-			const { suggestions, reserve } = await fetchSuggestions(me, 'carousel');
+			const { suggestions } = await fetchSuggestions(me, 'carousel');
 
 			expect(suggestions.map((suggestion) => suggestion.group)).toEqual([
 				...Array(4).fill('mutual'),
@@ -299,27 +298,25 @@ describe('suggestionService against a real database', () => {
 			]);
 			expect(idsInGroup(suggestions, 'popular')).toEqual(ids(populars.slice(0, 4)));
 			expect(idsInGroup(suggestions, 'new')).toEqual(ids(news.slice(0, 2)));
-			expect(reserve).toHaveLength(5);
 		});
 
-		it('gives the empty feed 5 most-followed and 3 new, no mutuals and no reserve, even for a user who follows people', async () => {
+		it('gives the empty feed 5 most-followed and 3 new, no mutuals, even for a user who follows people', async () => {
 			const { me, populars, news } = await seedFullWorld();
 
-			const { suggestions, reserve } = await fetchSuggestions(me, 'empty-feed');
+			const { suggestions } = await fetchSuggestions(me, 'empty-feed');
 
 			expect(suggestions.map((suggestion) => suggestion.group)).toEqual([...Array(5).fill('popular'), ...Array(3).fill('new')]);
 			expect(idsInGroup(suggestions, 'popular')).toEqual(ids(populars.slice(0, 5)));
 			expect(idsInGroup(suggestions, 'new')).toEqual(ids(news.slice(0, 3)));
-			expect(reserve).toEqual([]);
 		});
 
-		it('keeps the reserve in group order and never repeats a listed suggestion', async () => {
+		it.each([['sidebar'], ['carousel'], ['empty-feed']])('never repeats a suggestion and sends no reserve for the %s', async (placement) => {
 			const { me } = await seedFullWorld();
 
-			const { suggestions, reserve } = await fetchSuggestions(me, 'sidebar');
+			const result = await fetchSuggestions(me, placement);
 
-			expect(reserve.map((suggestion) => suggestion.group)).toEqual(Array(5).fill('mutual'));
-			expect(new Set([...ids(suggestions), ...ids(reserve)]).size).toBe(10);
+			expect(result).not.toHaveProperty('reserve');
+			expect(new Set(ids(result.suggestions)).size).toBe(result.suggestions.length);
 		});
 	});
 
@@ -360,22 +357,40 @@ describe('suggestionService against a real database', () => {
 			expect(new Set(ids(suggestions)).size).toBe(5);
 		});
 
-		it('returns fewer suggestions than places, and no reserve, when there are not enough users', async () => {
+		it('returns fewer suggestions than places when there are not enough users', async () => {
 			const me = await createUser('me');
 			const others = await createUsers('other', 2);
 
-			const { suggestions, reserve } = await fetchSuggestions(me, 'carousel');
+			const { suggestions } = await fetchSuggestions(me, 'carousel');
 
 			expect(new Set(ids(suggestions))).toEqual(new Set(ids(others)));
-			expect(reserve).toEqual([]);
 		});
 
-		it('returns empty lists when the user is the only one there', async () => {
+		it('returns an empty list when the user is the only one there', async () => {
 			const me = await createUser('me');
 
 			const result = await fetchSuggestions(me, 'sidebar');
 
-			expect(result).toEqual({ suggestions: [], reserve: [], isCarouselDismissed: false });
+			expect(result).toEqual({ suggestions: [], isCarouselDismissed: false });
+		});
+
+		it('still fills the list when the same people top the mutual, most-followed and new groups', async () => {
+			const me = await createUser('me');
+			const followedA = await createUser('followedA');
+
+			await follow(me, followedA);
+
+			const overlapping = await createUsers('overlapping', 5, (index) => ({ joinedDaysAgo: index, postCount: 1 }));
+
+			for (const [index, person] of overlapping.entries()) {
+				await follow(followedA, person);
+				await addFollowers(person, 10 - index);
+			}
+
+			const { suggestions } = await fetchSuggestions(me, 'sidebar');
+
+			expect(suggestions).toHaveLength(5);
+			expect(new Set(ids(suggestions))).toEqual(new Set(ids(overlapping)));
 		});
 
 		it('lists someone who qualifies for all three groups once, as a mutual', async () => {
@@ -429,21 +444,18 @@ describe('suggestionService against a real database', () => {
 			]);
 		});
 
-		it('carries the reason on mutuals in the reserve too, and none on the other groups', async () => {
+		it('carries the reason on mutuals only, and none on the other groups', async () => {
 			const { me } = await seedFullWorld();
 
-			const { suggestions, reserve } = await fetchSuggestions(me, 'sidebar');
+			const { suggestions } = await fetchSuggestions(me, 'sidebar');
 
-			const rows = [...suggestions, ...reserve];
-
-			expect(rows.filter((row) => row.group === 'mutual').every((row) => row.followedBy?.username === 'followed1')).toBe(true);
-			expect(rows.filter((row) => row.group !== 'mutual').every((row) => row.followedBy === undefined)).toBe(true);
-			expect(reserve.every((row) => row.moreMutualCount === 0)).toBe(true);
+			expect(suggestions.filter((row) => row.group === 'mutual').every((row) => row.followedBy?.username === 'followed1')).toBe(true);
+			expect(suggestions.filter((row) => row.group !== 'mutual').every((row) => row.followedBy === undefined)).toBe(true);
 		});
 	});
 
 	describe('the shape of a suggestion', () => {
-		it('carries id, username, group and the profile picture url only, never the email or password', async () => {
+		it('carries id, username, group, the profile picture url and the story summary only, never the email or password', async () => {
 			const me = await createUser('me');
 			const other = await createUser('other');
 
@@ -455,7 +467,13 @@ describe('suggestionService against a real database', () => {
 			const { suggestions } = await fetchSuggestions(me, 'sidebar');
 
 			expect(suggestions).toEqual([
-				{ _id: other._id, username: 'other', profilePicture: { imageUrl: 'https://cdn.example.com/other.jpg' }, group: 'popular' },
+				{
+					_id: other._id,
+					username: 'other',
+					profilePicture: { imageUrl: 'https://cdn.example.com/other.jpg' },
+					group: 'popular',
+					story: null,
+				},
 			]);
 		});
 	});

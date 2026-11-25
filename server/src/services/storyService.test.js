@@ -18,7 +18,16 @@ const UserModel = require('../models/userModel');
 const imageStorageService = require('./imageStorageService');
 const constants = require('../config/constants');
 const { ERROR_CODES } = require('../config/errorCodes');
-const { addStory, getStoryTray, getUserStories, recordStoryView, getStoryViewers, deleteStory, deleteExpiredStories } = require('./storyService');
+const {
+	addStory,
+	getStoryTray,
+	getUserStory,
+	withStorySummaries,
+	recordStoryView,
+	getStoryViewers,
+	deleteStory,
+	deleteExpiredStories,
+} = require('./storyService');
 
 const NOW = new Date('2026-10-22T12:00:00.000Z');
 const ACTIVE_SINCE = new Date(NOW.getTime() - 24 * 60 * 60 * 1000);
@@ -156,8 +165,9 @@ describe('storyService', () => {
 			StoryModel.find = jest.fn().mockReturnValue(buildQuery(stories));
 		};
 
-		const givenViews = (storyIds) => {
+		const givenViews = (storyIds, viewersCounts = []) => {
 			StoryViewModel.find = jest.fn().mockReturnValue(buildQuery(storyIds.map((storyId) => ({ storyId }))));
+			StoryViewModel.aggregate = jest.fn().mockResolvedValue(viewersCounts.map(([_id, count]) => ({ _id, count })));
 		};
 
 		const givenAuthors = (authorIds) => {
@@ -170,7 +180,15 @@ describe('storyService', () => {
 				);
 		};
 
-		const story = (_id, userId, createdAt) => ({ _id, userId, createdAt });
+		const story = (_id, userId, createdAt) => ({
+			_id,
+			userId,
+			createdAt,
+			imageUrl: `https://cdn/${_id}.jpg`,
+			imageWidth: 1080,
+			imageHeight: 1920,
+			imageIdentifier: `folder/${_id}`,
+		});
 
 		it('rejects a session whose user no longer exists with 401 UNAUTHENTICATED', async () => {
 			givenCurrentUser(null);
@@ -305,6 +323,126 @@ describe('storyService', () => {
 			expect(tray.map((entry) => String(entry.user._id))).toEqual([AUTHOR_B]);
 		});
 
+		it('loads the active stories oldest first so they play in order', async () => {
+			givenCurrentUser({ _id: ME, following: [AUTHOR_A] });
+			const query = buildQuery([]);
+			StoryModel.find = jest.fn().mockReturnValue(query);
+			givenViews([]);
+			givenAuthors([]);
+
+			await getStoryTray(ME);
+
+			expect(query.sort).toHaveBeenCalledWith({ createdAt: 1, _id: 1 });
+		});
+
+		it('carries the active stories of each user in the entry, oldest first', async () => {
+			givenCurrentUser({ _id: ME, following: [AUTHOR_A, AUTHOR_B] });
+			givenStories([story('s-a1', AUTHOR_A, minutesAgo(90)), story('s-b1', AUTHOR_B, minutesAgo(80)), story('s-a2', AUTHOR_A, minutesAgo(30))]);
+			givenViews([]);
+			givenAuthors([AUTHOR_A, AUTHOR_B]);
+
+			const tray = await getStoryTray(ME);
+
+			const storyIdsByUser = Object.fromEntries(tray.map((entry) => [String(entry.user._id), entry.stories.map((trayStory) => trayStory._id)]));
+
+			expect(storyIdsByUser).toEqual({ [AUTHOR_A]: ['s-a1', 's-a2'], [AUTHOR_B]: ['s-b1'] });
+		});
+
+		it('shapes each story with its image data and without the storage identifier', async () => {
+			givenCurrentUser({ _id: ME, following: [AUTHOR_A] });
+			givenStories([story(STORY_ID, AUTHOR_A, minutesAgo(5))]);
+			givenViews([]);
+			givenAuthors([AUTHOR_A]);
+
+			const tray = await getStoryTray(ME);
+
+			expect(tray[0].stories[0]).toEqual({
+				_id: STORY_ID,
+				userId: AUTHOR_A,
+				imageUrl: `https://cdn/${STORY_ID}.jpg`,
+				imageWidth: 1080,
+				imageHeight: 1920,
+				createdAt: minutesAgo(5),
+				isWatched: false,
+			});
+		});
+
+		it("flags which of another user's stories you have watched, without a viewers count", async () => {
+			givenCurrentUser({ _id: ME, following: [AUTHOR_A] });
+			givenStories([story(STORY_ID, AUTHOR_A, minutesAgo(60)), story(STORY_ID_2, AUTHOR_A, minutesAgo(30))]);
+			givenViews([STORY_ID]);
+			givenAuthors([AUTHOR_A]);
+
+			const tray = await getStoryTray(ME);
+
+			expect(tray[0].stories.map((entry) => entry.isWatched)).toEqual([true, false]);
+			expect(tray[0].stories[0]).not.toHaveProperty('viewersCount');
+		});
+
+		it('gives each of your own stories its viewers count, without a watched flag', async () => {
+			givenCurrentUser({ _id: ME, following: [] });
+			givenStories([story(STORY_ID, ME, minutesAgo(60)), story(STORY_ID_2, ME, minutesAgo(30))]);
+			givenViews([], [[STORY_ID, 3]]);
+			givenAuthors([ME]);
+
+			const tray = await getStoryTray(ME);
+
+			expect(tray[0].stories.map((entry) => entry.viewersCount)).toEqual([3, 0]);
+			expect(tray[0].stories[0]).not.toHaveProperty('isWatched');
+		});
+
+		it('counts views of your own stories only, grouped per story', async () => {
+			givenCurrentUser({ _id: ME, following: [AUTHOR_A] });
+			givenStories([story(STORY_ID, ME, minutesAgo(60)), story(STORY_ID_2, AUTHOR_A, minutesAgo(30))]);
+			givenViews([]);
+			givenAuthors([ME, AUTHOR_A]);
+
+			await getStoryTray(ME);
+
+			expect(StoryViewModel.aggregate).toHaveBeenCalledWith([
+				{ $match: { storyId: { $in: [STORY_ID] } } },
+				{ $group: { _id: '$storyId', count: { $sum: 1 } } },
+			]);
+		});
+
+		it('looks up the views of the current user for the stories of others only', async () => {
+			givenCurrentUser({ _id: ME, following: [AUTHOR_A] });
+			givenStories([story(STORY_ID, ME, minutesAgo(60)), story(STORY_ID_2, AUTHOR_A, minutesAgo(30))]);
+			givenViews([]);
+			givenAuthors([ME, AUTHOR_A]);
+
+			await getStoryTray(ME);
+
+			expect(StoryViewModel.find).toHaveBeenCalledWith({ viewerId: ME, storyId: { $in: [STORY_ID_2] } });
+		});
+
+		it('leaves hidden visitors out of the viewers count of your own stories', async () => {
+			getHiddenVisitorIds.mockResolvedValue([AUTHOR_C]);
+			givenCurrentUser({ _id: ME, following: [] });
+			givenStories([story(STORY_ID, ME, minutesAgo(60))]);
+			givenViews([]);
+			givenAuthors([ME]);
+
+			await getStoryTray(ME);
+
+			expect(StoryViewModel.aggregate).toHaveBeenCalledWith([
+				{ $match: { storyId: { $in: [STORY_ID] }, viewerId: { $nin: [AUTHOR_C] } } },
+				{ $group: { _id: '$storyId', count: { $sum: 1 } } },
+			]);
+		});
+
+		it('does not load or carry the stories of hidden visitors', async () => {
+			getHiddenVisitorIds.mockResolvedValue([AUTHOR_B]);
+			givenCurrentUser({ _id: ME, following: [AUTHOR_A, AUTHOR_B] });
+			givenStories([]);
+			givenViews([]);
+			givenAuthors([]);
+
+			await getStoryTray(ME);
+
+			expect(StoryModel.find).toHaveBeenCalledWith({ userId: { $in: [ME, AUTHOR_A] }, createdAt: { $gt: ACTIVE_SINCE } });
+		});
+
 		it('answers 500 when the database fails', async () => {
 			UserModel.findById = jest.fn().mockImplementation(() => {
 				throw new Error('db down');
@@ -314,137 +452,316 @@ describe('storyService', () => {
 		});
 	});
 
-	describe('getUserStories', () => {
-		const author = { _id: AUTHOR_A, username: 'author', profilePicture: { imageUrl: 'https://cdn/a.jpg' } };
-
-		const givenAuthor = (value) => {
-			UserModel.findById = jest.fn().mockReturnValue(buildQuery(value));
-		};
-
+	describe('withStorySummaries', () => {
 		const givenStories = (stories) => {
-			const query = buildQuery(stories);
-
-			StoryModel.find = jest.fn().mockReturnValue(query);
-
-			return query;
+			StoryModel.find = jest.fn().mockReturnValue(buildQuery(stories));
 		};
 
-		const storyDoc = (_id, userId, createdAt) => ({
+		const givenViews = (storyIds) => {
+			StoryViewModel.find = jest.fn().mockReturnValue(buildQuery(storyIds.map((storyId) => ({ storyId }))));
+		};
+
+		const activeStory = (_id, userId) => ({ _id, userId });
+
+		const summaryOf = async (users, viewerId) => (await withStorySummaries({ users, viewerId })).map((user) => user.story);
+
+		it('gives a user with no active story a null summary', async () => {
+			givenStories([]);
+
+			await expect(summaryOf([{ _id: AUTHOR_A }], ME)).resolves.toEqual([null]);
+		});
+
+		it('keeps the other fields of every row and adds only the story', async () => {
+			givenStories([]);
+
+			const result = await withStorySummaries({ users: [{ _id: AUTHOR_A, username: 'a', followersCount: 3 }], viewerId: ME });
+
+			expect(result).toEqual([{ _id: AUTHOR_A, username: 'a', followersCount: 3, story: null }]);
+		});
+
+		it('returns an empty list, without querying, when there are no users', async () => {
+			givenStories([]);
+
+			await expect(withStorySummaries({ users: [], viewerId: ME })).resolves.toEqual([]);
+
+			expect(StoryModel.find).not.toHaveBeenCalled();
+			expect(StoryViewModel.find).not.toHaveBeenCalled();
+		});
+
+		it('only counts stories that are still active', async () => {
+			givenStories([]);
+
+			await withStorySummaries({ users: [{ _id: AUTHOR_A }], viewerId: ME });
+
+			expect(StoryModel.find).toHaveBeenCalledWith({ userId: { $in: [AUTHOR_A] }, createdAt: { $gt: ACTIVE_SINCE } });
+		});
+
+		it('marks a user with an unwatched story as not watched', async () => {
+			givenStories([activeStory(STORY_ID, AUTHOR_A)]);
+			givenViews([]);
+
+			await expect(summaryOf([{ _id: AUTHOR_A }], ME)).resolves.toEqual([{ isWatched: false }]);
+		});
+
+		it('marks a user with only some stories watched as not watched', async () => {
+			givenStories([activeStory(STORY_ID, AUTHOR_A), activeStory(STORY_ID_2, AUTHOR_A)]);
+			givenViews([STORY_ID]);
+
+			await expect(summaryOf([{ _id: AUTHOR_A }], ME)).resolves.toEqual([{ isWatched: false }]);
+		});
+
+		it('marks a user whose stories are all watched as watched', async () => {
+			givenStories([activeStory(STORY_ID, AUTHOR_A), activeStory(STORY_ID_2, AUTHOR_A)]);
+			givenViews([STORY_ID, STORY_ID_2]);
+
+			await expect(summaryOf([{ _id: AUTHOR_A }], ME)).resolves.toEqual([{ isWatched: true }]);
+		});
+
+		it('always marks the viewer own story as watched, without loading any views', async () => {
+			givenStories([activeStory(STORY_ID, ME)]);
+			givenViews([]);
+
+			await expect(summaryOf([{ _id: ME }], ME)).resolves.toEqual([{ isWatched: true }]);
+
+			expect(StoryViewModel.find).not.toHaveBeenCalled();
+		});
+
+		it('marks every story as not watched for a guest, without loading any views', async () => {
+			givenStories([activeStory(STORY_ID, AUTHOR_A)]);
+			givenViews([STORY_ID]);
+
+			await expect(summaryOf([{ _id: AUTHOR_A }], undefined)).resolves.toEqual([{ isWatched: false }]);
+
+			expect(StoryViewModel.find).not.toHaveBeenCalled();
+		});
+
+		it('summarises each user on their own stories when several users are given', async () => {
+			givenStories([activeStory(STORY_ID, AUTHOR_A), activeStory(STORY_ID_2, AUTHOR_B), activeStory(STORY_ID_3, ME)]);
+			givenViews([STORY_ID]);
+
+			await expect(summaryOf([{ _id: AUTHOR_A }, { _id: AUTHOR_B }, { _id: AUTHOR_C }, { _id: ME }], ME)).resolves.toEqual([
+				{ isWatched: true },
+				{ isWatched: false },
+				null,
+				{ isWatched: true },
+			]);
+		});
+
+		it('loads the stories once and the views once for any number of users, never one query per user', async () => {
+			givenStories([activeStory(STORY_ID, AUTHOR_A), activeStory(STORY_ID_2, AUTHOR_B), activeStory(STORY_ID_3, AUTHOR_C)]);
+			givenViews([STORY_ID]);
+
+			await withStorySummaries({ users: [{ _id: AUTHOR_A }, { _id: AUTHOR_B }, { _id: AUTHOR_C }, { _id: AUTHOR_D }], viewerId: ME });
+
+			expect(StoryModel.find).toHaveBeenCalledTimes(1);
+			expect(StoryViewModel.find).toHaveBeenCalledTimes(1);
+		});
+
+		it('asks for the views of only the viewer, on only the stories of other users', async () => {
+			givenStories([activeStory(STORY_ID, AUTHOR_A), activeStory(STORY_ID_2, ME)]);
+			givenViews([]);
+
+			await withStorySummaries({ users: [{ _id: AUTHOR_A }, { _id: ME }], viewerId: ME });
+
+			expect(StoryViewModel.find).toHaveBeenCalledWith({ viewerId: ME, storyId: { $in: [STORY_ID] } });
+		});
+
+		it('skips the views query when nobody given has a story', async () => {
+			givenStories([]);
+			givenViews([]);
+
+			await withStorySummaries({ users: [{ _id: AUTHOR_A }], viewerId: ME });
+
+			expect(StoryViewModel.find).not.toHaveBeenCalled();
+		});
+
+		it('wraps a database failure in a 500 AppError that keeps the cause', async () => {
+			const failure = new Error('connection lost');
+
+			StoryModel.find = jest.fn().mockImplementation(() => {
+				throw failure;
+			});
+
+			await expect(withStorySummaries({ users: [{ _id: AUTHOR_A }], viewerId: ME })).rejects.toMatchObject({
+				statusCode: 500,
+				cause: failure,
+			});
+		});
+	});
+
+	describe('getUserStory', () => {
+		const givenStories = (stories) => {
+			StoryModel.find = jest.fn().mockReturnValue(buildQuery(stories));
+		};
+
+		const givenViews = (storyIds, viewersCounts = []) => {
+			StoryViewModel.find = jest.fn().mockReturnValue(buildQuery(storyIds.map((storyId) => ({ storyId }))));
+			StoryViewModel.aggregate = jest.fn().mockResolvedValue(viewersCounts.map(([_id, count]) => ({ _id, count })));
+		};
+
+		const story = (_id, userId, createdAt) => ({
 			_id,
 			userId,
+			createdAt,
 			imageUrl: `https://cdn/${_id}.jpg`,
 			imageWidth: 1080,
 			imageHeight: 1920,
 			imageIdentifier: `folder/${_id}`,
-			createdAt,
 		});
 
-		it('rejects a malformed user id with 404 USER_NOT_FOUND without querying', async () => {
-			UserModel.findById = jest.fn();
+		it.each([['not-an-id'], [''], ['123'], [undefined]])(
+			'answers 404 USER_NOT_FOUND for the malformed id %p, without querying',
+			async (userId) => {
+				givenStories([]);
 
-			await expect(getUserStories({ authorId: 'nope', requesterId: ME })).rejects.toMatchObject({
+				await expect(getUserStory({ userId, viewerId: ME })).rejects.toMatchObject({ statusCode: 404, code: ERROR_CODES.USER_NOT_FOUND });
+
+				expect(StoryModel.find).not.toHaveBeenCalled();
+			},
+		);
+
+		it('answers 404 USER_NOT_FOUND for a hidden visitor, without loading their stories', async () => {
+			getHiddenVisitorIds.mockResolvedValue([AUTHOR_A]);
+			givenStories([story(STORY_ID, AUTHOR_A, minutesAgo(5))]);
+
+			await expect(getUserStory({ userId: AUTHOR_A, viewerId: ME })).rejects.toMatchObject({
 				statusCode: 404,
 				code: ERROR_CODES.USER_NOT_FOUND,
 			});
 
-			expect(UserModel.findById).not.toHaveBeenCalled();
+			expect(StoryModel.find).not.toHaveBeenCalled();
 		});
 
-		it('rejects an unknown user with 404 USER_NOT_FOUND', async () => {
-			givenAuthor(null);
-
-			await expect(getUserStories({ authorId: AUTHOR_A, requesterId: ME })).rejects.toMatchObject({
-				statusCode: 404,
-				code: ERROR_CODES.USER_NOT_FOUND,
-			});
-		});
-
-		it('only asks for stories younger than 24 hours', async () => {
-			givenAuthor(author);
+		it('works out the hidden visitors for the viewer', async () => {
 			givenStories([]);
-			StoryViewModel.find = jest.fn().mockReturnValue(buildQuery([]));
 
-			await getUserStories({ authorId: AUTHOR_A, requesterId: ME });
+			await getUserStory({ userId: AUTHOR_A, viewerId: ME });
+
+			expect(getHiddenVisitorIds).toHaveBeenCalledWith(ME);
+		});
+
+		it('loads only the active stories of that user, oldest first', async () => {
+			const query = buildQuery([]);
+
+			StoryModel.find = jest.fn().mockReturnValue(query);
+
+			await getUserStory({ userId: AUTHOR_A, viewerId: ME });
 
 			expect(StoryModel.find).toHaveBeenCalledWith({ userId: AUTHOR_A, createdAt: { $gt: ACTIVE_SINCE } });
-		});
-
-		it('returns the stories oldest first', async () => {
-			givenAuthor(author);
-			const query = givenStories([]);
-			StoryViewModel.find = jest.fn().mockReturnValue(buildQuery([]));
-
-			await getUserStories({ authorId: AUTHOR_A, requesterId: ME });
-
 			expect(query.sort).toHaveBeenCalledWith({ createdAt: 1, _id: 1 });
 		});
 
-		it('returns the author as username and photo only', async () => {
-			givenAuthor(author);
+		it('answers no story and no stories when the user has no active story', async () => {
 			givenStories([]);
-			StoryViewModel.find = jest.fn().mockReturnValue(buildQuery([]));
 
-			const result = await getUserStories({ authorId: AUTHOR_A, requesterId: ME });
-
-			expect(result.user).toEqual({ _id: AUTHOR_A, username: 'author', profilePicture: { imageUrl: 'https://cdn/a.jpg' } });
+			await expect(getUserStory({ userId: AUTHOR_A, viewerId: ME })).resolves.toEqual({ story: null, stories: [] });
 		});
 
-		it("flags which of another user's stories the requester has watched, without a viewers count", async () => {
-			givenAuthor(author);
-			givenStories([storyDoc(STORY_ID, AUTHOR_A, minutesAgo(60)), storyDoc(STORY_ID_2, AUTHOR_A, minutesAgo(30))]);
-			StoryViewModel.find = jest.fn().mockReturnValue(buildQuery([{ storyId: STORY_ID }]));
-			StoryViewModel.aggregate = jest.fn();
+		it('answers no story and no stories to a guest when the user has no active story', async () => {
+			givenStories([]);
 
-			const result = await getUserStories({ authorId: AUTHOR_A, requesterId: ME });
+			await expect(getUserStory({ userId: AUTHOR_A, viewerId: undefined })).resolves.toEqual({ story: null, stories: [] });
+		});
 
-			expect(result.stories.map((entry) => entry.isWatched)).toEqual([true, false]);
-			expect(result.stories[0]).not.toHaveProperty('viewersCount');
-			expect(StoryViewModel.find).toHaveBeenCalledWith({ viewerId: ME, storyId: { $in: [STORY_ID, STORY_ID_2] } });
+		it('answers a guest an unwatched ring and no stories, without loading any views', async () => {
+			givenStories([story(STORY_ID, AUTHOR_A, minutesAgo(5))]);
+			givenViews([STORY_ID]);
+
+			await expect(getUserStory({ userId: AUTHOR_A, viewerId: undefined })).resolves.toEqual({ story: { isWatched: false }, stories: [] });
+
+			expect(StoryViewModel.find).not.toHaveBeenCalled();
 			expect(StoryViewModel.aggregate).not.toHaveBeenCalled();
 		});
 
-		it('does not expose the storage identifier', async () => {
-			givenAuthor(author);
-			givenStories([storyDoc(STORY_ID, AUTHOR_A, minutesAgo(60))]);
-			StoryViewModel.find = jest.fn().mockReturnValue(buildQuery([]));
+		it('answers another user stories with whether each has been watched, without the storage identifier', async () => {
+			givenStories([story(STORY_ID, AUTHOR_A, minutesAgo(30)), story(STORY_ID_2, AUTHOR_A, minutesAgo(5))]);
+			givenViews([STORY_ID]);
 
-			const result = await getUserStories({ authorId: AUTHOR_A, requesterId: ME });
-
-			expect(result.stories[0]).not.toHaveProperty('imageIdentifier');
+			await expect(getUserStory({ userId: AUTHOR_A, viewerId: ME })).resolves.toEqual({
+				story: { isWatched: false },
+				stories: [
+					{
+						_id: STORY_ID,
+						userId: AUTHOR_A,
+						imageUrl: `https://cdn/${STORY_ID}.jpg`,
+						imageWidth: 1080,
+						imageHeight: 1920,
+						createdAt: minutesAgo(30),
+						isWatched: true,
+					},
+					{
+						_id: STORY_ID_2,
+						userId: AUTHOR_A,
+						imageUrl: `https://cdn/${STORY_ID_2}.jpg`,
+						imageWidth: 1080,
+						imageHeight: 1920,
+						createdAt: minutesAgo(5),
+						isWatched: false,
+					},
+				],
+			});
 		});
 
-		it('returns the viewers count of each of your own stories, without a watched flag', async () => {
-			givenAuthor({ ...author, _id: ME });
-			givenStories([storyDoc(STORY_ID, ME, minutesAgo(60)), storyDoc(STORY_ID_2, ME, minutesAgo(30))]);
-			StoryViewModel.aggregate = jest.fn().mockResolvedValue([{ _id: STORY_ID, count: 3 }]);
-			StoryViewModel.find = jest.fn();
+		it('looks up the views of only the viewer on those stories', async () => {
+			givenStories([story(STORY_ID, AUTHOR_A, minutesAgo(5))]);
+			givenViews([]);
 
-			const result = await getUserStories({ authorId: ME, requesterId: ME });
+			await getUserStory({ userId: AUTHOR_A, viewerId: ME });
 
-			expect(result.stories.map((entry) => entry.viewersCount)).toEqual([3, 0]);
-			expect(result.stories[0]).not.toHaveProperty('isWatched');
+			expect(StoryViewModel.find).toHaveBeenCalledWith({ viewerId: ME, storyId: { $in: [STORY_ID] } });
+		});
+
+		it('marks the ring as watched once every story of another user has been watched', async () => {
+			givenStories([story(STORY_ID, AUTHOR_A, minutesAgo(30)), story(STORY_ID_2, AUTHOR_A, minutesAgo(5))]);
+			givenViews([STORY_ID, STORY_ID_2]);
+
+			const result = await getUserStory({ userId: AUTHOR_A, viewerId: ME });
+
+			expect(result.story).toEqual({ isWatched: true });
+		});
+
+		it('answers your own stories as a watched ring, each with its viewers count and no isWatched', async () => {
+			givenStories([story(STORY_ID, ME, minutesAgo(30)), story(STORY_ID_2, ME, minutesAgo(5))]);
+			givenViews([], [[STORY_ID, 4]]);
+
+			const result = await getUserStory({ userId: ME, viewerId: ME });
+
+			expect(result.story).toEqual({ isWatched: true });
+			expect(result.stories.map((entry) => entry.viewersCount)).toEqual([4, 0]);
+			result.stories.forEach((entry) => expect(entry).not.toHaveProperty('isWatched'));
+			result.stories.forEach((entry) => expect(entry).not.toHaveProperty('imageIdentifier'));
+		});
+
+		it('does not load your own views as watched history', async () => {
+			givenStories([story(STORY_ID, ME, minutesAgo(5))]);
+			givenViews([]);
+
+			await getUserStory({ userId: ME, viewerId: ME });
+
 			expect(StoryViewModel.find).not.toHaveBeenCalled();
 		});
 
-		it('counts the views of your own stories grouped per story', async () => {
-			givenAuthor({ ...author, _id: ME });
-			givenStories([storyDoc(STORY_ID, ME, minutesAgo(60))]);
-			StoryViewModel.aggregate = jest.fn().mockResolvedValue([]);
+		it('leaves the hidden visitors out of your viewers count', async () => {
+			getHiddenVisitorIds.mockResolvedValue([AUTHOR_B]);
+			givenStories([story(STORY_ID, ME, minutesAgo(5))]);
+			givenViews([], [[STORY_ID, 1]]);
 
-			await getUserStories({ authorId: ME, requesterId: ME });
+			await getUserStory({ userId: ME, viewerId: ME });
 
 			expect(StoryViewModel.aggregate).toHaveBeenCalledWith([
-				{ $match: { storyId: { $in: [STORY_ID] } } },
+				{ $match: { storyId: { $in: [STORY_ID] }, viewerId: { $nin: [AUTHOR_B] } } },
 				{ $group: { _id: '$storyId', count: { $sum: 1 } } },
 			]);
 		});
 
-		it('answers 500 when the database fails', async () => {
-			UserModel.findById = jest.fn().mockImplementation(() => {
-				throw new Error('db down');
+		it('wraps a database failure in a 500 AppError that keeps the cause', async () => {
+			const failure = new Error('connection lost');
+
+			StoryModel.find = jest.fn().mockImplementation(() => {
+				throw failure;
 			});
 
-			await expect(getUserStories({ authorId: AUTHOR_A, requesterId: ME })).rejects.toMatchObject({ statusCode: 500 });
+			await expect(getUserStory({ userId: AUTHOR_A, viewerId: ME })).rejects.toMatchObject({ statusCode: 500, cause: failure });
 		});
 	});
 

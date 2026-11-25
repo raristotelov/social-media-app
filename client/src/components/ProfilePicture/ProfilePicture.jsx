@@ -1,9 +1,19 @@
+import { STORY_RING_STATES } from '../../constants/stories';
+
 import './ProfilePicture.css';
 
-const ProfilePicture = (props) => {
-	const { imageUrl, className } = props;
+const getRingClassNames = (ringState) => {
+	if (!ringState) {
+		return [];
+	}
 
-	const classNames = ['profile-picture', className].filter(Boolean).join(' ');
+	return ringState === STORY_RING_STATES.UNWATCHED ? ['story-ring', 'story-ring-unwatched'] : ['story-ring'];
+};
+
+const ProfilePicture = (props) => {
+	const { imageUrl, className, ringState } = props;
+
+	const classNames = ['profile-picture', ...getRingClassNames(ringState), className].filter(Boolean).join(' ');
 
 	if (imageUrl) {
 		return <img className={classNames} src={imageUrl} alt='' />;

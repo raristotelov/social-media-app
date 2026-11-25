@@ -2,6 +2,8 @@ export const STORY_DURATION_MS = 5000;
 
 export const STORY_HOLD_THRESHOLD_MS = 200;
 
+export const TRAY_PRELOAD_USER_COUNT = 3;
+
 export const STORY_ASPECT_RATIO = 9 / 16;
 
 export const STORY_ASPECT_RATIO_TOLERANCE = 0.02;
@@ -27,8 +29,12 @@ export const STORY_VIEWER_OVERLAYS = Object.freeze({
 
 export const STORY_START_TARGETS = Object.freeze({
 	FIRST_UNWATCHED: 'first-unwatched',
-	FIRST: 'first',
 	LAST: 'last',
+});
+
+export const STORY_RING_STATES = Object.freeze({
+	UNWATCHED: 'unwatched',
+	WATCHED: 'watched',
 });
 
 export const OWN_STORY_LABEL = 'Your story';

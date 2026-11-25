@@ -238,6 +238,52 @@ describe('MainHeader', () => {
 		});
 	});
 
+	describe('the account menu trigger', () => {
+		const getTrigger = () => screen.getByRole('button', { name: /johndoe/ });
+
+		beforeEach(() => {
+			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] });
+		});
+
+		it('opens the menu when it is clicked while the menu is closed', async () => {
+			await user.click(getTrigger());
+
+			expect(getTrigger()).toHaveAttribute('aria-expanded', 'true');
+			expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
+		});
+
+		it('closes the menu when it is clicked while the menu is open', async () => {
+			await user.click(getTrigger());
+			await user.click(getTrigger());
+
+			expect(getTrigger()).toHaveAttribute('aria-expanded', 'false');
+			expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
+		});
+
+		it('reopens the menu when it is clicked again after closing it', async () => {
+			await user.click(getTrigger());
+			await user.click(getTrigger());
+			await user.click(getTrigger());
+
+			expect(getTrigger()).toHaveAttribute('aria-expanded', 'true');
+			expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
+		});
+
+		it('closes the menu when the username inside it is clicked while the menu is open', async () => {
+			await user.click(getTrigger());
+			await user.click(screen.getByText('johndoe'));
+
+			expect(getTrigger()).toHaveAttribute('aria-expanded', 'false');
+		});
+
+		it('still closes the menu when something outside the trigger and the menu is pressed', async () => {
+			await user.click(getTrigger());
+			await user.click(screen.getByPlaceholderText('Search'));
+
+			expect(getTrigger()).toHaveAttribute('aria-expanded', 'false');
+		});
+	});
+
 	describe('navigation icons', () => {
 		it('draws the Feed and Popular icons in currentColor so they follow the theme', () => {
 			renderMainHeader({ _id: 'user1', username: 'johndoe', following: [] });

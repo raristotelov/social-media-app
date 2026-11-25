@@ -4,7 +4,7 @@ import {
 	loginViaApi,
 	userIdFromSession,
 	uploadStoryViaApi,
-	getUserStoriesViaApi,
+	getTrayStoriesViaApi,
 	recordStoryViewViaApi,
 	publicIdFromImageUrl,
 } from '../../support/api';
@@ -75,8 +75,6 @@ describe('story teardown', () => {
 			expect(removed.stories).to.equal(0);
 		});
 
-		cy.then(() => getUserStoriesViaApi(authorSession, userIdFromSession(authorSession)))
-			.its('stories')
-			.should('have.length', 1);
+		cy.then(() => getTrayStoriesViaApi(authorSession, userIdFromSession(authorSession))).should('have.length', 1);
 	});
 });

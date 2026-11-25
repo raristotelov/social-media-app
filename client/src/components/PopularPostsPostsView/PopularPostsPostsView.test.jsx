@@ -484,7 +484,7 @@ describe('PopularPostsPostsView', () => {
 			expect(getTileStatTexts(0)[1]).toBe('1');
 		});
 
-		it('shows the toast for a failed like and keeps the post', async () => {
+		it('keeps the like and the post and shows no toast when the like fails', async () => {
 			likeUserPost.mockRejectedValue({ code: 'POST_NOT_FOUND', status: 404 });
 
 			renderPosts();
@@ -492,8 +492,11 @@ describe('PopularPostsPostsView', () => {
 			const articles = await screen.findAllByRole('article');
 
 			await user.click(within(articles[1]).getByRole('button', { name: 'Like post' }));
+			await waitFor(() => expect(likeUserPost).toHaveBeenCalledTimes(1));
 
-			expect(await screen.findByText('This post no longer exists')).toBeInTheDocument();
+			expect(within(articles[1]).getByRole('button', { name: 'Unlike post' })).toHaveAttribute('aria-pressed', 'true');
+			expect(within(articles[1]).getByText('1 like')).toBeInTheDocument();
+			expect(screen.queryByText('This post no longer exists')).not.toBeInTheDocument();
 			expect(getRenderedPostIds()).toEqual(['p1', 'p2', 'p3']);
 		});
 	});

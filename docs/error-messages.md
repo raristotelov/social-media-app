@@ -67,10 +67,8 @@ Shown for `INTERNAL_ERROR`, unknown codes and network failures.
 | Edit caption | Form message | Couldn't save the caption. Try again. |
 | Upload picture | Form message | Couldn't upload the picture. Try again. |
 | Delete post | Toast | Couldn't delete the post. Try again. |
-| Like / unlike a post or a comment (#11) | Toast | Couldn't update your like. Try again. |
 | Add comment (#11) | Form message | Couldn't post your comment. Try again. |
 | Reply (#11) | Form message | Couldn't post your reply. Try again. |
-| Open a user's stories (#13) | Toast | Couldn't load stories. Try again. |
 | Delete story (#13) | Toast | Couldn't delete your story. Try again. |
 | Follow — profile button and suggestions (#14) | Toast | Couldn't follow this user. Try again. |
 | Unfollow — profile button and empty-feed suggestions (#14) | Toast | Couldn't unfollow this user. Try again. |

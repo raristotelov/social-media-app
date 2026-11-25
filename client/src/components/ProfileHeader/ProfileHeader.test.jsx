@@ -214,4 +214,100 @@ describe('ProfileHeader', () => {
 		expect(container.querySelector('img')).not.toBeInTheDocument();
 		expect(container.querySelector('svg')).toBeInTheDocument();
 	});
+
+	describe('story ring', () => {
+		const withPicture = { profilePicture: { imageUrl: 'https://example.com/john.jpg' } };
+
+		it('rings the picture red and makes it a button when the user has an unwatched story', () => {
+			const { container } = renderProfileHeader({ userData: buildUserData(withPicture), story: { isWatched: false }, onStoryClick: vi.fn() });
+
+			expect(screen.getByRole('button', { name: "View johndoe's story" })).toContainElement(container.querySelector('img'));
+			expect(container.querySelector('img')).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+
+		it('rings the picture grey when the story is watched', () => {
+			const { container } = renderProfileHeader({ userData: buildUserData(withPicture), story: { isWatched: true }, onStoryClick: vi.fn() });
+
+			expect(container.querySelector('img')).toHaveClass('story-ring');
+			expect(container.querySelector('img')).not.toHaveClass('story-ring-unwatched');
+			expect(screen.getByRole('button', { name: "View johndoe's story" })).toBeInTheDocument();
+		});
+
+		it('rings the placeholder picture too', () => {
+			const { container } = renderProfileHeader({ story: { isWatched: false }, onStoryClick: vi.fn() });
+
+			expect(container.querySelector('svg.profile-picture')).toHaveClass('story-ring', 'story-ring-unwatched');
+			expect(screen.getByRole('button', { name: "View johndoe's story" })).toBeInTheDocument();
+		});
+
+		it('names the button "View your story" on your own profile', () => {
+			renderProfileHeader({ isLoggedInUserProfile: true, story: { isWatched: true }, onStoryClick: vi.fn() });
+
+			expect(screen.getByRole('button', { name: 'View your story' })).toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: "View johndoe's story" })).not.toBeInTheDocument();
+		});
+
+		it('calls onStoryClick once when the ringed picture is clicked', async () => {
+			const user = userEvent.setup();
+			const onStoryClick = vi.fn();
+
+			renderProfileHeader({ story: { isWatched: false }, onStoryClick });
+
+			await user.click(screen.getByRole('button', { name: "View johndoe's story" }));
+
+			expect(onStoryClick).toHaveBeenCalledTimes(1);
+		});
+
+		it('can be pressed with the keyboard', async () => {
+			const user = userEvent.setup();
+			const onStoryClick = vi.fn();
+
+			renderProfileHeader({ story: { isWatched: false }, onStoryClick });
+
+			screen.getByRole('button', { name: "View johndoe's story" }).focus();
+			await user.keyboard('{Enter}');
+
+			expect(onStoryClick).toHaveBeenCalledTimes(1);
+		});
+
+		it.each([[null], [undefined]])('has no ring and no story button when the story is %p', (story) => {
+			const { container } = renderProfileHeader({ userData: buildUserData(withPicture), story, onStoryClick: vi.fn() });
+
+			expect(container.querySelector('img')).not.toHaveClass('story-ring');
+			expect(screen.queryByRole('button', { name: /story/i })).not.toBeInTheDocument();
+		});
+
+		it('keeps the picture inert, not a button, when there is no ring', async () => {
+			const user = userEvent.setup();
+			const onStoryClick = vi.fn();
+			const { container } = renderProfileHeader({ userData: buildUserData(withPicture), story: null, onStoryClick });
+
+			await user.click(container.querySelector('img'));
+
+			expect(container.querySelector('.profile-picture-wrapper button')).not.toBeInTheDocument();
+			expect(onStoryClick).not.toHaveBeenCalled();
+		});
+
+		it('does not call onStoryClick when other buttons of the header are clicked', async () => {
+			const user = userEvent.setup();
+			const onStoryClick = vi.fn();
+
+			renderProfileHeader({ story: { isWatched: false }, onStoryClick, onFollowersClick: vi.fn() });
+
+			await user.click(screen.getByRole('button', { name: 'Follow' }));
+			await user.click(screen.getByRole('button', { name: /^1\s*follower$/ }));
+
+			expect(onStoryClick).not.toHaveBeenCalled();
+		});
+
+		it('does not throw when the ringed picture is clicked and no handler is given', async () => {
+			const user = userEvent.setup();
+
+			renderProfileHeader({ story: { isWatched: false } });
+
+			await user.click(screen.getByRole('button', { name: "View johndoe's story" }));
+
+			expect(screen.getByRole('button', { name: "View johndoe's story" })).toBeInTheDocument();
+		});
+	});
 });

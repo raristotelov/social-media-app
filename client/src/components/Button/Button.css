@@ -11,11 +11,13 @@
 	border-radius: 20px;
 }
 
-.button-classname:hover {
-	color: var(--brand-red);
-	background-color: var(--background-surface);
-	border: 1px solid var(--brand-red);
-	cursor: pointer;
+@media (hover: hover) {
+	.button-classname:hover {
+		color: var(--brand-red);
+		background-color: var(--background-surface);
+		border: 1px solid var(--brand-red);
+		cursor: pointer;
+	}
 }
 
 .button-classname:disabled {
@@ -33,10 +35,12 @@
 	border: 1px solid var(--brand-red);
 }
 
-.button-secondary:hover {
-	color: var(--static-white);
-	background-color: var(--brand-red);
-	border: 1px solid var(--brand-red);
+@media (hover: hover) {
+	.button-secondary:hover {
+		color: var(--static-white);
+		background-color: var(--brand-red);
+		border: 1px solid var(--brand-red);
+	}
 }
 
 .button-secondary:disabled {

@@ -58,6 +58,69 @@ describe('SearchResults', () => {
 		});
 	});
 
+	describe('story ring', () => {
+		it('rings the avatar red when the user has a story that is not fully watched', () => {
+			const { container } = renderSearchResults({
+				results: [buildUser({ profilePicture: { imageUrl: 'https://example.com/jane.jpg' }, story: { isWatched: false } })],
+			});
+
+			expect(container.querySelector('img.search-result-avatar')).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+
+		it('rings the avatar grey when the user has a story that is fully watched', () => {
+			const { container } = renderSearchResults({
+				results: [buildUser({ profilePicture: { imageUrl: 'https://example.com/jane.jpg' }, story: { isWatched: true } })],
+			});
+
+			const avatar = container.querySelector('img.search-result-avatar');
+
+			expect(avatar).toHaveClass('story-ring');
+			expect(avatar).not.toHaveClass('story-ring-unwatched');
+		});
+
+		it('rings the placeholder avatar too', () => {
+			const { container } = renderSearchResults({ results: [buildUser({ story: { isWatched: false } })] });
+
+			expect(container.querySelector('svg.search-result-avatar')).toHaveClass('story-ring', 'story-ring-unwatched');
+		});
+
+		it.each([[null], [undefined]])('draws no ring when the story is %p', (story) => {
+			const { container } = renderSearchResults({ results: [buildUser({ story })] });
+
+			expect(container.querySelector('.search-result-avatar')).not.toHaveClass('story-ring');
+		});
+
+		it('rings only the rows that have a story', () => {
+			const { container } = renderSearchResults({
+				results: [buildUser({ _id: 'user1', story: { isWatched: false } }), buildUser({ _id: 'user2', username: 'johndoe', story: null })],
+			});
+
+			const avatars = container.querySelectorAll('.search-result-avatar');
+
+			expect(avatars[0]).toHaveClass('story-ring');
+			expect(avatars[1]).not.toHaveClass('story-ring');
+		});
+
+		it('is an indicator only: the row stays one link to the profile and adds no button', () => {
+			renderSearchResults({ results: [buildUser({ _id: 'user7', story: { isWatched: false } })] });
+
+			expect(screen.getAllByRole('link')).toHaveLength(1);
+			expect(screen.getByRole('link', { name: /janedoe/ })).toHaveAttribute('href', '/user/user7');
+			expect(screen.queryByRole('button')).not.toBeInTheDocument();
+		});
+
+		it('still calls onResultClick when a ringed row is clicked', async () => {
+			const user = userEvent.setup();
+			const onResultClick = vi.fn();
+
+			renderSearchResults({ results: [buildUser({ story: { isWatched: false } })], onResultClick });
+
+			await user.click(screen.getByRole('link', { name: /janedoe/ }));
+
+			expect(onResultClick).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	describe('rows', () => {
 		it('shows the username and links the row to that profile', () => {
 			renderSearchResults({ results: [buildUser({ _id: 'user7', username: 'janedoe' })] });

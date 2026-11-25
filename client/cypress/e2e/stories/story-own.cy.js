@@ -6,7 +6,7 @@ import {
 	userIdFromSession,
 	followUserViaApi,
 	uploadStoryViaApi,
-	getUserStoriesViaApi,
+	getTrayStoriesViaApi,
 	recordStoryViewViaApi,
 	getStoryViewersViaApi,
 	deleteStoryViaApi,
@@ -164,9 +164,7 @@ describe('your own stories: Seen by', () => {
 				expect(response.body.code).to.equal('STORY_FORBIDDEN');
 			});
 
-			cy.then(() => getUserStoriesViaApi(ownerSession, ownerId))
-				.its('stories')
-				.should('have.length', 2);
+			cy.then(() => getTrayStoriesViaApi(ownerSession, ownerId)).should('have.length', 2);
 		});
 
 		it('answers 404 STORY_NOT_FOUND for a story that does not exist or has a malformed id', () => {
@@ -183,7 +181,9 @@ describe('your own stories: Seen by', () => {
 		});
 
 		it("shows another user's stories oldest first with a watched flag and no viewers count", () => {
-			cy.then(() => getUserStoriesViaApi(viewerSession, ownerId)).then(({ stories: listed }) => {
+			cy.then(() => followUserViaApi(viewerSession, ownerId));
+
+			cy.then(() => getTrayStoriesViaApi(viewerSession, ownerId)).then((listed) => {
 				expect(listed.map((story) => story._id)).to.deep.equal(stories.map((story) => story._id));
 				expect(listed.map((story) => story.isWatched)).to.deep.equal([true, false]);
 				listed.forEach((story) => expect(story).not.to.have.property('viewersCount'));
@@ -191,7 +191,7 @@ describe('your own stories: Seen by', () => {
 		});
 
 		it('shows your own stories with a viewers count and no watched flag', () => {
-			cy.then(() => getUserStoriesViaApi(ownerSession, ownerId)).then(({ stories: listed }) => {
+			cy.then(() => getTrayStoriesViaApi(ownerSession, ownerId)).then((listed) => {
 				expect(listed.map((story) => story.viewersCount)).to.deep.equal([1, 0]);
 				listed.forEach((story) => expect(story).not.to.have.property('isWatched'));
 			});
@@ -275,16 +275,14 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		confirmPopup().should('not.exist');
 		cy.get('.story-viewer').should('not.have.class', 'story-viewer-paused');
 		cy.get('@deleteRequest.all').should('have.length', 0);
-		cy.then(() => getUserStoriesViaApi(ownerSession, ownerId))
-			.its('stories')
-			.should('have.length', 2);
+		cy.then(() => getTrayStoriesViaApi(ownerSession, ownerId)).should('have.length', 2);
 	});
 
 	it('deletes the story with its Cloudinary image and view records, and carries on with the next story', () => {
 		let deletedPublicId;
 		let keptPublicId;
 
-		cy.then(() => getUserStoriesViaApi(ownerSession, ownerId)).then(({ stories: listed }) => {
+		cy.then(() => getTrayStoriesViaApi(ownerSession, ownerId)).then((listed) => {
 			deletedPublicId = publicIdFromImageUrl(listed[0].imageUrl);
 			keptPublicId = publicIdFromImageUrl(listed[1].imageUrl);
 		});
@@ -303,7 +301,7 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		cy.get('.story-viewer').should('be.visible');
 		cy.get('.story-viewer-segment').should('have.length', 1);
 
-		cy.then(() => getUserStoriesViaApi(ownerSession, ownerId)).then(({ stories: listed }) => {
+		cy.then(() => getTrayStoriesViaApi(ownerSession, ownerId)).then((listed) => {
 			expect(listed.map((story) => story._id)).to.deep.equal([stories[1]._id]);
 		});
 		cy.then(() => cy.task('cloudinaryAssetExists', deletedPublicId)).should('eq', false);
@@ -345,9 +343,7 @@ describe('your own stories: delete, and views recorded in the browser', () => {
 		cy.get('.toast-region').should('contain.text', DELETE_ERROR_TOAST);
 		cy.get('.story-viewer').should('not.have.class', 'story-viewer-paused');
 		cy.get('.story-viewer-segment').should('have.length', 2);
-		cy.then(() => getUserStoriesViaApi(ownerSession, ownerId))
-			.its('stories')
-			.should('have.length', 2);
+		cy.then(() => getTrayStoriesViaApi(ownerSession, ownerId)).should('have.length', 2);
 	});
 
 	it('ends the session and goes to /log-in when the token is no longer valid', () => {

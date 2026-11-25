@@ -18,6 +18,7 @@
 	--feedback-error-inverse: #ff6b6b;
 	--feedback-success-inverse: #66bb6a;
 	--overlay-button-hover: rgba(0, 0, 0, 0.4);
+	--overlay-button-hover-strong: rgba(0, 0, 0, 0.6);
 	--overlay-story-dim: rgba(0, 0, 0, 0.72);
 	--overlay-story-scrim: rgba(0, 0, 0, 0.55);
 	--overlay-story-segment-track: rgba(255, 255, 255, 0.35);
@@ -46,6 +47,7 @@
 	--feedback-error-inverse: #c62828;
 	--feedback-success-inverse: #2e7d32;
 	--overlay-button-hover: rgba(0, 0, 0, 0.4);
+	--overlay-button-hover-strong: rgba(0, 0, 0, 0.6);
 	--overlay-story-dim: rgba(0, 0, 0, 0.72);
 	--overlay-story-scrim: rgba(0, 0, 0, 0.55);
 	--overlay-story-segment-track: rgba(255, 255, 255, 0.35);

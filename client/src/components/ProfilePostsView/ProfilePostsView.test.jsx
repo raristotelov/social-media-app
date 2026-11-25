@@ -17,6 +17,10 @@ import ProfilePostsView from './ProfilePostsView';
 vi.mock('../../services/userService');
 vi.mock('../../services/userPostService');
 vi.mock('../../services/commentService');
+vi.mock('../../services/storyService', async () => ({
+	...(await vi.importActual('../../services/storyService')),
+	getUserStory: vi.fn(async () => ({ story: null, stories: [] })),
+}));
 
 const LocationProbe = () => {
 	const location = useLocation();

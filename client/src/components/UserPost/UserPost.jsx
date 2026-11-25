@@ -2,15 +2,13 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import LoggedInUserContext from '../../contexts/LoggedInUserContext';
-import ToastContext from '../../contexts/ToastContext';
 import useLoginRedirect from '../../hooks/useLoginRedirect';
 import usePostActionsMenu from '../../hooks/usePostActionsMenu';
 import { likeUserPost, unlikeUserPost } from '../../services/userPostService';
 import { addComment } from '../../services/commentService';
-import { ACTION_FALLBACK_MESSAGES } from '../../constants/errorMessages';
 import { USER_LIST_TYPES } from '../../constants/userLists';
 import { countCommentsAndReplies, getPreviewComments } from '../../utils/comments';
-import { getErrorMessage, isUnauthenticatedError } from '../../utils/errors';
+import { isUnauthenticatedError } from '../../utils/errors';
 import { getPostImageAspectRatio } from '../../utils/images';
 
 import AddCommentForm from '../AddCommentForm/AddCommentForm';
@@ -35,7 +33,6 @@ const UserPost = ({ userPostData, author, showActions = false, commentsOpenReque
 	const heartPulseTimeoutRef = useRef(null);
 
 	const { loggedInUser, endSession } = useContext(LoggedInUserContext);
-	const { showToast } = useContext(ToastContext);
 	const redirectToLogin = useLoginRedirect();
 	const { isMenuOpen, menuContainerRef, toggleMenu, closeMenu } = usePostActionsMenu();
 
@@ -62,6 +59,8 @@ const UserPost = ({ userPostData, author, showActions = false, commentsOpenReque
 	const triggerHeartPulse = () => {
 		setIsHeartPulsing(true);
 
+		clearTimeout(heartPulseTimeoutRef.current);
+
 		heartPulseTimeoutRef.current = setTimeout(() => setIsHeartPulsing(false), HEART_PULSE_DURATION_MS);
 	};
 
@@ -78,21 +77,23 @@ const UserPost = ({ userPostData, author, showActions = false, commentsOpenReque
 
 		isUpdatingLikeRef.current = true;
 
+		const otherLikes = likes.filter((likeUserId) => likeUserId !== loggedInUser._id);
+
+		onPostChange(userPostId, { likes: hasLikedUserPost ? otherLikes : [...otherLikes, loggedInUser._id] });
+
+		if (!hasLikedUserPost) {
+			triggerHeartPulse();
+		}
+
 		try {
 			const updatedUserPost = hasLikedUserPost
 				? await unlikeUserPost({ userPostToUnlikeId: userPostId })
 				: await likeUserPost({ userPostToLikeId: userPostId });
 
 			onPostChange(userPostId, { likes: updatedUserPost.likes });
-
-			if (!hasLikedUserPost) {
-				triggerHeartPulse();
-			}
 		} catch (error) {
 			if (isUnauthenticatedError(error)) {
 				endSession();
-			} else {
-				showToast(getErrorMessage(error, ACTION_FALLBACK_MESSAGES.UPDATE_LIKE));
 			}
 		} finally {
 			isUpdatingLikeRef.current = false;

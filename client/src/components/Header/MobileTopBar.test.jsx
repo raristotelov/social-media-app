@@ -235,6 +235,33 @@ describe('MobileTopBar', () => {
 			expect(sheet).toBeInTheDocument();
 		});
 
+		it('closes when the Account menu button is clicked while the sheet is open', async () => {
+			const { sheet } = await openMenu();
+
+			await user.click(screen.getByRole('button', { name: 'Account menu' }));
+
+			expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute('aria-expanded', 'false');
+			expect(sheet).not.toBeInTheDocument();
+		});
+
+		it('opens again when the Account menu button is clicked a second time after closing', async () => {
+			await openMenu();
+
+			await user.click(screen.getByRole('button', { name: 'Account menu' }));
+			await user.click(screen.getByRole('button', { name: 'Account menu' }));
+
+			expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute('aria-expanded', 'true');
+			expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
+		});
+
+		it('still closes when something outside the button and the sheet is pressed', async () => {
+			await openMenu();
+
+			await user.click(document.body);
+
+			expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute('aria-expanded', 'false');
+		});
+
 		it('can be opened again after being swiped closed', async () => {
 			const { sheet, handle } = await openMenu();
 

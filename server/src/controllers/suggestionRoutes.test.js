@@ -25,7 +25,6 @@ const JWT_SECRET = 'suggestion-routes-test-secret';
 
 const SUGGESTIONS_RESULT = {
 	suggestions: [{ _id: '64b7f0a1c2d3e4f5a6b7c8d2', username: 'alice', group: 'popular' }],
-	reserve: [],
 	isCarouselDismissed: false,
 };
 

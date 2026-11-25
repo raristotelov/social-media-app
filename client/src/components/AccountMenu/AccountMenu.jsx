@@ -11,7 +11,16 @@ import BottomSheetHandle from '../BottomSheetHandle/BottomSheetHandle';
 
 import './AccountMenu.css';
 
-const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, onNotificationsClick, className = '', isBottomSheet = false }) => {
+const AccountMenu = ({
+	isOpen,
+	onClose,
+	triggerRef,
+	logoutHandler,
+	onChangePasswordClick,
+	onNotificationsClick,
+	className = '',
+	isBottomSheet = false,
+}) => {
 	const { loggedInUser, updateLoggedInUser } = useContext(LoggedInUserContext);
 	const { unreadCount } = useContext(NotificationsContext);
 	const menuRef = useRef(null);
@@ -23,6 +32,10 @@ const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, on
 		}
 
 		const closeOnOutsideClick = (event) => {
+			if (triggerRef?.current?.contains(event.target)) {
+				return;
+			}
+
 			if (menuRef.current && !menuRef.current.contains(event.target)) {
 				onClose();
 			}
@@ -41,7 +54,7 @@ const AccountMenu = ({ isOpen, onClose, logoutHandler, onChangePasswordClick, on
 			document.removeEventListener('mousedown', closeOnOutsideClick);
 			document.removeEventListener('keydown', closeOnEscape);
 		};
-	}, [isOpen, onClose]);
+	}, [isOpen, onClose, triggerRef]);
 
 	if (!isOpen) {
 		return null;

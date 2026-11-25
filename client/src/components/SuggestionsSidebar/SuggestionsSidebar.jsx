@@ -6,7 +6,7 @@ import SuggestedUser from '../SuggestedUser/SuggestedUser';
 import './SuggestionsSidebar.css';
 
 const SuggestionsSidebar = () => {
-	const { suggestions, isLoaded, followSuggestion } = useSuggestions(SUGGESTION_PLACEMENTS.SIDEBAR);
+	const { suggestions, followedIds, isLoaded, followSuggestion, unfollowSuggestion } = useSuggestions(SUGGESTION_PLACEMENTS.SIDEBAR);
 
 	if (!isLoaded || !suggestions.length) {
 		return null;
@@ -21,7 +21,9 @@ const SuggestionsSidebar = () => {
 					key={suggestion._id}
 					suggestion={suggestion}
 					actionStyle={SUGGESTED_USER_ACTION_STYLES.LINK}
+					isFollowed={followedIds.includes(suggestion._id)}
 					onFollowClick={followSuggestion}
+					onUnfollowClick={unfollowSuggestion}
 				/>
 			))}
 		</aside>
